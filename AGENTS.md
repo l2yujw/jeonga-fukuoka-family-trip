@@ -25,4 +25,4 @@ Private mobile web for the Jeonga family Fukuoka trip.
 10. Stop at the requested phase; do not continue autonomously.
 
 ## Current phase
-Phase 2 — boarding experience
+Phase 2.1 — trip date and landing hero polish

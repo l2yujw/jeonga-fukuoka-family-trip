@@ -8,8 +8,8 @@ values (
   'jeonga-fukuoka-2026',
   '전가네 후쿠오카 가족여행',
   '후쿠오카 · 가라츠 · 유후인 · 벳부 · 아소',
-  '2026-10-09',
-  '2026-10-11',
+  '2026-09-11',
+  '2026-09-13',
   'REPLACE_WITH_REAL_HASH'
 )
 on conflict (slug) do nothing;

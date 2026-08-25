@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button, Card, MobileShell } from "@/components/ui";
 import { demoBoardingAdapter } from "./demo-adapter";
@@ -47,14 +48,29 @@ export function LandingEntry() {
             전가네 가족여행 출발
           </h1>
           <p className="mt-4 inline-flex min-h-9 items-center rounded-pill border border-line bg-surface/75 px-4 text-sm font-medium text-text-secondary shadow-card">
-            2026.10.09 – 10.11
+            2026.09.11 – 09.13
           </p>
           <p className="font-editorial mt-6 text-lg text-text-secondary">
             우리 가족의 후쿠오카행이 곧 출발합니다.
           </p>
         </header>
 
-        <Card className="relative mt-auto overflow-hidden p-5 sm:p-6" variant="elevated">
+        <figure className="mx-auto mt-4 grid min-h-36 w-full max-w-sm grid-cols-[minmax(0,1fr)_10rem] items-center min-[390px]:grid-cols-[minmax(0,1fr)_11rem]">
+          <figcaption className="font-editorial z-10 -mr-2 -rotate-2 break-keep rounded-md border border-line bg-surface/90 px-3 py-2 text-center text-caption leading-relaxed text-accent-primary shadow-card">
+            꽃길만 걷는다고 전해라~♪
+          </figcaption>
+          <Image
+            src="/assets/grandfather-cutout.png"
+            alt="가족여행 주인공"
+            width={420}
+            height={347}
+            sizes="(min-width: 390px) 176px, 160px"
+            priority
+            className="h-auto w-40 justify-self-end object-contain min-[390px]:w-44"
+          />
+        </figure>
+
+        <Card className="relative mt-2 overflow-hidden p-5 sm:p-6" variant="elevated">
           <div aria-hidden="true" className="absolute top-0 left-0 h-1 w-full bg-[repeating-linear-gradient(90deg,var(--app-color-accent-primary)_0_12px,transparent_12px_20px)] opacity-65" />
           <form onSubmit={handleSubmit} noValidate={false}>
             <label htmlFor="member-name" className="block text-sm font-semibold">
