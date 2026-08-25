@@ -145,9 +145,10 @@ export function MobileShell({ className = "", ...props }: HTMLAttributes<HTMLDiv
 
 export type BottomNavItem = {
   label: string;
-  href: string;
+  href?: string;
   icon: ReactNode;
   active?: boolean;
+  disabled?: boolean;
 };
 
 type BottomNavProps = HTMLAttributes<HTMLElement> & {
@@ -162,20 +163,35 @@ export function BottomNav({ className = "", items, ...props }: BottomNavProps) {
       {...props}
     >
       <ul className="grid grid-flow-col auto-cols-fr">
-        {items.map(({ active, href, icon, label }) => (
-          <li key={`${href}-${label}`}>
-            <a
-              href={href}
-              aria-current={active ? "page" : undefined}
-              className={`tap-target flex flex-col items-center justify-center gap-1 rounded-md px-2 py-1 text-caption font-semibold transition-colors ${active ? "text-accent-primary" : "text-text-secondary hover:text-text-primary"}`}
-            >
+        {items.map(({ active, disabled, href, icon, label }) => {
+          const content = (
+            <>
               <span aria-hidden="true" className="text-lg leading-none">
                 {icon}
               </span>
               {label}
-            </a>
-          </li>
-        ))}
+            </>
+          );
+          const classes = `tap-target flex w-full flex-col items-center justify-center gap-1 rounded-md px-2 py-1 text-caption font-semibold transition-colors ${active ? "text-accent-primary" : "text-text-secondary hover:text-text-primary"}`;
+
+          return (
+            <li key={`${href ?? "disabled"}-${label}`}>
+              {href && !disabled ? (
+                <a
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={classes}
+                >
+                  {content}
+                </a>
+              ) : (
+                <button type="button" disabled aria-label={`${label}, 준비 중`} className={classes}>
+                  {content}
+                </button>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );
