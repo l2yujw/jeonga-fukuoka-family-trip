@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "canvas": {
+    "width": 1080,
+    "height": 1920
+  },
+  "templateKey": "polaroid_moodboard",
+  "backgroundKey": "warm_ivory",
+  "items": [
+    {
+      "type": "photo",
+      "id": "item-1",
+      "photoId": "uuid",
+      "x": 72,
+      "y": 180,
+      "width": 520,
+      "height": 620,
+      "rotation": -3,
+      "frame": "polaroid",
+      "caption": "유후인에서",
+      "z": 1
+    }
+  ]
+}

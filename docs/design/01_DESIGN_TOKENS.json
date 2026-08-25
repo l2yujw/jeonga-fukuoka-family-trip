@@ -1,0 +1,39 @@
+{
+  "color": {
+    "background": "#F6F1E8",
+    "surface": "#FFFDF8",
+    "textPrimary": "#3A3028",
+    "textSecondary": "#7B6F64",
+    "accentPrimary": "#A65F48",
+    "accentSecondary": "#69765C",
+    "line": "#E6DDD2",
+    "online": "#5E8A63",
+    "danger": "#B14E45"
+  },
+  "radius": {
+    "sm": 12,
+    "md": 16,
+    "lg": 20,
+    "xl": 28,
+    "pill": 999
+  },
+  "space": {
+    "1": 4,
+    "2": 8,
+    "3": 12,
+    "4": 16,
+    "5": 20,
+    "6": 24,
+    "8": 32,
+    "10": 40
+  },
+  "fontSize": {
+    "caption": 13,
+    "body": 16,
+    "section": 20,
+    "pageTitle": 26,
+    "hero": 36
+  },
+  "tapTargetMin": 44,
+  "mobileMaxWidth": 520
+}

@@ -1,0 +1,53 @@
+PHASE 0 — REPOSITORY SCAFFOLD
+
+Read AGENTS.md and all files under docs/ first.
+
+Goal:
+Create only the initial Next.js project foundation for this repository.
+
+Implement:
+- Next.js current stable app-router project
+- TypeScript
+- Tailwind CSS
+- src/ based structure
+- ESLint
+- sensible .gitignore
+- .env.example with placeholder variables only
+- directories:
+  src/app
+  src/components
+  src/features
+  src/lib
+  src/types
+- Supabase client package and minimal client/server helper skeletons only
+- preserve docs/, references/, AGENTS.md
+
+Do NOT implement:
+- family name entry
+- boarding
+- schedule UI
+- photo upload
+- memory cards
+- database migrations execution
+- Supabase production configuration
+- Vercel deployment
+- extra UI beyond a minimal placeholder app page
+
+Dependencies:
+Keep minimal. Do not install react-konva yet unless scaffold requires it (it should not).
+
+Validation:
+- npm install succeeds
+- npm run lint succeeds
+- npm run build succeeds
+- dev server can start
+
+Completion report must include:
+1. changed/created files
+2. dependencies added
+3. lint result
+4. build result
+5. architectural assumptions, if any
+6. blockers/risks
+
+Stop after Phase 0.

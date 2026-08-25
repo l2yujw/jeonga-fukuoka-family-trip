@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "canvas": {
+    "width": 1080,
+    "height": 1920
+  },
+  "templates": [
+    {
+      "key": "polaroid_moodboard",
+      "requiredMin": 6,
+      "requiredMax": 8,
+      "slots": [
+        {
+          "id": "p1",
+          "x": 70,
+          "y": 170,
+          "w": 470,
+          "h": 560,
+          "r": -4,
+          "z": 2,
+          "frame": "polaroid"
+        },
+        {
+          "id": "p2",
+          "x": 560,
+          "y": 120,
+          "w": 390,
+          "h": 480,
+          "r": 3,
+          "z": 1,
+          "frame": "polaroid"
+        },
+        {
+          "id": "p3",
+          "x": 130,
+          "y": 760,
+          "w": 360,
+          "h": 430,
+          "r": 2,
+          "z": 3,
+          "frame": "polaroid"
+        },
+        {
+          "id": "p4",
+          "x": 520,
+          "y": 650,
+          "w": 450,
+          "h": 520,
+          "r": -2,
+          "z": 2,
+          "frame": "polaroid"
+        },
+        {
+          "id": "p5",
+          "x": 70,
+          "y": 1240,
+          "w": 420,
+          "h": 480,
+          "r": -3,
+          "z": 1,
+          "frame": "polaroid"
+        },
+        {
+          "id": "p6",
+          "x": 520,
+          "y": 1210,
+          "w": 410,
+          "h": 490,
+          "r": 4,
+          "z": 2,
+          "frame": "polaroid"
+        }
+      ],
+      "textSlots": [
+        {
+          "id": "t1",
+          "x": 120,
+          "y": 1740,
+          "maxWidth": 840,
+          "style": "memory-line"
+        }
+      ]
+    },
+    {
+      "key": "four_cut",
+      "requiredMin": 4,
+      "requiredMax": 4,
+      "slots": [
+        {
+          "id": "f1",
+          "x": 290,
+          "y": 170,
+          "w": 500,
+          "h": 330,
+          "r": 0,
+          "z": 1,
+          "frame": "strip"
+        },
+        {
+          "id": "f2",
+          "x": 290,
+          "y": 520,
+          "w": 500,
+          "h": 330,
+          "r": 0,
+          "z": 1,
+          "frame": "strip"
+        },
+        {
+          "id": "f3",
+          "x": 290,
+          "y": 870,
+          "w": 500,
+          "h": 330,
+          "r": 0,
+          "z": 1,
+          "frame": "strip"
+        },
+        {
+          "id": "f4",
+          "x": 290,
+          "y": 1220,
+          "w": 500,
+          "h": 330,
+          "r": 0,
+          "z": 1,
+          "frame": "strip"
+        }
+      ],
+      "textSlots": [
+        {
+          "id": "t1",
+          "x": 330,
+          "y": 1600,
+          "maxWidth": 420,
+          "style": "four-cut-footer"
+        },
+        {
+          "id": "t2",
+          "x": 330,
+          "y": 1660,
+          "maxWidth": 420,
+          "style": "date-small"
+        }
+      ]
+    },
+    {
+      "key": "editorial_collage",
+      "requiredMin": 4,
+      "requiredMax": 6,
+      "slots": [
+        {
+          "id": "e1",
+          "x": 80,
+          "y": 220,
+          "w": 600,
+          "h": 760,
+          "r": 0,
+          "z": 1,
+          "frame": "plain"
+        },
+        {
+          "id": "e2",
+          "x": 710,
+          "y": 240,
+          "w": 290,
+          "h": 350,
+          "r": 0,
+          "z": 2,
+          "frame": "plain"
+        },
+        {
+          "id": "e3",
+          "x": 700,
+          "y": 630,
+          "w": 300,
+          "h": 350,
+          "r": 0,
+          "z": 2,
+          "frame": "plain"
+        },
+        {
+          "id": "e4",
+          "x": 80,
+          "y": 1040,
+          "w": 430,
+          "h": 500,
+          "r": 0,
+          "z": 1,
+          "frame": "plain"
+        },
+        {
+          "id": "e5",
+          "x": 540,
+          "y": 1040,
+          "w": 460,
+          "h": 500,
+          "r": 0,
+          "z": 1,
+          "frame": "plain"
+        }
+      ],
+      "textSlots": [
+        {
+          "id": "title",
+          "x": 80,
+          "y": 100,
+          "maxWidth": 900,
+          "style": "editorial-title"
+        },
+        {
+          "id": "caption",
+          "x": 80,
+          "y": 1600,
+          "maxWidth": 900,
+          "style": "editorial-caption"
+        }
+      ]
+    }
+  ]
+}
