@@ -1,12 +1,154 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6f1e8;
-  --foreground: #3a3028;
+  --app-color-background: #f6f1e8;
+  --app-color-surface: #fffdf8;
+  --app-color-text-primary: #3a3028;
+  --app-color-text-secondary: #7b6f64;
+  --app-color-accent-primary: #a65f48;
+  --app-color-accent-secondary: #69765c;
+  --app-color-line: #e6ddd2;
+  --app-color-online: #5e8a63;
+  --app-color-danger: #b14e45;
+
+  --app-radius-sm: 12px;
+  --app-radius-md: 16px;
+  --app-radius-lg: 20px;
+  --app-radius-xl: 28px;
+  --app-radius-pill: 999px;
+
+  --app-space-1: 4px;
+  --app-space-2: 8px;
+  --app-space-3: 12px;
+  --app-space-4: 16px;
+  --app-space-5: 20px;
+  --app-space-6: 24px;
+  --app-space-8: 32px;
+  --app-space-10: 40px;
+
+  --app-font-caption: 13px;
+  --app-font-body: 16px;
+  --app-font-section: 20px;
+  --app-font-page-title: 26px;
+  --app-font-hero: 36px;
+
+  --app-tap-target-min: 44px;
+  --app-mobile-max-width: 520px;
+  --app-shadow-card: 0 8px 24px rgb(58 48 40 / 7%);
+  --app-shadow-raised: 0 12px 32px rgb(58 48 40 / 11%);
+}
+
+@theme inline {
+  --color-background: var(--app-color-background);
+  --color-surface: var(--app-color-surface);
+  --color-text-primary: var(--app-color-text-primary);
+  --color-text-secondary: var(--app-color-text-secondary);
+  --color-accent-primary: var(--app-color-accent-primary);
+  --color-accent-secondary: var(--app-color-accent-secondary);
+  --color-line: var(--app-color-line);
+  --color-online: var(--app-color-online);
+  --color-danger: var(--app-color-danger);
+
+  --radius-sm: var(--app-radius-sm);
+  --radius-md: var(--app-radius-md);
+  --radius-lg: var(--app-radius-lg);
+  --radius-xl: var(--app-radius-xl);
+  --radius-pill: var(--app-radius-pill);
+
+  --spacing-1: var(--app-space-1);
+  --spacing-2: var(--app-space-2);
+  --spacing-3: var(--app-space-3);
+  --spacing-4: var(--app-space-4);
+  --spacing-5: var(--app-space-5);
+  --spacing-6: var(--app-space-6);
+  --spacing-8: var(--app-space-8);
+  --spacing-10: var(--app-space-10);
+
+  --text-caption: var(--app-font-caption);
+  --text-body: var(--app-font-body);
+  --text-section: var(--app-font-section);
+  --text-page-title: var(--app-font-page-title);
+  --text-hero: var(--app-font-hero);
+
+  --font-sans: "Pretendard Variable", Pretendard, -apple-system,
+    BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic",
+    sans-serif;
+  --font-editorial: "Iowan Old Style", "Noto Serif KR", "Nanum Myeongjo",
+    Batang, serif;
+  --container-mobile: var(--app-mobile-max-width);
+  --shadow-card: var(--app-shadow-card);
+  --shadow-raised: var(--app-shadow-raised);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--app-color-background);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100svh;
+  margin: 0;
+  background: var(--app-color-background);
+  color: var(--app-color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--app-font-body);
+  line-height: 1.6;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--app-color-accent-primary) 42%, transparent);
+  outline-offset: 3px;
+}
+
+.font-editorial {
+  font-family: var(--font-editorial);
+}
+
+.tap-target {
+  min-width: var(--app-tap-target-min);
+  min-height: var(--app-tap-target-min);
+}
+
+.safe-top {
+  padding-top: max(var(--app-space-5), env(safe-area-inset-top));
+}
+
+.safe-x {
+  padding-right: max(var(--app-space-5), env(safe-area-inset-right));
+  padding-left: max(var(--app-space-5), env(safe-area-inset-left));
+}
+
+.safe-bottom {
+  padding-bottom: max(var(--app-space-2), env(safe-area-inset-bottom));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
