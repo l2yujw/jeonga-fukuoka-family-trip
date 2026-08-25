@@ -18,7 +18,7 @@ export default function HomePage() {
             후쿠오카 가족여행
           </h1>
           <p className="font-editorial mt-2 text-lg text-accent-primary">함께하는 2박 3일</p>
-          <p className="mt-6 text-sm font-semibold text-text-secondary">2026.10.09–11</p>
+          <p className="mt-6 text-sm font-semibold text-text-secondary">2026.09.11–13</p>
           <div className="mt-7 flex items-center gap-3 text-accent-primary" aria-hidden="true">
             <span className="size-2 rounded-pill bg-current" />
             <span className="flex-1 border-t border-dashed border-current/45" />

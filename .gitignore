@@ -20,3 +20,7 @@ pnpm-debug.log*
 # tooling
 .vercel
 *.tsbuildinfo
+
+# Private family photo assets
+/source/grandfather_source.png
+/public/assets/grandfather-cutout.png

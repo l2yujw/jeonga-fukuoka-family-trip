@@ -6,6 +6,10 @@
 ## Day Tabs
 DAY 1 / DAY 2 / DAY 3
 
+- DAY 1: 2026-09-11
+- DAY 2: 2026-09-12
+- DAY 3: 2026-09-13
+
 ## Item
 - optional time
 - location

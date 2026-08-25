@@ -6,7 +6,7 @@
 ## Above the fold
 - Eyebrow: `FUKUOKA FAMILY TRIP`
 - Title: `전가네 가족여행 출발`
-- Date: `2026.10.09 – 10.11`
+- Date: `2026.09.11 – 09.13`
 - Copy: `우리 가족의 후쿠오카행이 곧 출발합니다.`
 - Label: `탑승할 가족의 이름을 입력해주세요`
 - Name input
