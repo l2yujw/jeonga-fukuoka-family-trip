@@ -8,6 +8,7 @@ import { demoBoardingAdapter } from "./demo-adapter";
 
 export function LandingEntry() {
   const router = useRouter();
+  const privateHeroUrl = process.env.NEXT_PUBLIC_PRIVATE_HERO_URL?.trim();
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -55,18 +56,19 @@ export function LandingEntry() {
           </p>
         </header>
 
-        {process.env.NEXT_PUBLIC_ENABLE_PRIVATE_HERO === "true" && (
+        {privateHeroUrl && (
           <figure className="mx-auto mt-4 grid min-h-36 w-full max-w-sm grid-cols-[minmax(0,1fr)_10rem] items-center min-[390px]:grid-cols-[minmax(0,1fr)_11rem]">
             <figcaption className="font-editorial z-10 -mr-2 -rotate-2 break-keep rounded-md border border-line bg-surface/90 px-3 py-2 text-center text-caption leading-relaxed text-accent-primary shadow-card">
               꽃길만 걷는다고 전해라~♪
             </figcaption>
             <Image
-              src="/assets/grandfather-cutout.png"
+              src={privateHeroUrl}
               alt="가족여행 주인공"
               width={420}
               height={347}
               sizes="(min-width: 390px) 176px, 160px"
               priority
+              unoptimized
               className="h-auto w-40 justify-self-end object-contain min-[390px]:w-44"
             />
           </figure>

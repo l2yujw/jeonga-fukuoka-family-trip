@@ -28,8 +28,8 @@ select t.id, v.day_no, v.sequence, v.time_label, v.location_name, v.title, v.des
 from public.trips t
 cross join (
   values
-  (1, 10, null, '인천', '인천 국제공항 출발', 'LJ261 출발시간은 견적서 내 06:05/06:50 충돌. 최종 항공권 확인 필요.', 'flight'),
-  (1, 20, '08:10', '후쿠오카', '후쿠오카 국제공항 도착', '입국 수속 후 전용 차량 탑승', 'flight'),
+  (1, 10, null, '인천', '인천 국제공항 출발', '항공편 및 출발시간 재확인 필요.', 'flight'),
+  (1, 20, null, '후쿠오카', '후쿠오카 국제공항 도착', '도착시간 재확인 후 입국 수속 및 이동', 'flight'),
   (1, 30, null, '가라츠', '가라츠 이동', null, 'move'),
   (1, 40, null, '가라츠', '니지노 마쓰바라', '일본 3대 송림 해안가의 소나무 숲', 'sightseeing'),
   (1, 50, null, '가라츠', '카가미야마 전망대', '가라츠시의 절경 감상', 'sightseeing'),
@@ -53,8 +53,8 @@ cross join (
   (3, 30, null, '고코노에', '고코노에 이동', null, 'move'),
   (3, 40, null, '고코노에', '코코노에 유메오오츠리바시', '꿈의 대현수교 산책', 'sightseeing'),
   (3, 50, null, '후쿠오카', '후쿠오카 이동', null, 'move'),
-  (3, 60, '20:05', '후쿠오카', '후쿠오카 공항 출발', 'LJ266', 'flight'),
-  (3, 70, '21:35', '인천', '인천 국제공항 도착', '여행 종료', 'flight')
+  (3, 60, null, '후쿠오카', '후쿠오카 공항 출발', '항공편 및 출발시간 재확인 필요.', 'flight'),
+  (3, 70, null, '인천', '인천 국제공항 도착', '도착시간 재확인 필요.', 'flight')
 ) as v(day_no, sequence, time_label, location_name, title, description, item_type)
 where t.slug = 'jeonga-fukuoka-2026'
 on conflict (trip_id, day_no, sequence) do nothing;
