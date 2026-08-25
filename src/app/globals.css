@@ -142,6 +142,45 @@ a {
   padding-bottom: max(var(--app-space-2), env(safe-area-inset-bottom));
 }
 
+@keyframes boarding-plane {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(min(66vw, 250px));
+  }
+}
+
+@keyframes boarding-progress {
+  from {
+    width: 8%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .boarding-plane {
+    animation: boarding-plane 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .boarding-progress {
+    animation: boarding-progress 900ms ease-out both;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boarding-plane {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .boarding-progress {
+    width: 100%;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
