@@ -164,17 +164,17 @@ a {
 }
 
 .landing-name-overlay,
-.landing-submit-overlay,
-.landing-form-error {
+.landing-submit-overlay {
   position: absolute;
   z-index: 1;
 }
 
 .landing-name-overlay {
-  top: 61.2378%;
+  top: 63.5451%;
   left: 27.6671%;
   width: 47.0106%;
   height: 4.6145%;
+  min-height: var(--app-tap-target-min);
   padding: 0 2% 0 13.4%;
   border: 2px solid transparent;
   border-radius: var(--app-radius-pill);
@@ -183,6 +183,7 @@ a {
   font-size: clamp(1rem, 4.4vw, 1.2rem);
   font-weight: 600;
   outline-offset: -2px;
+  transform: translateY(-50%);
 }
 
 .landing-name-overlay[aria-invalid="true"] {
@@ -191,32 +192,29 @@ a {
 }
 
 .landing-form-error {
-  top: 66.4495%;
-  left: 18%;
-  width: 64%;
   margin: 0;
-  padding: 0.1rem 0.25rem;
-  border-radius: 0.25rem;
-  background: rgb(255 253 248 / 92%);
+  padding: var(--app-space-3) var(--app-space-4);
+  background: var(--app-color-surface);
   color: var(--app-color-danger);
-  font-size: clamp(0.65rem, 2.8vw, 0.75rem);
+  font-size: var(--app-font-caption);
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.4;
   text-align: center;
-  transform: translateY(-50%);
 }
 
 .landing-submit-overlay {
-  top: 67.0467%;
+  top: 69.2997%;
   left: 27.6671%;
   width: 46.6589%;
   height: 4.5060%;
+  min-height: var(--app-tap-target-min);
   padding: 0;
   border: 0;
   border-radius: var(--app-radius-pill);
   background: transparent;
   color: white;
   cursor: pointer;
+  transform: translateY(-50%);
 }
 
 .landing-submit-overlay[aria-busy="true"] {

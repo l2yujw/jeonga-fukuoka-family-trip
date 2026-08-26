@@ -14,10 +14,38 @@ import { savePendingMember } from "./pending-member";
 export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolean }) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [error, setError] = useState(
-    invalidInvite ? "초대 링크가 올바르지 않아요. 전달받은 링크를 다시 확인해주세요." : "",
-  );
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  if (invalidInvite) {
+    return (
+      <MobileShell className="safe-x safe-top safe-bottom flex items-center">
+        <main
+          aria-labelledby="invalid-invite-title"
+          className="w-full rounded-xl border border-line bg-surface p-8 text-center shadow-card"
+        >
+          <span
+            aria-hidden="true"
+            className="mx-auto mb-5 flex size-12 items-center justify-center rounded-pill bg-accent-primary/10 text-section text-accent-primary"
+          >
+            ✦
+          </span>
+          <p className="text-caption font-bold tracking-[0.16em] text-accent-primary uppercase">
+            FUKUOKA FAMILY TRIP
+          </p>
+          <h1
+            id="invalid-invite-title"
+            className="mt-3 break-keep [text-wrap:balance] font-editorial text-page-title font-semibold"
+          >
+            초대 링크를 확인해주세요
+          </h1>
+          <p role="alert" className="mt-4 text-sm text-text-secondary">
+            초대 링크가 올바르지 않아요. 전달받은 링크를 다시 확인해주세요.
+          </p>
+        </main>
+      </MobileShell>
+    );
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -73,6 +101,12 @@ export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolea
 
   return (
     <MobileShell className="landing-raster-page">
+      {error && (
+        <p id="member-name-error" role="alert" className="landing-form-error">
+          {error}
+        </p>
+      )}
+
       <main className="landing-plate" aria-labelledby="landing-title">
         <Image
           src="/api/landing-visual"
@@ -114,12 +148,6 @@ export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolea
             }}
             className="landing-name-overlay"
           />
-
-          {error && (
-            <p id="member-name-error" role="alert" className="landing-form-error">
-              {error}
-            </p>
-          )}
 
           <button
             type="submit"
