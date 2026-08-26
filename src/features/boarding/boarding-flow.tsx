@@ -103,44 +103,62 @@ export function BoardingFlow() {
   const boardedCount = slots.filter((slot) => slot.boarded).length;
 
   return (
-    <MobileShell className="safe-top safe-x">
+    <MobileShell className="cabin-page safe-top safe-x overflow-hidden">
       <main className="pb-8">
-        <header className="pt-3 text-center">
-          <Badge tone="sage">탑승 완료</Badge>
-          <h1 ref={completionHeading} tabIndex={-1} className="font-editorial mt-4 text-page-title font-semibold outline-none">
-            {session.member.name}
+        <header className="relative pt-2 text-center">
+          <p className="text-[0.62rem] font-bold tracking-[0.25em] text-accent-secondary">WELCOME ON BOARD</p>
+          <Badge tone="sage" className="mt-3 border border-accent-secondary/20">탑승 완료</Badge>
+          <h1 ref={completionHeading} tabIndex={-1} className="font-editorial mt-4 text-[2rem] font-semibold tracking-[-0.04em] outline-none">
+            {session.member.name}님,
           </h1>
-          <p className="mt-1 text-sm font-semibold text-accent-primary">{session.member.displayRole}</p>
-          <p className="font-editorial mx-auto mt-4 max-w-xs break-keep text-lg leading-relaxed text-text-secondary">
-            후쿠오카행 전가네 가족여행에 합류했습니다.
-          </p>
+          <p className="font-editorial mt-1 text-[1.35rem] font-semibold text-accent-primary">우리 여행에 잘 오셨어요.</p>
+          <p className="mt-2 text-xs font-semibold text-text-secondary">{session.member.displayRole}</p>
         </header>
 
-        <Card className="mt-6 overflow-hidden p-5">
-          <div className="flex items-end justify-between gap-4 border-b border-dashed border-line pb-4">
-            <div>
-              <p className="text-caption font-bold tracking-[0.14em] text-text-secondary">FAMILY BOARDING</p>
-              <h2 className="font-editorial mt-1 text-section font-semibold">가족 탑승 현황</h2>
+        <section className="cabin-window mx-auto mt-6" aria-label="인천에서 후쿠오카로 향하는 여행 경로">
+          <div className="cabin-window__view">
+            <p className="text-[0.6rem] font-bold tracking-[0.2em] text-accent-secondary">NOW ARRIVING</p>
+            <div className="mt-4 flex items-center gap-3 text-accent-primary">
+              <span className="font-editorial text-lg font-semibold">ICN</span>
+              <span className="size-1.5 rounded-full bg-current" />
+              <span className="relative flex-1 border-t border-dashed border-current/55">
+                <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#e8eee5] px-1 text-base">✈︎</span>
+              </span>
+              <span className="size-1.5 rounded-full border border-current" />
+              <span className="font-editorial text-lg font-semibold">FUKUOKA</span>
             </div>
-            <p className="shrink-0 font-editorial text-lg font-semibold text-accent-primary">
-              {boardedCount} / 9 탑승 완료
+            <p className="font-editorial mt-5 break-keep text-base font-semibold leading-relaxed text-text-primary/80">
+              후쿠오카행 전가네 가족여행에 합류했습니다.
             </p>
           </div>
+        </section>
 
-          <ul className="mt-5 grid grid-cols-3 gap-2.5" aria-label="가족 탑승 현황 9명">
+        <Card className="cabin-panel relative mt-6 overflow-hidden border-accent-secondary/20 p-5">
+          <div className="flex items-end justify-between gap-3 border-b border-text-primary/10 pb-4">
+            <div>
+              <p className="text-[0.62rem] font-bold tracking-[0.2em] text-accent-secondary">FAMILY SEAT ROW</p>
+              <h2 className="font-editorial mt-1 text-section font-semibold">가족 탑승 현황</h2>
+            </div>
+            <div className="shrink-0 rounded-sm bg-accent-primary px-3 py-2 text-center text-surface shadow-card">
+              <p className="text-[0.55rem] font-bold tracking-[0.14em] opacity-75">ON BOARD</p>
+              <p className="font-editorial text-lg font-semibold leading-none">{boardedCount} / 9</p>
+            </div>
+          </div>
+
+          <ul className="mt-5 grid grid-cols-3 gap-x-3 gap-y-4" aria-label="가족 탑승 현황 9명">
             {slots.map((slot) => (
               <li
                 key={slot.id}
                 aria-label={slot.member ? `${slot.member.name}, 탑승 완료${slot.online ? ", 온라인" : ""}` : "아직 탑승하지 않은 가족"}
-                className={`relative flex aspect-[0.92] min-w-0 flex-col items-center justify-center rounded-md border p-2 text-center ${slot.boarded ? "border-accent-primary bg-accent-primary/7 shadow-card" : "border-line/75 bg-background/45 text-text-secondary/35"}`}
+                className={`cabin-seat relative flex aspect-[0.92] min-w-0 flex-col items-center justify-center p-2 text-center ${slot.boarded ? "cabin-seat--boarded" : "text-text-secondary/35"}`}
               >
-                <span className={`flex size-10 items-center justify-center rounded-pill ${slot.boarded ? "bg-accent-primary text-white" : "bg-line/55"}`} aria-hidden="true">
-                  {slot.boarded ? "✓" : "·"}
+                <span className={`relative z-10 flex size-9 items-center justify-center rounded-full ${slot.boarded ? "bg-accent-primary text-white shadow-card" : "border border-line/80 bg-background/65"}`} aria-hidden="true">
+                  {slot.boarded ? "✓" : slots.indexOf(slot) + 1}
                 </span>
                 {slot.member && (
                   <>
-                    <span className="mt-2 w-full truncate text-sm font-bold">{slot.member.name}</span>
-                    <span className="mt-0.5 text-[11px] font-semibold text-accent-primary">방금 탑승</span>
+                    <span className="relative z-10 mt-1.5 w-full truncate text-sm font-bold">{slot.member.name}</span>
+                    <span className="relative z-10 mt-0.5 text-[10px] font-bold text-accent-primary">방금 탑승</span>
                   </>
                 )}
                 {slot.online && (
