@@ -2,7 +2,7 @@ import { BottomNav, Card, MobileShell } from "@/components/ui";
 
 const accessCards = [
   { number: "01", title: "여행 일정", tone: "bg-accent-primary/10 text-accent-primary", href: "/schedule" },
-  { number: "02", title: "사진 공유", tone: "bg-accent-secondary/12 text-accent-secondary" },
+  { number: "02", title: "사진 공유", tone: "bg-accent-secondary/12 text-accent-secondary", href: "/album" },
   { number: "03", title: "추억 카드 만들기", tone: "bg-[#b8825e]/12 text-[#8a5e40]" },
 ] as const;
 
@@ -69,7 +69,7 @@ export default function HomePage() {
         items={[
           { href: "/home", label: "홈", icon: "●", active: true },
           { href: "/schedule", label: "일정", icon: "□" },
-          { label: "앨범", icon: "▧", disabled: true },
+          { href: "/album", label: "앨범", icon: "▧" },
           { label: "카드", icon: "◇", disabled: true },
         ]}
       />

@@ -19,7 +19,7 @@ export default function SchedulePage() {
         items={[
           { href: "/home", label: "홈", icon: "●" },
           { href: "/schedule", label: "일정", icon: "□", active: true },
-          { label: "앨범", icon: "▧", disabled: true },
+          { href: "/album", label: "앨범", icon: "▧" },
           { label: "카드", icon: "◇", disabled: true },
         ]}
       />
