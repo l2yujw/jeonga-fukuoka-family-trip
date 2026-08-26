@@ -147,6 +147,16 @@ export async function updateAlbumPhotoCaption(photo: AlbumPhoto, caption: string
   return data.caption as string | null;
 }
 
+export async function downloadAlbumPhoto(photo: AlbumPhoto) {
+  await requireAuthUserId();
+  const { data, error } = await getSupabaseBrowserClient()
+    .storage.from(PHOTO_BUCKET)
+    .download(photo.storagePath);
+
+  if (error) throw error;
+  return data;
+}
+
 export async function deleteAlbumPhoto(photo: AlbumPhoto) {
   if (!photo.isOwner) throw new Error("photo-not-owned");
 

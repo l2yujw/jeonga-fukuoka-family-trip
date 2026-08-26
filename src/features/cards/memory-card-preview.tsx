@@ -1,21 +1,73 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import type { AlbumPhoto } from "@/features/album/album-types";
 import {
+  getMemoryCardRenderTemplate,
   resolveMemoryCardSlots,
-  type MemoryCardLayoutV1,
+  type MemoryCardRenderModel,
   type MemoryCardTemplateKey,
 } from "./memory-card";
+import {
+  getMemoryCardTemplateSpec,
+  MEMORY_CARD_FONT_STACKS,
+  MEMORY_CARD_TEXT_STYLES,
+  type ExportBounds,
+  type MemoryCardCaptionStyle,
+  type MemoryCardPhotoSlot,
+  type MemoryCardTextSlot,
+} from "./memory-card-template-spec";
 
 type MemoryCardPreviewProps = {
   templateKey: MemoryCardTemplateKey;
-  layout?: MemoryCardLayoutV1 | null;
+  renderModel?: MemoryCardRenderModel | null;
   photos: readonly AlbumPhoto[];
+  dateLabel?: string;
 };
 
+const percent = (value: number, total: number) => `${(value / total) * 100}%`;
+
+function photoSlotStyle(
+  slot: MemoryCardPhotoSlot,
+  bounds: ExportBounds,
+): CSSProperties {
+  return {
+    left: percent(slot.x - bounds.x, bounds.width),
+    top: percent(slot.y - bounds.y, bounds.height),
+    width: percent(slot.w, bounds.width),
+    height: percent(slot.h, bounds.height),
+    zIndex: slot.z,
+    transform: `rotate(${slot.r}deg)`,
+  };
+}
+
+function textSlotStyle(
+  slot: MemoryCardTextSlot,
+  bounds: ExportBounds,
+): CSSProperties {
+  const style: MemoryCardCaptionStyle = MEMORY_CARD_TEXT_STYLES[slot.style];
+  return {
+    left: percent(slot.x - bounds.x, bounds.width),
+    top: percent(slot.y - bounds.y, bounds.height),
+    width: percent(slot.maxWidth, bounds.width),
+    color: style.color,
+    fontFamily: MEMORY_CARD_FONT_STACKS[style.fontFamily],
+    fontSize: `${(style.fontSize / bounds.width) * 100}cqw`,
+    fontWeight: style.fontWeight,
+    lineHeight: style.lineHeight / style.fontSize,
+    letterSpacing: style.letterSpacing
+      ? `${(style.letterSpacing / bounds.width) * 100}cqw`
+      : undefined,
+    textAlign: style.textAlign,
+    display: "-webkit-box",
+    WebkitBoxOrient: "vertical",
+    WebkitLineClamp: style.maxLines,
+  };
+}
+
 export function MemoryCardPreview({
-  layout,
+  dateLabel = "",
+  renderModel,
   photos,
   templateKey,
 }: MemoryCardPreviewProps) {
@@ -23,94 +75,119 @@ export function MemoryCardPreview({
     new Set(),
   );
 
-  if (layout === null) {
+  if (renderModel === null) {
     return (
-      <div className="flex aspect-[4/5] items-center justify-center rounded-md bg-line/35 px-6 text-center text-sm text-text-secondary">
+      <div className="flex aspect-[9/16] items-center justify-center rounded-md bg-line/35 px-6 text-center text-sm text-text-secondary">
         카드 구성을 불러올 수 없어요.
       </div>
     );
   }
 
+  const emptyModel: MemoryCardRenderModel = {
+    kind: "canonical",
+    layoutVersion: 2,
+    layout: { version: 2, slots: [], caption: null },
+  };
+  const previewModel = renderModel ?? emptyModel;
+  const template = renderModel
+    ? getMemoryCardRenderTemplate(templateKey, renderModel)
+    : getMemoryCardTemplateSpec(templateKey);
+  if (!template) return null;
+
+  const bounds = template.exportBounds;
   const slots = resolveMemoryCardSlots(
     templateKey,
-    layout ?? { version: 1, slots: [] },
+    previewModel,
     new Map(photos.map((photo) => [photo.id, photo])),
   );
+  const resolvedBySlot = new Map(slots.map((slot) => [slot.slotId, slot]));
+  const frameClass = {
+    plain: "bg-surface",
+    polaroid: "bg-surface p-[3.5%] pb-[12%] shadow-card",
+    strip: "bg-text-primary p-[1.6%]",
+  } as const;
+  const caption = previewModel.kind === "canonical"
+    ? previewModel.layout.caption
+    : null;
 
-  const slotPhoto = (index: number) => {
-    const slot = slots[index];
-    const photo = slot?.photo;
-    const canRender =
-      photo?.signedUrl &&
-      slot.photoId &&
-      !unavailablePhotoIds.has(slot.photoId);
+  const scene = (
+    <div
+      className="relative w-full overflow-hidden rounded-sm [container-type:inline-size]"
+      style={{
+        aspectRatio: `${bounds.width} / ${bounds.height}`,
+        backgroundColor: template.backgroundColor,
+      }}
+    >
+      {[...template.slots].sort((a, b) => a.z - b.z).map((slot) => {
+        const resolved = resolvedBySlot.get(slot.id);
+        const photo = resolved?.photo;
+        const canRender = Boolean(
+          photo?.signedUrl &&
+          resolved?.photoId &&
+          !unavailablePhotoIds.has(resolved.photoId),
+        );
 
-    return canRender ? (
-      /* Signed URLs are short-lived runtime values from private Storage. */
-      /* eslint-disable-next-line @next/next/no-img-element */
-      <img
-        src={photo.signedUrl!}
-        alt={photo.caption ?? "추억 카드에 선택한 여행 사진"}
-        onError={() =>
-          setUnavailablePhotoIds((current) =>
-            new Set(current).add(slot.photoId as string),
-          )
-        }
-        className="size-full object-cover object-center"
-      />
-    ) : (
-      <span className="flex size-full items-center justify-center bg-line/45 px-2 text-center text-[10px] font-semibold text-text-secondary">
-        {slot?.photoId ? "사진을 표시할 수 없어요" : "사진 선택"}
-      </span>
-    );
-  };
-
-  if (templateKey === "four_cut") {
-    return (
-      <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-md bg-[#d7a078] p-4">
-        <div className="flex h-full w-[58%] flex-col gap-1.5 bg-text-primary p-2 pb-5 shadow-raised">
-          {slots.map((slot, index) => (
-            <div key={slot.slotId} className="min-h-0 flex-1 overflow-hidden bg-surface">
-              {slotPhoto(index)}
+        return (
+          <div
+            key={slot.id}
+            className={`absolute overflow-hidden ${frameClass[slot.frame]}`}
+            style={photoSlotStyle(slot, bounds)}
+          >
+            <div className="relative size-full overflow-hidden bg-line/40">
+              {canRender ? (
+                /* Signed URLs are short-lived runtime values from private Storage. */
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={photo!.signedUrl!}
+                  alt={photo!.caption ?? "추억 카드에 선택한 여행 사진"}
+                  onError={() =>
+                    setUnavailablePhotoIds((current) =>
+                      new Set(current).add(resolved!.photoId!),
+                    )
+                  }
+                  className="size-full object-cover object-center"
+                />
+              ) : resolved?.optionalEmpty ? null : (
+                <span className="flex size-full items-center justify-center bg-line/45 px-1 text-center text-[clamp(6px,2vw,10px)] font-semibold text-text-secondary">
+                  {resolved?.photoId
+                    ? "사진을 표시할 수 없어요"
+                    : "사진 선택"}
+                </span>
+              )}
             </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+          </div>
+        );
+      })}
 
-  if (templateKey === "editorial_collage") {
-    return (
-      <div className="aspect-[4/5] overflow-hidden rounded-md bg-[#f3eadb] p-4">
-        <p className="font-editorial mb-2 border-b border-text-primary/25 pb-1 text-[10px] font-bold tracking-[0.16em]">
-          FUKUOKA · FAMILY JOURNAL
-        </p>
-        <div className="grid h-[calc(100%-2.25rem)] grid-cols-3 grid-rows-2 gap-1.5">
-          <div className="col-span-2 row-span-2 overflow-hidden">{slotPhoto(0)}</div>
-          <div className="overflow-hidden">{slotPhoto(1)}</div>
-          <div className="overflow-hidden">{slotPhoto(2)}</div>
-        </div>
-      </div>
-    );
-  }
-
-  const frameClasses = [
-    "top-[9%] left-1/2 z-10 w-[58%] -translate-x-1/2 -rotate-1",
-    "bottom-[6%] left-[5%] w-[40%] -rotate-4",
-    "right-[5%] bottom-[5%] w-[40%] rotate-4",
-  ];
+      {template.textSlots.map((slot) => {
+        const value = slot.id === "title"
+          ? "FUKUOKA · FAMILY JOURNAL"
+          : slot.id === "t2"
+            ? dateLabel
+            : caption ?? "";
+        return (
+          <p
+            key={slot.id}
+            style={textSlotStyle(slot, bounds)}
+            className="absolute m-0 overflow-hidden break-words"
+          >
+            {value}
+          </p>
+        );
+      })}
+    </div>
+  );
 
   return (
-    <div className="relative aspect-[4/5] overflow-hidden rounded-md bg-[#ddc7a8]">
-      <span aria-hidden="true" className="home-tape absolute top-3 left-1/2 z-10 -translate-x-1/2" />
-      {slots.map((slot, index) => (
-        <div
-          key={slot.slotId}
-          className={`absolute aspect-[4/5] bg-surface p-1.5 pb-4 shadow-card ${frameClasses[index]}`}
-        >
-          <div className="size-full overflow-hidden bg-line/35">{slotPhoto(index)}</div>
-        </div>
-      ))}
+    <div
+      className={templateKey === "four_cut"
+        ? "rounded-md bg-line/25 p-3"
+        : "overflow-hidden rounded-md"}
+      aria-label={`${template.displayName} 카드 미리보기`}
+    >
+      <div className={templateKey === "four_cut" ? "mx-auto w-[58%] shadow-raised" : "w-full"}>
+        {scene}
+      </div>
     </div>
   );
 }

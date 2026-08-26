@@ -5,6 +5,7 @@ import {
   ALBUM_FILE_MAX_BYTES,
   buildPhotoInsertPayload,
   buildStoragePath,
+  getAlbumPhotoDownloadFilename,
   isPhotoOwner,
   mapPersistedPhotoRows,
   validateAlbumFile,
@@ -117,10 +118,42 @@ test("persisted mapping preserves newest-first input and calculates owner", () =
 
   assert.deepEqual(mapped.map(({ id }) => id), ["newer", "older"]);
   assert.equal(mapped[0].uploaderName, "류정원");
+  assert.equal(mapped[0].originalFilename, "original.jpg");
+  assert.equal(mapped[0].mimeType, "image/jpeg");
   assert.equal(mapped[0].signedUrl, "https://signed.example/newer");
   assert.equal(mapped[1].signedUrl, null);
   assert.equal(isPhotoOwner(newer, authUserId), true);
   assert.equal(isPhotoOwner(newer, "different-auth-user"), false);
+});
+
+test("download filenames prefer a sanitized original and safely preserve HEIC fallbacks", () => {
+  assert.equal(
+    getAlbumPhotoDownloadFilename({
+      id: photoId,
+      originalFilename: "../가족:사진?.HEIC",
+      mimeType: "image/heic",
+      storagePath: `${tripId}/${authUserId}/${photoId}.heic`,
+    }),
+    "가족-사진-.HEIC",
+  );
+  assert.equal(
+    getAlbumPhotoDownloadFilename({
+      id: photoId,
+      originalFilename: null,
+      mimeType: "image/heif",
+      storagePath: `${tripId}/${authUserId}/${photoId}.heif`,
+    }),
+    `fukuoka-photo-${photoId}.heif`,
+  );
+  assert.equal(
+    getAlbumPhotoDownloadFilename({
+      id: "unsafe/id",
+      originalFilename: null,
+      mimeType: null,
+      storagePath: "trip/user/original.webp",
+    }),
+    "fukuoka-photo-unsafe-id.webp",
+  );
 });
 
 test("private album repository never requests public Storage URLs", async () => {
@@ -129,6 +162,7 @@ test("private album repository never requests public Storage URLs", async () => 
     "utf8",
   );
   assert.match(source, /createSignedUrl/);
+  assert.match(source, /\.download\(photo\.storagePath\)/);
   assert.doesNotMatch(source, /getPublicUrl/);
 });
 

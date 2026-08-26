@@ -1,23 +1,63 @@
 {
   "phase": "Phase 5 — Memory Card MVP",
-  "layoutJsonV1": {
-    "version": 1,
-    "slots": [
-      {
-        "slotId": "hero",
-        "photoId": "uuid"
-      }
-    ]
+  "coordinateAuthority": "docs/card_engine/01_TEMPLATE_COORDINATES.json",
+  "readCompatibility": {
+    "legacySimpleV1": {
+      "dbLayoutVersion": 1,
+      "jsonVersion": 1,
+      "caption": "absent",
+      "templates": {
+        "polaroid_moodboard": ["hero", "left", "right"],
+        "four_cut": ["cut-1", "cut-2", "cut-3", "cut-4"],
+        "editorial_collage": ["feature", "top", "bottom"]
+      },
+      "behavior": "Read and render with the legacy three/four/three-slot composition. Never expand or rewrite it as canonical slots."
+    },
+    "canonicalExperimentalV1": {
+      "dbLayoutVersion": 1,
+      "jsonVersion": 1,
+      "slotIds": "Canonical p/f/e IDs in coordinate-document order.",
+      "caption": "Optional string or null; absent and whitespace normalize to null in memory.",
+      "behavior": "Read before attempting legacy-simple-v1 detection. Never mutate the row merely by reading."
+    }
   },
-  "templates": {
-    "polaroid_moodboard": ["hero", "left", "right"],
-    "four_cut": ["cut-1", "cut-2", "cut-3", "cut-4"],
-    "editorial_collage": ["feature", "top", "bottom"]
+  "newWriteFormat": {
+    "name": "canonicalV2",
+    "dbLayoutVersion": 2,
+    "layoutJson": {
+      "version": 2,
+      "slots": [
+        {
+          "slotId": "canonical-slot-id",
+          "photoId": "uuid"
+        }
+      ],
+      "caption": null
+    },
+    "onlyNewWriteFormat": true
+  },
+  "canonicalTemplates": {
+    "polaroid_moodboard": {
+      "photoSlotIds": ["p1", "p2", "p3", "p4", "p5", "p6"],
+      "acceptedPhotoCounts": [6]
+    },
+    "four_cut": {
+      "photoSlotIds": ["f1", "f2", "f3", "f4"],
+      "acceptedPhotoCounts": [4]
+    },
+    "editorial_collage": {
+      "photoSlotIds": ["e1", "e2", "e3", "e4", "e5"],
+      "acceptedPhotoCounts": [4, 5],
+      "fourPhotoBehavior": "Persist e1 through e4; render e5 as an intentional empty slot."
+    }
   },
   "rules": {
-    "layoutVersion": 1,
+    "canonicalSlotOrderOnly": true,
     "photoIdsOnly": true,
     "uniquePhotoPerSlot": true,
+    "caption": "Card-specific text; empty or whitespace normalizes to null and never updates photos.caption.",
+    "signedUrlsInLayoutJson": false,
+    "storagePathsInLayoutJson": false,
     "resultStoragePath": null,
     "renderedResultStorage": "deferred"
   }

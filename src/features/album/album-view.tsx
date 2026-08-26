@@ -5,6 +5,7 @@ import { Badge, Button, Card, EmptyState, LoadingState } from "@/components/ui";
 import { useCurrentTripSession } from "@/features/boarding/trip-access-guard";
 import {
   deleteAlbumPhoto,
+  downloadAlbumPhoto,
   loadAlbumPhotos,
   updateAlbumPhotoCaption,
   uploadAlbumPhoto,
@@ -14,6 +15,7 @@ import {
   ALBUM_CAPTION_MAX_LENGTH,
   ALBUM_FILE_ACCEPT,
   createLocalPhotoDraft,
+  getAlbumPhotoDownloadFilename,
   validateAlbumFile,
 } from "./album-utils";
 
@@ -34,6 +36,7 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
   const [isDecoding, setIsDecoding] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
+  const [downloadingPhotoId, setDownloadingPhotoId] = useState<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const captionRef = useRef<HTMLInputElement>(null);
@@ -192,6 +195,25 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
       setError("사진을 삭제하지 못했어요. 다시 시도해주세요.");
     } finally {
       setBusyPhotoId(null);
+    }
+  };
+
+  const savePhoto = async (photo: AlbumPhoto) => {
+    if (downloadingPhotoId) return;
+    setDownloadingPhotoId(photo.id);
+    setError(null);
+    try {
+      const blob = await downloadAlbumPhoto(photo);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = getAlbumPhotoDownloadFilename(photo);
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch {
+      setError("사진을 저장하지 못했어요. 네트워크 연결을 확인해주세요.");
+    } finally {
+      setDownloadingPhotoId(null);
     }
   };
 
@@ -383,6 +405,14 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
                   )}
                   <div className="px-2 pt-2 pb-1.5">
                     <p className="truncate text-caption font-semibold">{uploaderLabel}</p>
+                    <button
+                      type="button"
+                      disabled={Boolean(downloadingPhotoId)}
+                      onClick={() => savePhoto(photo)}
+                      className="tap-target mt-1 px-2 text-caption font-semibold text-accent-secondary disabled:opacity-50"
+                    >
+                      {downloadingPhotoId === photo.id ? "저장 중" : "저장"}
+                    </button>
                     {editingId === photo.id ? (
                       <div className="mt-2">
                         <label htmlFor={`caption-${photo.id}`} className="sr-only">

@@ -1,6 +1,8 @@
 export type AlbumPhoto = {
   id: string;
   storagePath: string;
+  originalFilename: string | null;
+  mimeType: string | null;
   signedUrl: string | null;
   uploaderName: string | null;
   caption: string | null;
