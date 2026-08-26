@@ -26,6 +26,7 @@ const accessCards = [
     title: "추억 카드 만들기",
     subtitle: "한 장에 담는 여행",
     motif: "memory",
+    href: "/cards",
   },
 ] as const;
 
@@ -93,14 +94,10 @@ export default function HomePage() {
 
               const className = `home-menu-card home-menu-card--${item.motif} relative min-h-[11.5rem] overflow-hidden rounded-xl p-4 text-left shadow-card ${index === 0 ? "col-span-2 min-h-[9.6rem]" : ""}`;
 
-              return "href" in item ? (
+              return (
                 <a key={item.title} href={item.href} className={`${className} tap-target block`}>
                   {content}
                 </a>
-              ) : (
-                <button key={item.title} type="button" disabled aria-label={`${item.title}, 준비 중`} className={`${className} w-full disabled:cursor-not-allowed`}>
-                  {content}
-                </button>
               );
             })}
           </div>
@@ -112,7 +109,7 @@ export default function HomePage() {
           { href: "/home", label: "홈", icon: "●", active: true },
           { href: "/schedule", label: "일정", icon: "□" },
           { href: "/album", label: "앨범", icon: "▧" },
-          { label: "카드", icon: "◇", disabled: true },
+          { href: "/cards", label: "카드", icon: "◇" },
         ]}
       />
         </MobileShell>

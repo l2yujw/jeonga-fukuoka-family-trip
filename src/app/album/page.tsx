@@ -45,7 +45,7 @@ function AlbumPageContent() {
             { href: "/home", label: "홈", icon: "●" },
             { href: "/schedule", label: "일정", icon: "□" },
             { href: "/album", label: "앨범", icon: "▧", active: true },
-            { label: "카드", icon: "◇", disabled: true },
+            { href: "/cards", label: "카드", icon: "◇" },
           ]}
         />
       )}

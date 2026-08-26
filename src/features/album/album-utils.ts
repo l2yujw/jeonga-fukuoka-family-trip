@@ -109,6 +109,8 @@ export function mapPersistedPhotoRows(
   return rows.map((row) => ({
     id: row.id,
     storagePath: row.storage_path,
+    originalFilename: row.original_filename,
+    mimeType: row.mime_type,
     signedUrl: signedUrls.get(row.storage_path) ?? null,
     uploaderName: uploaderNames.get(row.uploader_member_id) ?? null,
     caption: row.caption,
@@ -116,4 +118,26 @@ export function mapPersistedPhotoRows(
     height: row.height,
     isOwner: isPhotoOwner(row, authUserId),
   }));
+}
+
+export function getAlbumPhotoDownloadFilename(
+  photo: Pick<AlbumPhoto, "id" | "mimeType" | "originalFilename" | "storagePath">,
+) {
+  const original = photo.originalFilename
+    ?.split(/[\\/]/)
+    .at(-1)
+    ?.replace(/[\u0000-\u001f\u007f<>:"/\\|?*]/g, "-")
+    .replace(/^\.+/, "")
+    .trim()
+    .slice(0, 180);
+  if (original) return original;
+
+  const storageExtension = photo.storagePath.split(".").at(-1)?.toLowerCase();
+  const extension = extensionByMimeType[
+    photo.mimeType?.toLowerCase() as AcceptedMimeType
+  ] ?? (/^[a-z0-9]{1,10}$/.test(storageExtension ?? "")
+    ? storageExtension
+    : "jpg");
+  const safeId = photo.id.replace(/[^a-zA-Z0-9-]/g, "-") || "photo";
+  return `fukuoka-photo-${safeId}.${extension}`;
 }
