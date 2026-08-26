@@ -1,24 +1,24 @@
 {
-  "version": 1,
-  "canvas": {
-    "width": 1080,
-    "height": 1920
+  "phase": "Phase 5 — Memory Card MVP",
+  "layoutJsonV1": {
+    "version": 1,
+    "slots": [
+      {
+        "slotId": "hero",
+        "photoId": "uuid"
+      }
+    ]
   },
-  "templateKey": "polaroid_moodboard",
-  "backgroundKey": "warm_ivory",
-  "items": [
-    {
-      "type": "photo",
-      "id": "item-1",
-      "photoId": "uuid",
-      "x": 72,
-      "y": 180,
-      "width": 520,
-      "height": 620,
-      "rotation": -3,
-      "frame": "polaroid",
-      "caption": "유후인에서",
-      "z": 1
-    }
-  ]
+  "templates": {
+    "polaroid_moodboard": ["hero", "left", "right"],
+    "four_cut": ["cut-1", "cut-2", "cut-3", "cut-4"],
+    "editorial_collage": ["feature", "top", "bottom"]
+  },
+  "rules": {
+    "layoutVersion": 1,
+    "photoIdsOnly": true,
+    "uniquePhotoPerSlot": true,
+    "resultStoragePath": null,
+    "renderedResultStorage": "deferred"
+  }
 }

@@ -29,7 +29,7 @@ export default function SchedulePage() {
           { href: "/home", label: "홈", icon: "●" },
           { href: "/schedule", label: "일정", icon: "□", active: true },
           { href: "/album", label: "앨범", icon: "▧" },
-          { label: "카드", icon: "◇", disabled: true },
+          { href: "/cards", label: "카드", icon: "◇" },
         ]}
       />
         </MobileShell>
