@@ -25,4 +25,4 @@ Private mobile web for the Jeonga family Fukuoka trip.
 10. Stop at the requested phase; do not continue autonomously.
 
 ## Current phase
-Phase 4B-1 — Supabase identity and real boarding session
+Phase 4B-2 — persistent private family album
