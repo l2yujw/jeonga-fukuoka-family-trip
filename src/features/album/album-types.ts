@@ -1,21 +1,32 @@
 export type AlbumPhoto = {
   id: string;
-  uploaderName: string;
-  uploaderMemberId: string | null;
-  previewUrl: string;
-  originalFilename: string;
-  mimeType: string;
+  storagePath: string;
+  signedUrl: string | null;
+  uploaderName: string | null;
   caption: string | null;
-  takenAt: string | null;
   width: number | null;
   height: number | null;
-  createdAt: string;
   isOwner: boolean;
 };
 
 export type LocalPhotoDraft = {
   file: File;
-  previewUrl: string;
+  previewUrl: string | null;
   width: number | null;
   height: number | null;
+};
+
+export type PersistedPhotoRow = {
+  id: string;
+  trip_id: string;
+  uploader_member_id: string;
+  uploader_auth_user_id: string;
+  storage_path: string;
+  original_filename: string | null;
+  mime_type: string | null;
+  caption: string | null;
+  taken_at: string | null;
+  width: number | null;
+  height: number | null;
+  created_at: string;
 };
