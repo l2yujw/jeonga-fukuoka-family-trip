@@ -24,3 +24,6 @@ pnpm-debug.log*
 # Private family photo assets
 /source/grandfather_source.png
 /public/assets/grandfather-cutout.png
+
+# Local visual references
+/local-references/

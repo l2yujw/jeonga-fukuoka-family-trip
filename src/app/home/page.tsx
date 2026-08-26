@@ -1,7 +1,7 @@
-import { Badge, BottomNav, Card, MobileShell } from "@/components/ui";
+import { BottomNav, Card, MobileShell } from "@/components/ui";
 
 const accessCards = [
-  { number: "01", title: "여행 일정", tone: "bg-accent-primary/10 text-accent-primary" },
+  { number: "01", title: "여행 일정", tone: "bg-accent-primary/10 text-accent-primary", href: "/schedule" },
   { number: "02", title: "사진 공유", tone: "bg-accent-secondary/12 text-accent-secondary" },
   { number: "03", title: "추억 카드 만들기", tone: "bg-[#b8825e]/12 text-[#8a5e40]" },
 ] as const;
@@ -27,38 +27,48 @@ export default function HomePage() {
         </header>
 
         <section className="mt-8" aria-labelledby="access-title">
-          <div className="flex items-center justify-between gap-4">
-            <h2 id="access-title" className="font-editorial text-section font-semibold">여행 메뉴</h2>
-            <Badge>준비 중</Badge>
-          </div>
+          <h2 id="access-title" className="font-editorial text-section font-semibold">여행 메뉴</h2>
           <div className="mt-4 grid gap-3">
-            {accessCards.map((item) => (
-              <Card key={item.title} className="overflow-hidden">
-                <button
-                  type="button"
-                  disabled
-                  aria-describedby="coming-soon-note"
-                  className="tap-target flex w-full items-center gap-4 p-4 text-left disabled:cursor-not-allowed"
-                >
+            {accessCards.map((item) => {
+              const content = (
+                <>
                   <span aria-hidden="true" className={`flex size-11 shrink-0 items-center justify-center rounded-md text-caption font-bold ${item.tone}`}>
                     {item.number}
                   </span>
                   <span className="min-w-0 flex-1 font-semibold">{item.title}</span>
-                  <span className="text-caption font-medium text-text-secondary">준비 중</span>
-                </button>
-              </Card>
-            ))}
+                  <span className="text-caption font-medium text-text-secondary">
+                    {"href" in item ? "보기" : "준비 중"}
+                  </span>
+                </>
+              );
+
+              return (
+                <Card key={item.title} className="overflow-hidden">
+                  {"href" in item ? (
+                    <a href={item.href} className="tap-target flex w-full items-center gap-4 p-4 text-left">
+                      {content}
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      aria-label={`${item.title}, 준비 중`}
+                      className="tap-target flex w-full items-center gap-4 p-4 text-left disabled:cursor-not-allowed"
+                    >
+                      {content}
+                    </button>
+                  )}
+                </Card>
+              );
+            })}
           </div>
-          <p id="coming-soon-note" className="mt-4 text-center text-caption text-text-secondary">
-            다음 여행 메뉴는 차례로 준비하고 있어요.
-          </p>
         </section>
       </main>
 
       <BottomNav
         items={[
           { href: "/home", label: "홈", icon: "●", active: true },
-          { label: "일정", icon: "□", disabled: true },
+          { href: "/schedule", label: "일정", icon: "□" },
           { label: "앨범", icon: "▧", disabled: true },
           { label: "카드", icon: "◇", disabled: true },
         ]}
