@@ -1,3 +1,25 @@
+grant select
+on table
+  public.trips,
+  public.family_members,
+  public.trip_memberships,
+  public.itinerary_items,
+  public.photos,
+  public.memory_cards
+to authenticated, service_role;
+
+grant insert, update, delete
+on table public.photos, public.memory_cards
+to authenticated;
+
+grant insert
+on table public.trip_memberships
+to service_role;
+
+grant update
+on table public.family_members
+to service_role;
+
 create policy "Members can read own membership"
 on public.trip_memberships
 for select

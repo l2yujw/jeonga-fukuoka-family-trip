@@ -4,7 +4,7 @@
 1. Supabase project 생성
 2. Anonymous Sign-Ins 활성화
 3. schema SQL 검토/실행
-4. RLS SQL 검토/실행
+4. table privilege/RLS SQL (`docs/data/02_RLS_FINAL.sql`) 검토/실행
 5. Storage bucket/policy SQL 검토/실행
 6. seed draft 중 확정 데이터만 반영
 

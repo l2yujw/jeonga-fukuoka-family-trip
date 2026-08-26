@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
-import { demoBoardingAdapter } from "@/features/boarding/demo-adapter";
+import { useCurrentTripSession } from "@/features/boarding/trip-access-guard";
 import {
   ALBUM_CAPTION_MAX_LENGTH,
   ALBUM_FILE_ACCEPT,
@@ -11,20 +11,18 @@ import {
 } from "./demo-album-adapter";
 import type { AlbumPhoto, LocalPhotoDraft } from "./album-types";
 
-const subscribeToSession = () => () => undefined;
-const readUploaderName = () => demoBoardingAdapter.readSession()?.member.name ?? null;
-
 type AlbumViewProps = {
   onComposerOpenChange?: (isOpen: boolean) => void;
 };
 
 export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
+  const currentTripSession = useCurrentTripSession();
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
   const [draft, setDraft] = useState<LocalPhotoDraft | null>(null);
   const [caption, setCaption] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isDecoding, setIsDecoding] = useState(false);
-  const uploaderName = useSyncExternalStore(subscribeToSession, readUploaderName, () => null);
+  const uploaderName = currentTripSession.member.name;
   const inputRef = useRef<HTMLInputElement>(null);
   const captionRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef(new Set<string>());
@@ -108,7 +106,7 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
     const photo: AlbumPhoto = {
       id: crypto.randomUUID(),
       uploaderName,
-      uploaderMemberId: null,
+      uploaderMemberId: currentTripSession.member.id,
       previewUrl: draft.previewUrl,
       originalFilename: draft.file.name,
       mimeType: draft.file.type,
@@ -151,19 +149,12 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
           />
           <Button
             onClick={() => inputRef.current?.click()}
-            disabled={!uploaderName || isDecoding}
-            aria-describedby={!uploaderName ? "album-session-help" : undefined}
+            disabled={isDecoding}
           >
             {isDecoding ? "미리보기 준비 중" : "사진 올리기"}
           </Button>
         </div>
       </div>
-
-      {!uploaderName && (
-        <p id="album-session-help" role="status" className="mt-3 text-sm text-text-secondary">
-          탑승 정보를 확인한 뒤 사진을 올릴 수 있어요.
-        </p>
-      )}
 
       {error && (
         <p role="alert" className="mt-4 rounded-md border border-danger/30 bg-danger/8 px-4 py-3 text-sm text-danger">
