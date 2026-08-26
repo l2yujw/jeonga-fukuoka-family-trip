@@ -142,29 +142,95 @@ a {
   padding-bottom: max(var(--app-space-2), env(safe-area-inset-bottom));
 }
 
-.landing-page {
-  background:
-    radial-gradient(circle at 90% 8%, rgb(166 95 72 / 8%), transparent 28%),
-    radial-gradient(circle at 7% 48%, rgb(105 118 92 / 7%), transparent 30%),
-    var(--app-color-background);
+.landing-raster-page {
+  min-height: 0;
+  max-width: 430px;
+  overflow: hidden;
+  background: #efe5d7;
 }
 
-.landing-ticket {
-  background-color: var(--app-color-surface);
-  background-image:
-    radial-gradient(circle at 20% 30%, rgb(58 48 40 / 2%) 0 0.7px, transparent 0.9px),
-    radial-gradient(circle at 70% 65%, rgb(166 95 72 / 2%) 0 0.8px, transparent 1px),
-    linear-gradient(115deg, rgb(255 255 255 / 26%), transparent 42%, rgb(166 95 72 / 2%));
-  background-size: 7px 7px, 11px 11px, auto;
+.landing-plate {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 853 / 1842;
 }
 
-.landing-sticker img {
-  filter:
-    drop-shadow(3px 0 0 white)
-    drop-shadow(-3px 0 0 white)
-    drop-shadow(0 3px 0 white)
-    drop-shadow(0 -3px 0 white)
-    drop-shadow(0 6px 5px rgb(58 48 40 / 16%));
+.landing-plate-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  user-select: none;
+}
+
+.landing-name-overlay,
+.landing-submit-overlay {
+  position: absolute;
+  z-index: 1;
+}
+
+.landing-name-overlay {
+  top: 63.5451%;
+  left: 27.6671%;
+  width: 47.0106%;
+  height: 4.6145%;
+  min-height: var(--app-tap-target-min);
+  padding: 0 2% 0 13.4%;
+  border: 2px solid transparent;
+  border-radius: var(--app-radius-pill);
+  background: transparent;
+  color: var(--app-color-text-primary);
+  font-size: clamp(1rem, 4.4vw, 1.2rem);
+  font-weight: 600;
+  outline-offset: -2px;
+  transform: translateY(-50%);
+}
+
+.landing-name-overlay[aria-invalid="true"] {
+  border-color: var(--app-color-danger);
+  background: rgb(255 253 248 / 88%);
+}
+
+.landing-form-error {
+  margin: 0;
+  padding: var(--app-space-3) var(--app-space-4);
+  background: var(--app-color-surface);
+  color: var(--app-color-danger);
+  font-size: var(--app-font-caption);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.landing-submit-overlay {
+  top: 69.2997%;
+  left: 27.6671%;
+  width: 46.6589%;
+  height: 4.5060%;
+  min-height: var(--app-tap-target-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--app-radius-pill);
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.landing-submit-overlay[aria-busy="true"] {
+  background: rgb(166 95 72 / 94%);
+}
+
+.landing-submit-overlay:disabled {
+  cursor: wait;
+}
+
+.landing-loading-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(0.8rem, 3.5vw, 1rem);
+  font-weight: 700;
 }
 
 .font-handwritten {
@@ -430,39 +496,6 @@ a {
   background:
     repeating-linear-gradient(135deg, rgb(166 95 72 / 3%) 0 8px, transparent 8px 16px),
     var(--app-color-surface);
-}
-
-.landing-stub-rail {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  display: flex;
-  width: 2.45rem;
-  flex-direction: column;
-  align-items: center;
-  padding-top: 1.75rem;
-  color: rgb(166 95 72 / 72%);
-}
-
-.landing-barcode {
-  width: 1rem;
-  height: 3.5rem;
-  background: repeating-linear-gradient(90deg, currentColor 0 1px, transparent 1px 3px, currentColor 3px 5px, transparent 5px 7px);
-}
-
-.landing-side-dot {
-  margin-top: 1rem;
-  font-size: 0.65rem;
-}
-
-.landing-side-copy {
-  margin-top: 0.7rem;
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
 }
 
 @keyframes boarding-plane {

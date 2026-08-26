@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { LandingEntry } from "@/features/boarding/landing-entry";
+import { INVITE_COOKIE_NAME } from "@/features/boarding/server/invite";
 
 type LandingPageProps = {
   searchParams: Promise<{ invite?: string | string[] }>;
@@ -6,5 +8,7 @@ type LandingPageProps = {
 
 export default async function Home({ searchParams }: LandingPageProps) {
   const invite = (await searchParams).invite;
-  return <LandingEntry invalidInvite={invite === "invalid"} />;
+  const hasInviteCookie = Boolean((await cookies()).get(INVITE_COOKIE_NAME));
+
+  return <LandingEntry invalidInvite={invite === "invalid" || !hasInviteCookie} />;
 }
