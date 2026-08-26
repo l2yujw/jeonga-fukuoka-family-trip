@@ -75,7 +75,7 @@ export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolea
     <MobileShell className="landing-raster-page">
       <main className="landing-plate" aria-labelledby="landing-title">
         <Image
-          src="/assets/landing/feedback01-landing-visual.png"
+          src="/api/landing-visual"
           alt=""
           aria-hidden="true"
           width={853}
