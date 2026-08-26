@@ -1,3 +1,5 @@
+"use client";
+
 import { BottomNav, MobileShell } from "@/components/ui";
 import { TripAccessGuard } from "@/features/boarding/trip-access-guard";
 
@@ -30,7 +32,8 @@ const accessCards = [
 export default function HomePage() {
   return (
     <TripAccessGuard>
-      <MobileShell className="journal-page flex min-h-svh flex-col overflow-hidden">
+      {() => (
+        <MobileShell className="journal-page flex min-h-svh flex-col overflow-hidden">
       <main className="safe-top safe-x flex-1 pb-8">
         <header className="home-hero relative isolate min-h-[25rem] overflow-hidden rounded-[2rem] border border-[#d8c9b8] px-6 pt-7 pb-6 shadow-raised">
           <div aria-hidden="true" className="home-tape absolute top-4 right-7" />
@@ -112,7 +115,8 @@ export default function HomePage() {
           { label: "카드", icon: "◇", disabled: true },
         ]}
       />
-      </MobileShell>
+        </MobileShell>
+      )}
     </TripAccessGuard>
   );
 }

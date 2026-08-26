@@ -1,3 +1,5 @@
+"use client";
+
 import { BottomNav, MobileShell } from "@/components/ui";
 import { TripAccessGuard } from "@/features/boarding/trip-access-guard";
 import { ScheduleView } from "@/features/schedule/schedule-view";
@@ -5,7 +7,8 @@ import { ScheduleView } from "@/features/schedule/schedule-view";
 export default function SchedulePage() {
   return (
     <TripAccessGuard>
-      <MobileShell className="journal-page flex min-h-svh flex-col overflow-hidden">
+      {() => (
+        <MobileShell className="journal-page flex min-h-svh flex-col overflow-hidden">
       <main className="safe-top safe-x flex-1 pb-[calc(6rem+env(safe-area-inset-bottom))]">
         <header className="schedule-header relative mb-7 overflow-hidden border-b border-text-primary/15 pb-6">
           <div aria-hidden="true" className="absolute top-0 right-0 text-right text-[0.58rem] font-bold leading-relaxed tracking-[0.18em] text-accent-secondary/65">
@@ -29,7 +32,8 @@ export default function SchedulePage() {
           { label: "카드", icon: "◇", disabled: true },
         ]}
       />
-      </MobileShell>
+        </MobileShell>
+      )}
     </TripAccessGuard>
   );
 }

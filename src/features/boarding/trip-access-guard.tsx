@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { LoadingState, MobileShell } from "@/components/ui";
 import type { CurrentTripSession } from "./boarding-logic";
@@ -14,7 +8,11 @@ import { getCurrentTripSession } from "./current-trip-session";
 
 const CurrentTripSessionContext = createContext<CurrentTripSession | null>(null);
 
-export function TripAccessGuard({ children }: { children: ReactNode }) {
+export function TripAccessGuard({
+  children,
+}: {
+  children: (session: CurrentTripSession) => ReactNode;
+}) {
   const router = useRouter();
   const [session, setSession] = useState<CurrentTripSession | null>(null);
 
@@ -49,7 +47,7 @@ export function TripAccessGuard({ children }: { children: ReactNode }) {
 
   return (
     <CurrentTripSessionContext.Provider value={session}>
-      {children}
+      {children(session)}
     </CurrentTripSessionContext.Provider>
   );
 }

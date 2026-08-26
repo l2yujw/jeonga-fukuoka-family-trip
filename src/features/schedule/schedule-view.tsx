@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Badge, Card } from "@/components/ui";
-import { scheduleDays, type ScheduleItemType } from "./schedule-data";
+import { useEffect, useState } from "react";
+import { Badge, Button, Card, LoadingState } from "@/components/ui";
+import { useCurrentTripSession } from "@/features/boarding/trip-access-guard";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  createScheduleDays,
+  type ItineraryItemRow,
+  type ScheduleDay,
+  type ScheduleItemType,
+} from "./schedule-data";
 
 const typeLabels: Record<ScheduleItemType, string> = {
   flight: "항공",
@@ -11,6 +18,7 @@ const typeLabels: Record<ScheduleItemType, string> = {
   meal: "식사",
   hotel: "숙소",
   optional: "선택",
+  other: "일정",
 };
 
 const typeTones: Record<ScheduleItemType, "neutral" | "primary" | "sage"> = {
@@ -20,6 +28,7 @@ const typeTones: Record<ScheduleItemType, "neutral" | "primary" | "sage"> = {
   meal: "sage",
   hotel: "primary",
   optional: "neutral",
+  other: "neutral",
 };
 
 const typeMarks: Record<ScheduleItemType, string> = {
@@ -29,12 +38,67 @@ const typeMarks: Record<ScheduleItemType, string> = {
   meal: "○",
   hotel: "▣",
   optional: "+",
+  other: "·",
 };
 
 const formatDate = (date: string) => date.slice(5).replace("-", ".");
 
 export function ScheduleView() {
+  const { trip } = useCurrentTripSession();
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [scheduleDays, setScheduleDays] = useState<ScheduleDay[] | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadItinerary() {
+      try {
+        const { data, error: queryError } = await getSupabaseBrowserClient()
+          .from("itinerary_items")
+          .select(
+            "day_no,sequence,time_label,location_name,title,description,item_type",
+          )
+          .eq("trip_id", trip.id)
+          .order("day_no", { ascending: true })
+          .order("sequence", { ascending: true });
+
+        if (!active) return;
+        if (queryError || !data?.length) throw queryError;
+        setScheduleDays(
+          createScheduleDays(data as ItineraryItemRow[], trip.startDate),
+        );
+      } catch {
+        if (active) {
+          setError("여행 일정을 불러오지 못했어요. 잠시 후 다시 시도해주세요.");
+        }
+      }
+    }
+
+    void loadItinerary();
+
+    return () => {
+      active = false;
+    };
+  }, [trip.id, trip.startDate]);
+
+  if (error) {
+    return (
+      <div className="py-16 text-center">
+        <p role="alert" className="break-keep text-sm font-medium text-danger">
+          {error}
+        </p>
+        <Button className="mt-5" onClick={() => window.location.reload()}>
+          다시 시도
+        </Button>
+      </div>
+    );
+  }
+
+  if (!scheduleDays) {
+    return <LoadingState className="min-h-80" label="여행 일정을 불러오고 있어요" />;
+  }
+
   const selectedDay = scheduleDays[selectedDayIndex];
 
   return (

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --test src/features/album/demo-album-adapter.test.mjs src/features/boarding/boarding-logic.test.mjs src/features/boarding/server/invite.test.mjs",
+    "test": "node --test docs/data/rls-privileges.test.mjs src/features/album/demo-album-adapter.test.mjs src/features/boarding/boarding-logic.test.mjs src/features/boarding/protected-routes.test.mjs src/features/boarding/server/invite.test.mjs src/features/schedule/schedule-data.test.mjs",
     "invite:generate": "node scripts/generate-invite-token.mjs"
   },
   "dependencies": {

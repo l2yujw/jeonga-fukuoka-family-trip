@@ -8,7 +8,7 @@ import { TripAccessGuard } from "@/features/boarding/trip-access-guard";
 export default function AlbumPage() {
   return (
     <TripAccessGuard>
-      <AlbumPageContent />
+      {() => <AlbumPageContent />}
     </TripAccessGuard>
   );
 }
