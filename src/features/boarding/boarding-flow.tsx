@@ -4,49 +4,163 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, LoadingState, MobileShell } from "@/components/ui";
 import {
-  demoBoardingAdapter,
-  type DemoBoardingSession,
-} from "./demo-adapter";
+  createFamilySlots,
+  isCurrentTripSession,
+  type CurrentTripSession,
+  type FamilyRosterMember,
+  type PendingMemberPreview,
+} from "./boarding-logic";
+import {
+  getCurrentAuthSession,
+  getCurrentTripSession,
+  loadFamilyRoster,
+} from "./current-trip-session";
+import {
+  clearPendingMember,
+  readPendingMember,
+} from "./pending-member";
 
-type Stage = "confirm" | "boarding" | "complete";
+type Stage = "loading" | "confirm" | "boarding" | "complete" | "error";
 
 export function BoardingFlow() {
   const router = useRouter();
   const completionHeading = useRef<HTMLHeadingElement>(null);
-  const [session, setSession] = useState<DemoBoardingSession | null>(null);
-  const [stage, setStage] = useState<Stage>("confirm");
+  const [pending, setPending] = useState<PendingMemberPreview | null>(null);
+  const [session, setSession] = useState<CurrentTripSession | null>(null);
+  const [roster, setRoster] = useState<FamilyRosterMember[]>([]);
+  const [stage, setStage] = useState<Stage>("loading");
+  const [claiming, setClaiming] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const saved = demoBoardingAdapter.readSession();
-      if (!saved) {
-        router.replace("/");
-        return;
-      }
-      setSession(saved);
-      setStage(saved.boarded ? "complete" : "confirm");
-    }, 0);
-    return () => window.clearTimeout(timer);
+    let active = true;
+
+    getCurrentTripSession()
+      .then(async (current) => {
+        if (!active) return;
+        if (current) {
+          const members = await loadFamilyRoster(current.trip.id);
+          if (!active) return;
+          setSession(current);
+          setRoster(members);
+          setStage("complete");
+          return;
+        }
+
+        const saved = readPendingMember();
+        if (!saved) {
+          router.replace("/");
+          return;
+        }
+        setPending(saved);
+        setStage("confirm");
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("탑승 정보를 불러오지 못했어요. 네트워크 연결을 확인해주세요.");
+        setStage("error");
+      });
+
+    return () => {
+      active = false;
+    };
   }, [router]);
 
   useEffect(() => {
     if (stage !== "boarding" || !session) return;
     const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 650 : 900;
-    const timer = window.setTimeout(() => {
-      setSession(demoBoardingAdapter.complete(session));
-      setStage("complete");
-    }, delay);
-    return () => window.clearTimeout(timer);
+    let active = true;
+    let timer = 0;
+    const animation = new Promise<void>((resolve) => {
+      timer = window.setTimeout(resolve, delay);
+    });
+
+    Promise.all([animation, loadFamilyRoster(session.trip.id)])
+      .then(([, members]) => {
+        if (!active) return;
+        setRoster(members);
+        setStage("complete");
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("가족 탑승 현황을 불러오지 못했어요. 다시 시도해주세요.");
+        setStage("error");
+      });
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [session, stage]);
 
   useEffect(() => {
     if (stage === "complete") completionHeading.current?.focus();
   }, [stage]);
 
-  if (!session) {
+  const claimMember = async () => {
+    if (!pending || claiming) return;
+    setClaiming(true);
+    setError("");
+
+    try {
+      const authSession = await getCurrentAuthSession();
+      if (!authSession) {
+        clearPendingMember();
+        router.replace("/");
+        return;
+      }
+
+      const response = await fetch("/api/claim-member", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ memberId: pending.memberId }),
+      });
+      const body: unknown = await response.json().catch(() => null);
+
+      if (!response.ok || !isCurrentTripSession(body)) {
+        const message =
+          body && typeof body === "object" && "error" in body &&
+          typeof body.error === "string"
+            ? body.error
+            : "탑승을 완료할 수 없어요. 잠시 후 다시 시도해주세요.";
+        setError(message);
+        return;
+      }
+
+      clearPendingMember();
+      setPending(null);
+      setSession(body);
+      setStage("boarding");
+    } catch {
+      setError("탑승을 완료할 수 없어요. 네트워크 연결을 확인해주세요.");
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const startAgain = () => {
+    clearPendingMember();
+    router.push("/");
+  };
+
+  if (stage === "loading") {
     return (
       <MobileShell className="safe-top safe-x">
         <LoadingState className="min-h-svh" label="탑승권을 확인하고 있어요" />
+      </MobileShell>
+    );
+  }
+
+  if (stage === "error") {
+    return (
+      <MobileShell className="safe-top safe-x flex min-h-svh items-center">
+        <main className="w-full text-center">
+          <p role="alert" className="break-keep text-sm font-medium text-danger">{error}</p>
+          <Button className="mt-5" onClick={() => window.location.reload()}>다시 시도</Button>
+        </main>
       </MobileShell>
     );
   }
@@ -74,23 +188,25 @@ export function BoardingFlow() {
   }
 
   if (stage === "confirm") {
+    if (!pending) return null;
     return (
       <MobileShell className="safe-top safe-x flex min-h-svh items-center">
         <main className="w-full py-8 text-center">
           <p className="text-caption font-bold tracking-[0.2em] text-accent-primary">PASSENGER CHECK</p>
           <h1 className="font-editorial mt-8 text-hero font-semibold tracking-[-0.04em]">
-            {session.member.name}
+            {pending.name}
           </h1>
-          <p className="mt-2 font-semibold text-accent-primary">{session.member.displayRole}</p>
+          <p className="mt-2 font-semibold text-accent-primary">{pending.displayRole}</p>
           <Card variant="elevated" className="relative mt-9 overflow-hidden p-6">
             <span aria-hidden="true" className="absolute top-1/2 -left-3 size-6 -translate-y-1/2 rounded-pill border border-line bg-background" />
             <span aria-hidden="true" className="absolute top-1/2 -right-3 size-6 -translate-y-1/2 rounded-pill border border-line bg-background" />
             <p className="font-editorial text-section font-semibold">맞으신가요?</p>
             <div className="my-5 border-t border-dashed border-line" />
-            <Button fullWidth onClick={() => setStage("boarding")}>
+            <Button fullWidth loading={claiming} onClick={claimMember}>
               네, 탑승할게요
             </Button>
-            <Button fullWidth variant="ghost" className="mt-2" onClick={() => router.push("/")}>
+            {error && <p role="alert" className="mt-3 text-caption font-medium text-danger">{error}</p>}
+            <Button fullWidth variant="ghost" className="mt-2" disabled={claiming} onClick={startAgain}>
               다시 입력
             </Button>
           </Card>
@@ -99,8 +215,9 @@ export function BoardingFlow() {
     );
   }
 
-  const slots = demoBoardingAdapter.familySlots(session);
-  const boardedCount = slots.filter((slot) => slot.boarded).length;
+  if (!session) return null;
+  const slots = createFamilySlots(roster, session.member.id);
+  const boardedCount = roster.filter((member) => member.boardedAt).length;
 
   return (
     <MobileShell className="cabin-page safe-top safe-x overflow-hidden">
@@ -149,7 +266,7 @@ export function BoardingFlow() {
             {slots.map((slot) => (
               <li
                 key={slot.id}
-                aria-label={slot.member ? `${slot.member.name}, 탑승 완료${slot.online ? ", 온라인" : ""}` : "아직 탑승하지 않은 가족"}
+                aria-label={slot.member ? `${slot.member.name}, ${slot.boarded ? "탑승 완료" : "탑승 대기"}${slot.online ? ", 온라인" : ""}` : "아직 등록되지 않은 가족"}
                 className={`cabin-seat relative flex aspect-[0.92] min-w-0 flex-col items-center justify-center p-2 text-center ${slot.boarded ? "cabin-seat--boarded" : "text-text-secondary/35"}`}
               >
                 <span className={`relative z-10 flex size-9 items-center justify-center rounded-full ${slot.boarded ? "bg-accent-primary text-white shadow-card" : "border border-line/80 bg-background/65"}`} aria-hidden="true">
@@ -158,7 +275,7 @@ export function BoardingFlow() {
                 {slot.member && (
                   <>
                     <span className="relative z-10 mt-1.5 w-full truncate text-sm font-bold">{slot.member.name}</span>
-                    <span className="relative z-10 mt-0.5 text-[10px] font-bold text-accent-primary">방금 탑승</span>
+                    <span className="relative z-10 mt-0.5 text-[10px] font-bold text-accent-primary">{slot.boarded ? "탑승 완료" : "탑승 대기"}</span>
                   </>
                 )}
                 {slot.online && (

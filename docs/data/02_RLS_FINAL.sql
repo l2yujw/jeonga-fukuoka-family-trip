@@ -1,3 +1,49 @@
+revoke all privileges
+on table
+  public.trips,
+  public.family_members,
+  public.trip_memberships,
+  public.itinerary_items,
+  public.photos,
+  public.memory_cards
+from authenticated, anon;
+
+grant select
+on table
+  public.trips,
+  public.family_members,
+  public.trip_memberships,
+  public.itinerary_items,
+  public.photos,
+  public.memory_cards
+to authenticated, service_role;
+
+grant insert, delete
+on table public.photos, public.memory_cards
+to authenticated;
+
+grant update (caption, taken_at)
+on table public.photos
+to authenticated;
+
+grant update (
+  template_key,
+  layout_version,
+  layout_json,
+  result_storage_path,
+  updated_at
+)
+on table public.memory_cards
+to authenticated;
+
+grant insert
+on table public.trip_memberships
+to service_role;
+
+grant update
+on table public.family_members
+to service_role;
+
 create policy "Members can read own membership"
 on public.trip_memberships
 for select
@@ -75,8 +121,26 @@ create policy "Uploaders can update own photo metadata"
 on public.photos
 for update
 to authenticated
-using (uploader_auth_user_id = (select auth.uid()))
-with check (uploader_auth_user_id = (select auth.uid()));
+using (
+  uploader_auth_user_id = (select auth.uid())
+  and exists (
+    select 1
+    from public.trip_memberships tm
+    where tm.trip_id = photos.trip_id
+      and tm.family_member_id = photos.uploader_member_id
+      and tm.auth_user_id = (select auth.uid())
+  )
+)
+with check (
+  uploader_auth_user_id = (select auth.uid())
+  and exists (
+    select 1
+    from public.trip_memberships tm
+    where tm.trip_id = photos.trip_id
+      and tm.family_member_id = photos.uploader_member_id
+      and tm.auth_user_id = (select auth.uid())
+  )
+);
 
 create policy "Uploaders can delete own photo metadata"
 on public.photos
@@ -116,8 +180,26 @@ create policy "Creators can update own memory cards"
 on public.memory_cards
 for update
 to authenticated
-using (creator_auth_user_id = (select auth.uid()))
-with check (creator_auth_user_id = (select auth.uid()));
+using (
+  creator_auth_user_id = (select auth.uid())
+  and exists (
+    select 1
+    from public.trip_memberships tm
+    where tm.trip_id = memory_cards.trip_id
+      and tm.family_member_id = memory_cards.creator_member_id
+      and tm.auth_user_id = (select auth.uid())
+  )
+)
+with check (
+  creator_auth_user_id = (select auth.uid())
+  and exists (
+    select 1
+    from public.trip_memberships tm
+    where tm.trip_id = memory_cards.trip_id
+      and tm.family_member_id = memory_cards.creator_member_id
+      and tm.auth_user_id = (select auth.uid())
+  )
+);
 
 create policy "Creators can delete own memory cards"
 on public.memory_cards

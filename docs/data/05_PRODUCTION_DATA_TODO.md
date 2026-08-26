@@ -30,4 +30,4 @@ Day 2 예정 후보:
 확정 전에는 UI에서 특정 호텔을 단정하지 않는다.
 
 5. Invite token
-고엔트로피 랜덤값 생성 후 DB에는 hash만 저장.
+고엔트로피 랜덤값 생성 후 DB에는 SHA-256 lowercase hex hash만 저장.
