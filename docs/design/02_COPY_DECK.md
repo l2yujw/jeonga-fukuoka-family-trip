@@ -24,7 +24,7 @@ Secondary: `다시 입력`
 `후쿠오카행 전가네 가족여행에 합류했습니다.`
 
 `가족 탑승 현황`
-`{boardedCount} / 9 탑승 완료`
+`{boardedCount} / {rosterCount} 탑승 완료`
 
 CTA: `여행 시작하기`
 

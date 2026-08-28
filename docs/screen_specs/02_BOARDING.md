@@ -17,20 +17,30 @@
 `후쿠오카행 전가네 가족여행에 합류했습니다.`
 
 ## Status
-`7 / 9 탑승 완료`
+`{boardedCount} / {rosterCount} 탑승 완료`
 
 Boarded:
-- full avatar/card
-- check
-
-Online(optional):
-- green dot
+- occupied seat
+- sage completion cue / check
 
 Not boarded:
-- muted placeholder
+- occupied but muted seat
+- `탑승 대기`
+
+Empty visual seat:
+- empty seat illustration only
+- no invented member or status
 
 Current member:
-- `방금 탑승`
+- terracotta accent
+- `나` or `방금 탑승`
+
+## Family cabin
+- complete screen uses exactly 10 visual seats in a 2-column × 5-row cabin
+- `family_members.seat_order` (1–10) drives assigned positions
+- null, invalid, or conflicting positions fall back to the next empty seat in stable roster order
+- seats are status displays only; there is no interactive seat selection, swapping, or reordering
+- no face/avatar image is required or rendered
 
 ## CTA
 `여행 시작하기`

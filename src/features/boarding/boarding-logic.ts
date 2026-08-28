@@ -1,5 +1,5 @@
 export const CURRENT_TRIP_SLUG = "jeonga-fukuoka-2026";
-export const FAMILY_SLOT_COUNT = 9;
+export const FAMILY_SLOT_COUNT = 10;
 
 export type SafeMemberPreview = {
   memberId: string;
@@ -34,13 +34,15 @@ export type FamilyRosterMember = {
   name: string;
   displayRole: string;
   boardedAt: string | null;
+  seatOrder: number | null;
 };
 
 export type FamilySlot = {
   id: string;
+  seatNumber: number;
   member: FamilyRosterMember | null;
   boarded: boolean;
-  online: boolean;
+  current: boolean;
 };
 
 const UUID_PATTERN =
@@ -121,22 +123,44 @@ export function createFamilySlots(
   roster: FamilyRosterMember[],
   currentMemberId: string,
 ): FamilySlot[] {
-  const slots: FamilySlot[] = roster.map((member) => ({
-    id: member.id,
-    member,
-    boarded: Boolean(member.boardedAt),
-    online: member.id === currentMemberId,
-  }));
-
-  return slots.concat(
-    Array.from(
-      { length: Math.max(0, FAMILY_SLOT_COUNT - slots.length) },
-      (_, index) => ({
-        id: `anonymous-${index + 1}`,
-        member: null,
-        boarded: false,
-        online: false,
-      }),
-    ),
+  const slots: FamilySlot[] = Array.from(
+    { length: FAMILY_SLOT_COUNT },
+    (_, index) => ({
+      id: `seat-${index + 1}`,
+      seatNumber: index + 1,
+      member: null,
+      boarded: false,
+      current: false,
+    }),
   );
+  const unassigned: FamilyRosterMember[] = [];
+
+  for (const member of roster) {
+    const seatIndex =
+      typeof member.seatOrder === "number" && Number.isInteger(member.seatOrder)
+        ? member.seatOrder - 1
+        : -1;
+    if (
+      seatIndex >= 0 &&
+      seatIndex < FAMILY_SLOT_COUNT &&
+      !slots[seatIndex].member
+    ) {
+      slots[seatIndex].member = member;
+    } else {
+      unassigned.push(member);
+    }
+  }
+
+  for (const member of unassigned) {
+    const slot = slots.find(({ member: occupant }) => !occupant);
+    if (!slot) break;
+    slot.member = member;
+  }
+
+  for (const slot of slots) {
+    slot.boarded = Boolean(slot.member?.boardedAt);
+    slot.current = slot.member?.id === currentMemberId;
+  }
+
+  return slots;
 }
