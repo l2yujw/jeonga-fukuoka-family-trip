@@ -36,5 +36,9 @@ Current member:
 `여행 시작하기`
 
 ## Motion
-600~1200ms 내 종료.
-reduced motion에서는 progress fade로 대체.
+- 상태 순서는 `confirm -> transition -> complete`를 유지한다.
+- transition/loading 화면의 dwell target은 약 1800ms이며, 승인된 boarding transition의 허용 가능한 visual dwell 범위는 1600~2200ms이다.
+- route/plane motion target은 약 1550ms이며, 보이는 transition 시간의 대부분을 차지해야 한다.
+- complete 직전의 짧은 final settle은 의도된 동작이다.
+- reduced motion에서는 움직이는 route animation 대신 static/fade-equivalent route presentation을 제공한다.
+- reduced-motion 상태의 timing도 의도된 여유를 유지할 수 있으며 abrupt하게 전환하지 않는다.
