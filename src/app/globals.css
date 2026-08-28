@@ -238,7 +238,7 @@ a {
   min-height: 100svh;
   max-width: 430px;
   overflow-x: clip;
-  background: #ead2b5;
+  background: #d7c3a3;
 }
 
 .boarding-confirm-raster-error {
@@ -257,36 +257,12 @@ a {
 
 .boarding-confirm-plate {
   position: relative;
+  left: 50%;
   isolation: isolate;
-  width: 100%;
-  aspect-ratio: 941 / 2020;
+  width: max(100%, 47.3396svh);
+  aspect-ratio: 863 / 1823;
   overflow: hidden;
-}
-
-.boarding-confirm-plate::before,
-.boarding-confirm-plate::after {
-  position: absolute;
-  z-index: 1;
-  left: 13.0712%;
-  width: 74.0701%;
-  background-image: url("/api/boarding-confirm-visual");
-  background-repeat: no-repeat;
-  background-size: 135% auto;
-  -webkit-mask-image: radial-gradient(ellipse, #000 94%, transparent 100%);
-  mask-image: radial-gradient(ellipse, #000 94%, transparent 100%);
-  content: "";
-}
-
-.boarding-confirm-plate::before {
-  top: 73.0198%;
-  height: 5.2475%;
-  background-position: 50% 99.2685%;
-}
-
-.boarding-confirm-plate::after {
-  top: 78.6139%;
-  height: 5.2475%;
-  background-position: 50% 99.2685%;
+  transform: translateX(-50%);
 }
 
 .boarding-confirm-plate-image {
@@ -298,6 +274,33 @@ a {
   height: auto;
   pointer-events: none;
   user-select: none;
+}
+
+.boarding-confirm-sample-mask {
+  position: absolute;
+  z-index: 1;
+  background-image: url("/api/boarding-confirm-visual");
+  background-repeat: no-repeat;
+  -webkit-mask-image: radial-gradient(ellipse, #000 96%, transparent 100%);
+  mask-image: radial-gradient(ellipse, #000 96%, transparent 100%);
+}
+
+.boarding-confirm-sample-mask--passenger {
+  top: 51.3439%;
+  left: 20.6257%;
+  width: 18.1924%;
+  height: 3.3461%;
+  background-position: 25.2125% 43.0193%;
+  background-size: 549.6815% 2988.5246%;
+}
+
+.boarding-confirm-sample-mask--role {
+  top: 58.2556%;
+  left: 20.6257%;
+  width: 37.6593%;
+  height: 3.2913%;
+  background-position: 33.0855% 42.9949%;
+  background-size: 265.5385% 3038.3333%;
 }
 
 .boarding-confirm-value,
@@ -314,7 +317,7 @@ a {
   overflow: hidden;
   color: #3d2b21;
   font-family: var(--font-editorial);
-  font-size: clamp(1.3rem, 6.15vw, 1.5rem);
+  font-size: clamp(1.25rem, 5.65vw, 1.42rem);
   font-weight: 400;
   letter-spacing: -0.015em;
   line-height: 1.25;
@@ -326,74 +329,49 @@ a {
 }
 
 .boarding-confirm-value[data-long="true"] {
-  font-size: clamp(1.15rem, 5.4vw, 1.32rem);
+  font-size: clamp(1.1rem, 5vw, 1.25rem);
   letter-spacing: -0.025em;
 }
 
 .boarding-confirm-value--passenger {
-  top: 45.4455%; /* y 918 */
-  left: 20.1913%;
-  width: 33%;
-  height: 3.4653%;
+  top: 50.7405%;
+  left: 21.2051%;
+  width: 40%;
+  height: 3.8398%;
 }
 
 .boarding-confirm-value--role {
-  top: 51.8812%; /* y 1048 */
-  left: 20.1913%;
-  width: 46%;
-  height: 3.4653%;
+  top: 58.1459%;
+  left: 21.2051%;
+  width: 50%;
+  height: 3.8398%;
 }
 
 .boarding-confirm-action {
   z-index: 3;
-  left: 13.9203%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 73.1137%;
+  left: 17.3812%;
+  width: 65.2375%;
   min-height: var(--app-tap-target-min);
-  height: 52px;
   padding: 0;
-  transform: translateY(-50%);
-  border-radius: 10px;
-  font-family: var(--font-editorial);
-  font-size: clamp(0.95rem, 4.2vw, 1.15rem);
-  font-weight: 500;
-  letter-spacing: 0.025em;
-  line-height: 1.2;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  border-radius: 18px;
   cursor: pointer;
 }
 
 .boarding-confirm-action--primary {
-  top: 78.1%;
-  border: 1px solid #a84d2d;
-  background: linear-gradient(180deg, #c76537, #b65330);
-  color: #fff9ee;
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 18%),
-    0 5px 12px rgb(58 48 40 / 20%);
+  top: 82.3368%;
+  height: 6.033%;
 }
 
 .boarding-confirm-action--secondary {
-  top: 86.25%;
-  border: 1px solid #c88d5d;
-  background: linear-gradient(180deg, #faecd9, #efd7bd);
-  color: #49372b;
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 55%),
-    0 4px 10px rgb(58 48 40 / 15%);
+  top: 89.3033%;
+  height: 5.7597%;
 }
 
 .boarding-confirm-action:disabled {
   cursor: wait;
-  opacity: 0.7;
-}
-
-.boarding-confirm-action-icon {
-  position: absolute;
-  left: 18%;
-  font-size: 1.25em;
-  line-height: 1;
 }
 
 .boarding-confirm-action--primary[aria-busy="true"]::after {
@@ -402,6 +380,7 @@ a {
   right: 8%;
   width: 16px;
   height: 16px;
+  padding: 0;
   transform: translateY(-50%);
   border: 2px solid rgb(255 255 255 / 48%);
   border-right-color: white;

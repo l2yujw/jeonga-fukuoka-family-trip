@@ -128,12 +128,13 @@ test("confirm plate keeps pending values and existing actions as live DOM", asyn
   assert.match(confirm, /boarding-confirm-value--passenger[\s\S]*\{pending\.name\}/);
   assert.match(confirm, /boarding-confirm-value--role[\s\S]*\{pending\.displayRole\}/);
   assert.doesNotMatch(confirm, /pending\.member\./);
-  assert.match(confirm, /네, 탑승할게요/);
+  assert.match(confirm, /aria-label="네, 탑승할게요"/);
   assert.match(confirm, /onClick=\{claimMember\}/);
-  assert.match(confirm, /다시 입력/);
+  assert.match(confirm, /aria-label="다시 입력"/);
   assert.match(confirm, /onClick=\{startAgain\}/);
   assert.match(confirm, /src="\/api\/boarding-confirm-visual"/);
-  assert.doesNotMatch(confirm, /boarding-confirm-mask/);
+  assert.match(confirm, /boarding-confirm-sample-mask--passenger/);
+  assert.match(confirm, /boarding-confirm-sample-mask--role/);
 });
 
 test("confirm overlays keep approved source geometry and accessible action targets", async () => {
@@ -142,14 +143,15 @@ test("confirm overlays keep approved source geometry and accessible action targe
     "utf8",
   );
 
-  assert.match(css, /\.boarding-confirm-plate\s*\{[^}]*aspect-ratio:\s*941\s*\/\s*2020/s);
-  assert.doesNotMatch(css, /\.boarding-confirm-mask/);
-  assert.match(css, /\.boarding-confirm-value\s*\{[^}]*font-family:\s*var\(--font-editorial\)[^}]*font-size:\s*clamp\(1\.3rem,\s*6\.15vw,\s*1\.5rem\)/s);
-  assert.match(css, /\.boarding-confirm-value--passenger\s*\{[^}]*top:\s*45\.4455%[^}]*left:\s*20\.1913%[^}]*width:\s*33%[^}]*height:\s*3\.4653%/s);
-  assert.match(css, /\.boarding-confirm-value--role\s*\{[^}]*top:\s*51\.8812%[^}]*left:\s*20\.1913%[^}]*width:\s*46%[^}]*height:\s*3\.4653%/s);
-  assert.match(css, /\.boarding-confirm-action\s*\{[^}]*min-height:\s*var\(--app-tap-target-min\)[^}]*height:\s*52px/s);
-  assert.match(css, /\.boarding-confirm-action--primary\s*\{[^}]*top:\s*78\.1%/s);
-  assert.match(css, /\.boarding-confirm-action--secondary\s*\{[^}]*top:\s*86\.25%/s);
+  assert.match(css, /\.boarding-confirm-plate\s*\{[^}]*width:\s*max\(100%,\s*47\.3396svh\)[^}]*aspect-ratio:\s*863\s*\/\s*1823/s);
+  assert.match(css, /\.boarding-confirm-sample-mask--passenger\s*\{[^}]*top:\s*51\.3439%[^}]*left:\s*20\.6257%[^}]*width:\s*18\.1924%[^}]*height:\s*3\.3461%/s);
+  assert.match(css, /\.boarding-confirm-sample-mask--role\s*\{[^}]*top:\s*58\.2556%[^}]*left:\s*20\.6257%[^}]*width:\s*37\.6593%[^}]*height:\s*3\.2913%/s);
+  assert.match(css, /\.boarding-confirm-value\s*\{[^}]*font-family:\s*var\(--font-editorial\)[^}]*font-size:\s*clamp\(1\.25rem,\s*5\.65vw,\s*1\.42rem\)/s);
+  assert.match(css, /\.boarding-confirm-value--passenger\s*\{[^}]*top:\s*50\.7405%[^}]*left:\s*21\.2051%[^}]*width:\s*40%[^}]*height:\s*3\.8398%/s);
+  assert.match(css, /\.boarding-confirm-value--role\s*\{[^}]*top:\s*58\.1459%[^}]*left:\s*21\.2051%[^}]*width:\s*50%[^}]*height:\s*3\.8398%/s);
+  assert.match(css, /\.boarding-confirm-action\s*\{[^}]*min-height:\s*var\(--app-tap-target-min\)[^}]*background:\s*transparent/s);
+  assert.match(css, /\.boarding-confirm-action--primary\s*\{[^}]*top:\s*82\.3368%[^}]*height:\s*6\.033%/s);
+  assert.match(css, /\.boarding-confirm-action--secondary\s*\{[^}]*top:\s*89\.3033%[^}]*height:\s*5\.7597%/s);
 });
 
 test("confirm visual route reads only the fixed ignored reference path", async () => {
@@ -160,7 +162,7 @@ test("confirm visual route reads only the fixed ignored reference path", async (
 
   assert.match(route, /serveLandingVisual as serveBoardingConfirmVisual/);
   assert.match(route, /resolveInviteTrip\(request\)/);
-  assert.match(route, /Jeonga_Fukuoka_Feedback03_Confirm_Final_Reference_v11\.png/);
+  assert.match(route, /Jeonga_Fukuoka_Feedback03_Confirm_StartStyle_Approved_Target_v1\.png/);
   assert.doesNotMatch(route, /request\.(?:nextUrl|url|json|formData)/);
 });
 

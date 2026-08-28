@@ -12,7 +12,7 @@ const localImagePath = join(
   process.cwd(),
   "local-references",
   "feedback03",
-  "Jeonga_Fukuoka_Feedback03_Confirm_Final_Reference_v11.png",
+  "Jeonga_Fukuoka_Feedback03_Confirm_StartStyle_Approved_Target_v1.png",
 );
 
 export async function GET(request: NextRequest) {
