@@ -105,6 +105,18 @@ export function isCurrentTripSession(value: unknown): value is CurrentTripSessio
   );
 }
 
+export async function resolveBoardingInitialization(
+  pending: PendingMemberPreview | null,
+  loadCurrentSession: () => Promise<CurrentTripSession | null>,
+) {
+  if (pending) return { stage: "confirm" as const, pending };
+
+  const session = await loadCurrentSession();
+  return session
+    ? { stage: "complete" as const, session }
+    : { stage: "redirect" as const };
+}
+
 export function createFamilySlots(
   roster: FamilyRosterMember[],
   currentMemberId: string,

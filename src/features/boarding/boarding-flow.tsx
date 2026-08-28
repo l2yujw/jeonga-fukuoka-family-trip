@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Badge, Button, Card, LoadingState, MobileShell } from "@/components/ui";
 import {
   createFamilySlots,
   isCurrentTripSession,
+  resolveBoardingInitialization,
   type CurrentTripSession,
   type FamilyRosterMember,
   type PendingMemberPreview,
@@ -35,25 +37,27 @@ export function BoardingFlow() {
   useEffect(() => {
     let active = true;
 
-    getCurrentTripSession()
-      .then(async (current) => {
+    const saved = readPendingMember();
+    resolveBoardingInitialization(saved, getCurrentTripSession)
+      .then(async (initialization) => {
         if (!active) return;
-        if (current) {
-          const members = await loadFamilyRoster(current.trip.id);
-          if (!active) return;
-          setSession(current);
-          setRoster(members);
-          setStage("complete");
+
+        if (initialization.stage === "confirm") {
+          setPending(initialization.pending);
+          setStage("confirm");
           return;
         }
 
-        const saved = readPendingMember();
-        if (!saved) {
+        if (initialization.stage === "redirect") {
           router.replace("/");
           return;
         }
-        setPending(saved);
-        setStage("confirm");
+
+        const members = await loadFamilyRoster(initialization.session.trip.id);
+        if (!active) return;
+        setSession(initialization.session);
+        setRoster(members);
+        setStage("complete");
       })
       .catch(() => {
         if (!active) return;
@@ -68,7 +72,7 @@ export function BoardingFlow() {
 
   useEffect(() => {
     if (stage !== "boarding" || !session) return;
-    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 650 : 900;
+    const delay = 1800;
     let active = true;
     let timer = 0;
     const animation = new Promise<void>((resolve) => {
@@ -167,20 +171,89 @@ export function BoardingFlow() {
 
   if (stage === "boarding") {
     return (
-      <MobileShell className="safe-top safe-x flex min-h-svh items-center justify-center">
-        <main className="w-full text-center" role="status" aria-live="polite">
-          <p className="text-caption font-bold tracking-[0.22em] text-accent-primary">BOARDING...</p>
-          <h1 className="font-editorial mt-4 text-page-title font-semibold">탑승권을 확인하고 있어요</h1>
-          <div className="mx-auto mt-10 max-w-xs px-4" aria-hidden="true">
-            <div className="relative h-16">
-              <div className="absolute inset-x-0 top-8 border-t-2 border-dashed border-line" />
-              <span className="absolute top-[25px] left-0 size-3 rounded-pill bg-accent-primary" />
-              <span className="absolute top-[25px] right-0 size-3 rounded-pill border-2 border-accent-secondary bg-background" />
-              <span className="boarding-plane absolute top-3 left-0 text-3xl text-accent-primary">✈︎</span>
+      <MobileShell className="boarding-transition-page" aria-busy="true">
+        <main
+          className="boarding-transition"
+          role="status"
+          aria-live="polite"
+          aria-labelledby="boarding-transition-title"
+        >
+          <div className="boarding-transition__upper" aria-hidden="true">
+            <svg className="boarding-transition__upper-botanical" viewBox="0 0 170 150" focusable="false">
+              <path className="boarding-botanical-stem" d="M-8 5C25 23 36 57 69 75c31 17 55 36 96 47M30 44C42 37 54 27 60 13M64 73c17-4 33-17 43-32M99 94c19-1 35-10 49-25" />
+              <g className="boarding-botanical-leaves">
+                <ellipse cx="18" cy="27" rx="6" ry="15" transform="rotate(-38 18 27)" />
+                <ellipse cx="35" cy="50" rx="6" ry="16" transform="rotate(52 35 50)" />
+                <ellipse cx="47" cy="32" rx="6" ry="15" transform="rotate(31 47 32)" />
+                <ellipse cx="61" cy="65" rx="6" ry="16" transform="rotate(-47 61 65)" />
+                <ellipse cx="79" cy="75" rx="6" ry="15" transform="rotate(53 79 75)" />
+                <ellipse cx="92" cy="54" rx="6" ry="15" transform="rotate(34 92 54)" />
+                <ellipse cx="110" cy="99" rx="6" ry="16" transform="rotate(-45 110 99)" />
+                <ellipse cx="130" cy="83" rx="6" ry="15" transform="rotate(40 130 83)" />
+                <ellipse cx="139" cy="116" rx="6" ry="15" transform="rotate(-48 139 116)" />
+              </g>
+              <g className="boarding-botanical-flowers">
+                <g transform="translate(59 20)"><circle cy="-6" r="5" /><circle cx="6" r="5" /><circle cy="6" r="5" /><circle cx="-6" r="5" /><circle className="boarding-botanical-flower-core" r="2.5" /></g>
+                <g transform="translate(106 42)"><circle cy="-6" r="5" /><circle cx="6" r="5" /><circle cy="6" r="5" /><circle cx="-6" r="5" /><circle className="boarding-botanical-flower-core" r="2.5" /></g>
+                <g transform="translate(148 69)"><circle cy="-5" r="4.5" /><circle cx="5" r="4.5" /><circle cy="5" r="4.5" /><circle cx="-5" r="4.5" /><circle className="boarding-botanical-flower-core" r="2" /></g>
+              </g>
+            </svg>
+
+            <svg className="boarding-transition__upper-route" viewBox="0 0 150 90" focusable="false">
+              <path d="M3 64c29 0 39-4 40-22 2-23 34-23 35 0 1 22-16 24 13 26 23 2 32-5 43-19" />
+              <text x="128" y="52">✈︎</text>
+            </svg>
+
+            <svg className="boarding-transition__postmark" viewBox="0 0 145 100" focusable="false">
+              <defs>
+                <path id="boarding-postmark-top" d="M17 51a33 33 0 0 1 66 0" />
+                <path id="boarding-postmark-bottom" d="M17 57a33 33 0 0 0 66 0" />
+              </defs>
+              <circle cx="50" cy="54" r="39" />
+              <circle cx="50" cy="54" r="32" />
+              <text><textPath href="#boarding-postmark-top" startOffset="50%">JEONGA FAMILY</textPath></text>
+              <text><textPath href="#boarding-postmark-bottom" startOffset="50%">FUKUOKA</textPath></text>
+              <path className="boarding-transition__postmark-star" d="m50 42 2.5 6 6.5.5-5 4 1.5 6.5-5.5-3.5-5.5 3.5 1.5-6.5-5-4 6.5-.5Z" />
+              <path className="boarding-transition__postmark-lines" d="M91 34c13-8 28 8 42 0M89 43c14-8 28 8 44 0M89 52c14-8 29 8 46 0M88 61c15-8 31 8 48 0" />
+            </svg>
+          </div>
+
+          <section className="boarding-transition__copy">
+            <p className="boarding-transition__eyebrow">BOARDING...</p>
+            <div className="boarding-transition__mini-route" aria-hidden="true"><span>✈︎</span></div>
+            <h1 id="boarding-transition-title"><span>탑승권을</span><span>확인하고 있어요</span></h1>
+            <p className="boarding-transition__wait">잠시만 기다려주세요.</p>
+          </section>
+
+          <section className="boarding-ticket" aria-label="인천에서 후쿠오카로 이동 중">
+            <div className="boarding-ticket__inner" aria-hidden="true">
+              <div className="boarding-ticket__destinations">
+                <span><strong>ICN</strong><small>SEOUL</small></span>
+                <span className="boarding-ticket__flight">✈︎</span>
+                <span><strong>FUK</strong><small>FUKUOKA</small></span>
+              </div>
+              <div className="boarding-route-progress">
+                <span className="boarding-route-progress__origin" />
+                <span className="boarding-route-progress__dashes" />
+                <span className="boarding-progress" />
+                <span className="boarding-plane">✈︎</span>
+                <span className="boarding-route-progress__destination" />
+              </div>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-pill bg-line/60">
-              <div className="boarding-progress h-full rounded-pill bg-accent-primary" />
-            </div>
+          </section>
+
+          <div className="boarding-transition__lower" aria-hidden="true">
+            <svg className="boarding-transition__lower-route" viewBox="0 0 190 100" focusable="false">
+              <path d="M5 28c33-3 47 7 42 28-5 22 31 25 36 3 6-24-16-26 15-29 27-2 46 8 69-10" />
+              <text x="158" y="28">✈︎</text>
+            </svg>
+            <span className="boarding-transition__papers"><i /><i /><i /></span>
+            <span className="boarding-transition__passport"><i /><b>PASSPORT</b></span>
+            <svg className="boarding-transition__lower-botanical" viewBox="0 0 110 155" focusable="false">
+              <path d="M54 160C51 119 64 73 83 11M55 126c-12-23-25-39-42-50m48 31c14-14 25-21 43-27M68 72c-10-14-16-28-18-43" />
+              <g><ellipse cx="45" cy="117" rx="5" ry="13" transform="rotate(-35 45 117)" /><ellipse cx="68" cy="99" rx="5" ry="13" transform="rotate(44 68 99)" /><ellipse cx="34" cy="97" rx="5" ry="13" transform="rotate(-45 34 97)" /><ellipse cx="76" cy="66" rx="5" ry="13" transform="rotate(42 76 66)" /><ellipse cx="56" cy="56" rx="5" ry="13" transform="rotate(-34 56 56)" /></g>
+              <g className="boarding-transition__lower-flowers"><circle cx="83" cy="12" r="5" /><circle cx="103" cy="79" r="5" /><circle cx="50" cy="30" r="5" /><circle cx="13" cy="76" r="5" /></g>
+            </svg>
           </div>
         </main>
       </MobileShell>
@@ -190,26 +263,64 @@ export function BoardingFlow() {
   if (stage === "confirm") {
     if (!pending) return null;
     return (
-      <MobileShell className="safe-top safe-x flex min-h-svh items-center">
-        <main className="w-full py-8 text-center">
-          <p className="text-caption font-bold tracking-[0.2em] text-accent-primary">PASSENGER CHECK</p>
-          <h1 className="font-editorial mt-8 text-hero font-semibold tracking-[-0.04em]">
-            {pending.name}
-          </h1>
-          <p className="mt-2 font-semibold text-accent-primary">{pending.displayRole}</p>
-          <Card variant="elevated" className="relative mt-9 overflow-hidden p-6">
-            <span aria-hidden="true" className="absolute top-1/2 -left-3 size-6 -translate-y-1/2 rounded-pill border border-line bg-background" />
-            <span aria-hidden="true" className="absolute top-1/2 -right-3 size-6 -translate-y-1/2 rounded-pill border border-line bg-background" />
-            <p className="font-editorial text-section font-semibold">맞으신가요?</p>
-            <div className="my-5 border-t border-dashed border-line" />
-            <Button fullWidth loading={claiming} onClick={claimMember}>
-              네, 탑승할게요
-            </Button>
-            {error && <p role="alert" className="mt-3 text-caption font-medium text-danger">{error}</p>}
-            <Button fullWidth variant="ghost" className="mt-2" disabled={claiming} onClick={startAgain}>
-              다시 입력
-            </Button>
-          </Card>
+      <MobileShell className="boarding-confirm-raster-page">
+        {error && (
+          <p id="boarding-confirm-error" role="alert" className="boarding-confirm-raster-error">
+            {error}
+          </p>
+        )}
+
+        <main className="boarding-confirm-plate" aria-labelledby="boarding-confirm-title">
+          <Image
+            src="/api/boarding-confirm-visual"
+            alt=""
+            aria-hidden="true"
+            width={941}
+            height={2020}
+            draggable="false"
+            priority
+            unoptimized
+            className="boarding-confirm-plate-image"
+          />
+
+          <div className="sr-only">
+            <h1 id="boarding-confirm-title">탑승 확인</h1>
+            <p>탑승 정보를 확인해주세요</p>
+          </div>
+
+          <p
+            className="boarding-confirm-value boarding-confirm-value--passenger"
+            data-long={pending.name.length > 4 || undefined}
+          >
+            <span>{pending.name}</span>
+          </p>
+          <p
+            className="boarding-confirm-value boarding-confirm-value--role"
+            data-long={pending.displayRole.length > 8 || undefined}
+          >
+            <span>{pending.displayRole}</span>
+          </p>
+
+          <button
+            type="button"
+            className="boarding-confirm-action boarding-confirm-action--primary"
+            disabled={claiming}
+            aria-busy={claiming || undefined}
+            aria-describedby={error ? "boarding-confirm-error" : undefined}
+            onClick={claimMember}
+          >
+            <span className="boarding-confirm-action-icon" aria-hidden="true">✈︎</span>
+            <span>네, 탑승할게요</span>
+          </button>
+          <button
+            type="button"
+            className="boarding-confirm-action boarding-confirm-action--secondary"
+            disabled={claiming}
+            onClick={startAgain}
+          >
+            <span className="boarding-confirm-action-icon" aria-hidden="true">✎</span>
+            <span>다시 입력</span>
+          </button>
         </main>
       </MobileShell>
     );
