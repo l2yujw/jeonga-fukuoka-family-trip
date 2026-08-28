@@ -304,8 +304,8 @@ export function BoardingFlow() {
             src="/api/boarding-confirm-visual"
             alt=""
             aria-hidden="true"
-            width={941}
-            height={2020}
+            width={863}
+            height={1823}
             draggable="false"
             priority
             unoptimized
@@ -316,6 +316,15 @@ export function BoardingFlow() {
             <h1 id="boarding-confirm-title">탑승 확인</h1>
             <p>탑승 정보를 확인해주세요</p>
           </div>
+
+          <span
+            className="boarding-confirm-sample-mask boarding-confirm-sample-mask--passenger"
+            aria-hidden="true"
+          />
+          <span
+            className="boarding-confirm-sample-mask boarding-confirm-sample-mask--role"
+            aria-hidden="true"
+          />
 
           <p
             className="boarding-confirm-value boarding-confirm-value--passenger"
@@ -335,21 +344,17 @@ export function BoardingFlow() {
             className="boarding-confirm-action boarding-confirm-action--primary"
             disabled={claiming}
             aria-busy={claiming || undefined}
+            aria-label="네, 탑승할게요"
             aria-describedby={error ? "boarding-confirm-error" : undefined}
             onClick={claimMember}
-          >
-            <span className="boarding-confirm-action-icon" aria-hidden="true">✈︎</span>
-            <span>네, 탑승할게요</span>
-          </button>
+          />
           <button
             type="button"
             className="boarding-confirm-action boarding-confirm-action--secondary"
             disabled={claiming}
+            aria-label="다시 입력"
             onClick={startAgain}
-          >
-            <span className="boarding-confirm-action-icon" aria-hidden="true">✎</span>
-            <span>다시 입력</span>
-          </button>
+          />
         </main>
       </MobileShell>
     );
