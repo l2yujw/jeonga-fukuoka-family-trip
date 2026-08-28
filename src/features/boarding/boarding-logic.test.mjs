@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  FAMILY_SLOT_COUNT,
   createFamilySlots,
   isCurrentTripSession,
   isPendingMemberPreview,
@@ -36,6 +37,16 @@ const currentSession = {
     boardedAt: "2026-08-26T00:00:00.000Z",
   },
 };
+const rosterMember = (
+  id,
+  { boardedAt = null, seatOrder = null } = {},
+) => ({
+  id,
+  name: `가족 ${id}`,
+  displayRole: "가족",
+  boardedAt,
+  seatOrder,
+});
 
 test("member names are trimmed and normalized without fuzzy matching", () => {
   assert.equal(normalizeMemberName("  류정원  "), "류정원");
@@ -153,14 +164,95 @@ test("confirm visual route reads only the fixed ignored reference path", async (
   assert.doesNotMatch(route, /request\.(?:nextUrl|url|json|formData)/);
 });
 
-test("real roster rows are padded to nine anonymous visual slots", () => {
+test("family cabin always returns exactly ten visual seats", () => {
+  const slots = createFamilySlots([], memberId);
+
+  assert.equal(FAMILY_SLOT_COUNT, 10);
+  assert.equal(slots.length, 10);
+  assert.deepEqual(slots.map(({ seatNumber }) => seatNumber), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+});
+
+test("explicit seat orders map to the first and tenth visual seats", () => {
   const slots = createFamilySlots(
-    [{ id: memberId, name: "류정원", displayRole: "전가네 큰손자", boardedAt: "2026-08-26T00:00:00.000Z" }],
+    [rosterMember("first", { seatOrder: 1 }), rosterMember("last", { seatOrder: 10 })],
     memberId,
   );
 
-  assert.equal(slots.length, 9);
-  assert.equal(slots.filter(({ boarded }) => boarded).length, 1);
-  assert.equal(slots.filter(({ member }) => member === null).length, 8);
-  assert.equal(slots[0].online, true);
+  assert.equal(slots[0].member?.id, "first");
+  assert.equal(slots[9].member?.id, "last");
+});
+
+test("sparse assigned seats preserve unoccupied gaps", () => {
+  const slots = createFamilySlots(
+    [rosterMember("middle", { seatOrder: 6 })],
+    memberId,
+  );
+
+  assert.equal(slots[5].member?.id, "middle");
+  assert.equal(slots[0].member, null);
+  assert.equal(slots[9].member, null);
+});
+
+test("null seat orders fill the first available empty seats", () => {
+  const slots = createFamilySlots(
+    [
+      rosterMember("assigned-1", { seatOrder: 1 }),
+      rosterMember("fallback", { seatOrder: null }),
+      rosterMember("assigned-3", { seatOrder: 3 }),
+    ],
+    memberId,
+  );
+
+  assert.equal(slots[0].member?.id, "assigned-1");
+  assert.equal(slots[1].member?.id, "fallback");
+  assert.equal(slots[2].member?.id, "assigned-3");
+});
+
+test("unassigned fallback keeps stable roster order", () => {
+  const slots = createFamilySlots(
+    [rosterMember("fallback-a"), rosterMember("fallback-b"), rosterMember("assigned", { seatOrder: 4 })],
+    memberId,
+  );
+
+  assert.equal(slots[0].member?.id, "fallback-a");
+  assert.equal(slots[1].member?.id, "fallback-b");
+  assert.equal(slots[3].member?.id, "assigned");
+});
+
+test("more roster members never create more than ten slots", () => {
+  const roster = Array.from({ length: 12 }, (_, index) => rosterMember(`member-${index + 1}`));
+  const slots = createFamilySlots(roster, memberId);
+
+  assert.equal(slots.length, 10);
+  assert.equal(slots.filter(({ member }) => member).length, 10);
+  assert.equal(slots[9].member?.id, "member-10");
+});
+
+test("current member is marked independently of boarded status", () => {
+  const [slot] = createFamilySlots(
+    [rosterMember(memberId, { boardedAt: null, seatOrder: 1 })],
+    memberId,
+  );
+
+  assert.equal(slot.current, true);
+  assert.equal(slot.boarded, false);
+});
+
+test("duplicate and invalid seat orders cannot overwrite an assigned seat", () => {
+  const slots = createFamilySlots(
+    [
+      rosterMember("assigned", { seatOrder: 5 }),
+      rosterMember("duplicate", { seatOrder: 5 }),
+      rosterMember("too-low", { seatOrder: 0 }),
+      rosterMember("too-high", { seatOrder: 11 }),
+      rosterMember("fraction", { seatOrder: 2.5 }),
+    ],
+    memberId,
+  );
+
+  assert.equal(slots[4].member?.id, "assigned");
+  assert.deepEqual(
+    slots.filter(({ member }) => member?.id !== "assigned").slice(0, 4).map(({ member }) => member?.id),
+    ["duplicate", "too-low", "too-high", "fraction"],
+  );
 });

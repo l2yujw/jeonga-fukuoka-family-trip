@@ -82,8 +82,9 @@ export async function getCurrentTripSession(): Promise<CurrentTripSession | null
 export async function loadFamilyRoster(tripId: string) {
   const { data, error } = await getSupabaseBrowserClient()
     .from("family_members")
-    .select("id,name,display_role,boarded_at")
+    .select("id,name,display_role,boarded_at,seat_order")
     .eq("trip_id", tripId)
+    .order("seat_order", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 
   if (error) throw error;
@@ -94,6 +95,7 @@ export async function loadFamilyRoster(tripId: string) {
       name: member.name,
       displayRole: member.display_role,
       boardedAt: member.boarded_at,
+      seatOrder: member.seat_order,
     }),
   );
 }

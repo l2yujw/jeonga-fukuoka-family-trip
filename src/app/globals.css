@@ -550,71 +550,213 @@ a {
   content: "♡";
 }
 
-.cabin-page {
-  background:
-    linear-gradient(90deg, rgb(105 118 92 / 6%), transparent 12%, transparent 88%, rgb(105 118 92 / 6%)),
-    radial-gradient(circle at 50% 2%, rgb(166 95 72 / 10%), transparent 23%),
-    var(--app-color-background);
+.boarding-status-page {
+  position: relative;
+  min-height: 100svh;
+  overflow-x: clip;
+  background: #dceaf0;
 }
 
-.cabin-window {
-  width: min(100%, 21rem);
-  padding: 0.7rem;
-  border: 1px solid rgb(105 118 92 / 24%);
-  border-radius: 46% 46% 38% 38% / 35% 35% 28% 28%;
-  background: #e5dfd3;
-  box-shadow:
-    inset 0 0 0 5px rgb(255 253 248 / 75%),
-    0 14px 30px rgb(58 48 40 / 10%);
+.boarding-status-artboard {
+  position: relative;
+  left: 50%;
+  width: max(100%, calc(100svh * 1122 / 1402));
+  aspect-ratio: 1122 / 1402;
+  transform: translateX(-50%);
+  container-type: inline-size;
 }
 
-.cabin-window__view {
-  min-height: 10.75rem;
-  padding: 2rem 1.3rem 1.45rem;
-  border: 1px solid rgb(105 118 92 / 20%);
-  border-radius: 45% 45% 36% 36% / 34% 34% 25% 25%;
-  background:
-    linear-gradient(180deg, rgb(229 237 229) 0 52%, rgb(245 222 196 / 70%) 52% 65%, rgb(255 253 248 / 85%) 65%),
-    #e8eee5;
-  text-align: center;
-}
-
-.cabin-panel {
-  background:
-    repeating-linear-gradient(90deg, transparent 0 5.3rem, rgb(105 118 92 / 4%) 5.3rem calc(5.3rem + 1px)),
-    var(--app-color-surface);
-  box-shadow: 0 14px 35px rgb(58 48 40 / 9%);
-}
-
-.cabin-seat {
-  border: 1px solid rgb(105 118 92 / 18%);
-  border-radius: 1rem 1rem 0.7rem 0.7rem;
-  background: #f2eee6;
-  box-shadow:
-    inset 0 -0.6rem 0 rgb(105 118 92 / 5%),
-    0 4px 10px rgb(58 48 40 / 5%);
-}
-
-.cabin-seat::before {
+.boarding-status-plate-image {
   position: absolute;
-  top: 0.45rem;
-  left: 18%;
-  width: 64%;
-  height: 34%;
-  border: 1px solid rgb(105 118 92 / 10%);
-  border-radius: 0.65rem 0.65rem 0.45rem 0.45rem;
-  background: rgb(255 253 248 / 58%);
-  content: "";
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
 }
 
-.cabin-seat--boarded {
-  border-color: rgb(166 95 72 / 48%);
-  background: #fff8ef;
-  box-shadow:
-    inset 0 -0.6rem 0 rgb(166 95 72 / 8%),
-    0 7px 15px rgb(166 95 72 / 13%);
+.boarding-status-seats,
+.boarding-status-seat {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
 }
 
+.boarding-status-seats {
+  z-index: 1;
+  list-style: none;
+}
+
+.boarding-status-seat {
+  list-style: none;
+}
+
+.boarding-status-mask {
+  position: absolute;
+  z-index: 2;
+  flex: none;
+  min-width: 0;
+  border: 0;
+  border-radius: 0.12cqw;
+  pointer-events: none;
+}
+
+.boarding-status-name-mask {
+  background: #faf4ed;
+}
+
+.boarding-status-state-mask,
+.boarding-status-footer-mask {
+  background: #fcf6f0;
+}
+
+.boarding-status-seat-name {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 0;
+  overflow: hidden;
+  color: #231d19;
+  font-size: 1.43cqw;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.boarding-status-seat-state {
+  position: absolute;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 0.62cqw;
+  min-width: 0;
+}
+
+.boarding-status-seat-dot {
+  width: 1.16cqw;
+  height: 1.16cqw;
+  flex: none;
+  border-radius: 50%;
+  background: #cdbfb0;
+}
+
+.boarding-status-seat--boarded .boarding-status-seat-dot {
+  background: #5d7053;
+}
+
+.boarding-status-seat--current .boarding-status-seat-name {
+  color: #cc572d;
+}
+
+.boarding-status-seat--current .boarding-status-seat-dot {
+  background: #d65a2d;
+}
+
+.boarding-status-seat-state em {
+  color: #cc572d;
+  font-size: 1.25cqw;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.boarding-status-current-ring {
+  position: absolute;
+  z-index: 3;
+  flex: none;
+  min-width: 0;
+  border: max(1px, 0.18cqw) solid #d65a2d;
+  border-radius: 1.15cqw;
+}
+
+.boarding-status-seat-five-patch {
+  position: absolute;
+  top: 49.2154%;
+  left: 38.3244%;
+  z-index: 1;
+  width: 9.0018%;
+  height: 7.204%;
+  min-width: 0;
+  overflow: hidden;
+  flex: none;
+}
+
+.boarding-status-seat-five-patch > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.boarding-status-seat-five-number {
+  position: absolute;
+  top: 56.4%;
+  left: 59.4%;
+  display: grid;
+  width: 24%;
+  height: 28%;
+  transform: translate(-50%, -50%);
+  place-items: center;
+  background: #f3e7db;
+  color: #181512;
+  font-size: 2cqw;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.boarding-status-summary {
+  position: absolute;
+  top: 85.0927%;
+  left: 42.2459%;
+  z-index: 5;
+  display: flex;
+  width: 14.1711%;
+  height: 1.3552%;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: #302923;
+  font-size: 1.42cqw;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.boarding-status-cta {
+  position: absolute;
+  top: 77.3181%;
+  left: 29.4118%;
+  z-index: 6;
+  width: 38.7701%;
+  height: 5.3495%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2cqw;
+  background: transparent;
+  cursor: pointer;
+}
+
+.boarding-status-cta:focus-visible {
+  outline: max(2px, 0.24cqw) solid #d65a2d;
+  outline-offset: 0.35cqw;
+}
 .schedule-header::after {
   position: absolute;
   top: 1.25rem;

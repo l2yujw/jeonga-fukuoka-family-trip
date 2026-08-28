@@ -17,10 +17,15 @@ create table if not exists public.family_members (
   name text not null,
   display_role text not null,
   avatar_path text,
+  seat_order smallint check (seat_order is null or seat_order between 1 and 10),
   boarded_at timestamptz,
   created_at timestamptz not null default now(),
   unique (trip_id, name)
 );
+
+create unique index if not exists family_members_trip_seat_order_key
+on public.family_members (trip_id, seat_order)
+where seat_order is not null;
 
 create table if not exists public.trip_memberships (
   id uuid primary key default gen_random_uuid(),

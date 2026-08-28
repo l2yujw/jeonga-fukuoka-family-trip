@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Badge, Button, Card, LoadingState, MobileShell } from "@/components/ui";
+import { Button, LoadingState, MobileShell } from "@/components/ui";
 import {
   createFamilySlots,
   isCurrentTripSession,
@@ -23,6 +23,35 @@ import {
 } from "./pending-member";
 
 type Stage = "loading" | "confirm" | "boarding" | "complete" | "error";
+
+type SourceBox = { left: number; top: number; width: number; height: number };
+const PLATE_WIDTH = 1122;
+const PLATE_HEIGHT = 1402;
+
+const sourceBoxStyle = ({ left, top, width, height }: SourceBox) => ({
+  left: `${left * 100 / PLATE_WIDTH}%`,
+  top: `${top * 100 / PLATE_HEIGHT}%`,
+  width: `${width * 100 / PLATE_WIDTH}%`,
+  height: `${height * 100 / PLATE_HEIGHT}%`,
+});
+
+const SEAT_OVERLAYS = [
+  { ring: { left: 446, top: 436, width: 74, height: 79 }, nameMask: { left: 463, top: 517, width: 41, height: 18 }, statusMask: { left: 475, top: 540, width: 17, height: 17 }, name: { left: 426, top: 517, width: 108, height: 18 }, state: { left: 477, top: 542, width: 40, height: 13 } },
+  { ring: { left: 594, top: 436, width: 74, height: 79 }, nameMask: { left: 612, top: 517, width: 41, height: 18 }, statusMask: { left: 624, top: 540, width: 17, height: 17 }, name: { left: 574, top: 517, width: 108, height: 18 }, state: { left: 626, top: 542, width: 40, height: 13 } },
+  { ring: { left: 446, top: 574, width: 74, height: 79 }, nameMask: { left: 463, top: 653, width: 41, height: 18 }, statusMask: { left: 475, top: 676, width: 17, height: 17 }, name: { left: 426, top: 653, width: 108, height: 18 }, state: { left: 477, top: 678, width: 40, height: 13 } },
+  { ring: { left: 594, top: 574, width: 74, height: 79 }, nameMask: { left: 612, top: 653, width: 41, height: 18 }, statusMask: { left: 624, top: 676, width: 17, height: 17 }, name: { left: 574, top: 653, width: 108, height: 18 }, state: { left: 626, top: 678, width: 40, height: 13 } },
+  { ring: { left: 446, top: 710, width: 74, height: 79 }, nameMask: { left: 463, top: 790, width: 41, height: 18 }, statusMask: { left: 475, top: 812, width: 38, height: 17 }, name: { left: 426, top: 790, width: 108, height: 18 }, state: { left: 477, top: 814, width: 40, height: 13 } },
+  { ring: { left: 594, top: 710, width: 74, height: 79 }, nameMask: { left: 612, top: 790, width: 41, height: 18 }, statusMask: { left: 624, top: 812, width: 17, height: 17 }, name: { left: 574, top: 790, width: 108, height: 18 }, state: { left: 626, top: 814, width: 40, height: 13 } },
+  { ring: { left: 446, top: 847, width: 74, height: 79 }, nameMask: { left: 463, top: 926, width: 41, height: 19 }, statusMask: { left: 475, top: 947, width: 17, height: 17 }, name: { left: 426, top: 926, width: 108, height: 19 }, state: { left: 477, top: 949, width: 40, height: 13 } },
+  { ring: { left: 594, top: 847, width: 74, height: 79 }, nameMask: { left: 612, top: 926, width: 41, height: 19 }, statusMask: { left: 624, top: 947, width: 17, height: 17 }, name: { left: 574, top: 926, width: 108, height: 19 }, state: { left: 626, top: 949, width: 40, height: 13 } },
+  { ring: { left: 446, top: 974, width: 74, height: 77 }, nameMask: { left: 463, top: 1051, width: 41, height: 19 }, statusMask: { left: 475, top: 1071, width: 17, height: 18 }, name: { left: 426, top: 1051, width: 108, height: 19 }, state: { left: 477, top: 1074, width: 40, height: 13 } },
+  { ring: { left: 594, top: 974, width: 74, height: 77 }, nameMask: { left: 612, top: 1051, width: 41, height: 19 }, statusMask: { left: 624, top: 1071, width: 17, height: 18 }, name: { left: 574, top: 1051, width: 108, height: 19 }, state: { left: 626, top: 1074, width: 40, height: 13 } },
+] as const;
+
+const FOOTER_MASKS = [
+  { left: 474, top: 1193, width: 97, height: 19 },
+  { left: 584, top: 1193, width: 49, height: 19 },
+] as const;
 
 export function BoardingFlow() {
   const router = useRouter();
@@ -331,75 +360,111 @@ export function BoardingFlow() {
   const boardedCount = roster.filter((member) => member.boardedAt).length;
 
   return (
-    <MobileShell className="cabin-page safe-top safe-x overflow-hidden">
-      <main className="pb-8">
-        <header className="relative pt-2 text-center">
-          <p className="text-[0.62rem] font-bold tracking-[0.25em] text-accent-secondary">WELCOME ON BOARD</p>
-          <Badge tone="sage" className="mt-3 border border-accent-secondary/20">탑승 완료</Badge>
-          <h1 ref={completionHeading} tabIndex={-1} className="font-editorial mt-4 text-[2rem] font-semibold tracking-[-0.04em] outline-none">
-            {session.member.name}님,
-          </h1>
-          <p className="font-editorial mt-1 text-[1.35rem] font-semibold text-accent-primary">우리 여행에 잘 오셨어요.</p>
-          <p className="mt-2 text-xs font-semibold text-text-secondary">{session.member.displayRole}</p>
-        </header>
+    <MobileShell className="boarding-status-page">
+      <main className="boarding-status-artboard">
+        <Image
+          src="/api/boarding-status-visual"
+          alt=""
+          aria-hidden="true"
+          width={1122}
+          height={1402}
+          draggable="false"
+          priority
+          unoptimized
+          className="boarding-status-plate-image"
+        />
 
-        <section className="cabin-window mx-auto mt-6" aria-label="인천에서 후쿠오카로 향하는 여행 경로">
-          <div className="cabin-window__view">
-            <p className="text-[0.6rem] font-bold tracking-[0.2em] text-accent-secondary">NOW ARRIVING</p>
-            <div className="mt-4 flex items-center gap-3 text-accent-primary">
-              <span className="font-editorial text-lg font-semibold">ICN</span>
-              <span className="size-1.5 rounded-full bg-current" />
-              <span className="relative flex-1 border-t border-dashed border-current/55">
-                <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#e8eee5] px-1 text-base">✈︎</span>
-              </span>
-              <span className="size-1.5 rounded-full border border-current" />
-              <span className="font-editorial text-lg font-semibold">FUKUOKA</span>
-            </div>
-            <p className="font-editorial mt-5 break-keep text-base font-semibold leading-relaxed text-text-primary/80">
-              후쿠오카행 전가네 가족여행에 합류했습니다.
-            </p>
-          </div>
-        </section>
+        <h1 ref={completionHeading} tabIndex={-1} className="sr-only">가족 탑승 현황</h1>
 
-        <Card className="cabin-panel relative mt-6 overflow-hidden border-accent-secondary/20 p-5">
-          <div className="flex items-end justify-between gap-3 border-b border-text-primary/10 pb-4">
-            <div>
-              <p className="text-[0.62rem] font-bold tracking-[0.2em] text-accent-secondary">FAMILY SEAT ROW</p>
-              <h2 className="font-editorial mt-1 text-section font-semibold">가족 탑승 현황</h2>
-            </div>
-            <div className="shrink-0 rounded-sm bg-accent-primary px-3 py-2 text-center text-surface shadow-card">
-              <p className="text-[0.55rem] font-bold tracking-[0.14em] opacity-75">ON BOARD</p>
-              <p className="font-editorial text-lg font-semibold leading-none">{boardedCount} / 9</p>
-            </div>
-          </div>
+        <ol className="boarding-status-seats" aria-label="10개 좌석의 가족 탑승 상태">
+          {slots.map((slot) => {
+            const overlay = SEAT_OVERLAYS[slot.seatNumber - 1];
+            const state = slot.boarded ? "탑승 완료" : "탑승 대기";
 
-          <ul className="mt-5 grid grid-cols-3 gap-x-3 gap-y-4" aria-label="가족 탑승 현황 9명">
-            {slots.map((slot) => (
+            return (
               <li
                 key={slot.id}
-                aria-label={slot.member ? `${slot.member.name}, ${slot.boarded ? "탑승 완료" : "탑승 대기"}${slot.online ? ", 온라인" : ""}` : "아직 등록되지 않은 가족"}
-                className={`cabin-seat relative flex aspect-[0.92] min-w-0 flex-col items-center justify-center p-2 text-center ${slot.boarded ? "cabin-seat--boarded" : "text-text-secondary/35"}`}
+                aria-hidden={!slot.member || undefined}
+                aria-label={slot.member ? `${slot.seatNumber}번 좌석, ${slot.member.name}, ${state}${slot.current ? ", 현재 사용자" : ""}` : undefined}
+                className={`boarding-status-seat${slot.boarded ? " boarding-status-seat--boarded" : ""}${slot.current ? " boarding-status-seat--current" : ""}`}
               >
-                <span className={`relative z-10 flex size-9 items-center justify-center rounded-full ${slot.boarded ? "bg-accent-primary text-white shadow-card" : "border border-line/80 bg-background/65"}`} aria-hidden="true">
-                  {slot.boarded ? "✓" : slots.indexOf(slot) + 1}
-                </span>
+                {slot.seatNumber === 5 && (
+                  <span className="boarding-status-seat-five-patch" aria-hidden="true">
+                    <Image
+                      src="/api/boarding-status-visual?asset=neutral-seat-patch"
+                      alt=""
+                      aria-hidden="true"
+                      width={101}
+                      height={110}
+                      draggable="false"
+                      unoptimized
+                    />
+                    <span className="boarding-status-seat-five-number">5</span>
+                  </span>
+                )}
+
+                {slot.current && (
+                  <span
+                    className="boarding-status-current-ring"
+                    aria-hidden="true"
+                    style={sourceBoxStyle(overlay.ring)}
+                  />
+                )}
+
+                <span
+                  className="boarding-status-mask boarding-status-name-mask"
+                  aria-hidden="true"
+                  style={sourceBoxStyle(overlay.nameMask)}
+                />
+                <span
+                  className="boarding-status-mask boarding-status-state-mask"
+                  aria-hidden="true"
+                  style={sourceBoxStyle(overlay.statusMask)}
+                />
+
                 {slot.member && (
                   <>
-                    <span className="relative z-10 mt-1.5 w-full truncate text-sm font-bold">{slot.member.name}</span>
-                    <span className="relative z-10 mt-0.5 text-[10px] font-bold text-accent-primary">{slot.boarded ? "탑승 완료" : "탑승 대기"}</span>
+                    <strong
+                      className="boarding-status-seat-name"
+                      aria-hidden="true"
+                      style={sourceBoxStyle(overlay.name)}
+                    >
+                      {slot.member.name}
+                    </strong>
+                    <span
+                      className="boarding-status-seat-state"
+                      aria-hidden="true"
+                      style={sourceBoxStyle(overlay.state)}
+                    >
+                      <span className="boarding-status-seat-dot" />
+                      {slot.current && <em>나</em>}
+                    </span>
                   </>
                 )}
-                {slot.online && (
-                  <span className="absolute top-2 right-2 size-2.5 rounded-pill border-2 border-surface bg-online" aria-hidden="true" />
-                )}
               </li>
-            ))}
-          </ul>
-        </Card>
+            );
+          })}
+        </ol>
 
-        <Button fullWidth className="mt-5" onClick={() => router.push("/home")}>
-          여행 시작하기
-        </Button>
+        {FOOTER_MASKS.map((mask, index) => (
+          <span
+            key={index}
+            className="boarding-status-mask boarding-status-footer-mask"
+            aria-hidden="true"
+            style={sourceBoxStyle(mask)}
+          />
+        ))}
+
+        <p className="boarding-status-summary">
+          {boardedCount} / {roster.length} 탑승 완료
+        </p>
+
+        <button
+          type="button"
+          className="boarding-status-cta"
+          aria-label="여행 시작하기"
+          onClick={() => router.push("/home")}
+        />
       </main>
     </MobileShell>
   );
