@@ -1,119 +1,388 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { BottomNav, MobileShell } from "@/components/ui";
-import { TripAccessGuard } from "@/features/boarding/trip-access-guard";
+import {
+  loadHomeAlbumPhoto,
+  loadHomeAlbumPreview,
+} from "@/features/album/album-repository";
+import type { AlbumPhoto } from "@/features/album/album-types";
+import {
+  TripAccessGuard,
+  useCurrentTripSession,
+} from "@/features/boarding/trip-access-guard";
+import { loadLatestMemoryCard } from "@/features/cards/memory-card-repository";
+import { getMemoryCardTemplateSpec } from "@/features/cards/memory-card-template-spec";
+import type { MemoryCard } from "@/features/cards/memory-card";
+import {
+  getHomeSchedulePreview,
+  selectRandomSchedulePreviewImage,
+  type SchedulePreviewImageItem,
+} from "@/features/home/home-date-state";
+import { getHomeImageFit } from "@/features/home/home-preview-fit";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-const accessCards = [
-  {
-    number: "01",
-    kicker: "ROUTE NOTE",
-    title: "여행 일정",
-    subtitle: "우리의 3일 코스",
-    motif: "route",
-    href: "/schedule",
-  },
-  {
-    number: "02",
-    kicker: "FAMILY ALBUM",
-    title: "사진 공유",
-    subtitle: "함께 모은 순간들",
-    motif: "album",
-    href: "/album",
-  },
-  {
-    number: "03",
-    kicker: "MEMORY CARD",
-    title: "추억 카드 만들기",
-    subtitle: "한 장에 담는 여행",
-    motif: "memory",
-    href: "/cards",
-  },
+type Region = { x: number; y: number; w: number; h: number };
+
+const HOME_ARTBOARD = { width: 895, height: 1756 } as const;
+const HOME_MEDIA_BLEED = 3;
+
+const regions = {
+  quickSchedule: { x: 20, y: 695, w: 260, h: 259 },
+  quickAlbum: { x: 299, y: 695, w: 262, h: 259 },
+  quickCards: { x: 583, y: 695, w: 269, h: 259 },
+  previewSchedule: { x: 18, y: 1059, w: 263, h: 532 },
+  previewAlbum: { x: 294, y: 1059, w: 264, h: 532 },
+  previewCards: { x: 577, y: 1059, w: 273, h: 532 },
+  scheduleMask: { x: 36, y: 1168, w: 236, h: 295 },
+  scheduleMedia: { x: 36, y: 1164, w: 235, h: 241 },
+  scheduleTitle: { x: 40, y: 1482, w: 235, h: 47 },
+  scheduleMeta: { x: 40, y: 1529, w: 235, h: 58 },
+  albumMask: { x: 322, y: 1168, w: 238, h: 295 },
+  albumSingle: { x: 322, y: 1168, w: 237, h: 281 },
+  albumTitle: { x: 326, y: 1482, w: 230, h: 47 },
+  albumCount: { x: 326, y: 1529, w: 230, h: 58 },
+  cardMask: { x: 609, y: 1168, w: 242, h: 295 },
+  cardThumbnail: { x: 610, y: 1168, w: 240, h: 295 },
+  cardTitle: { x: 615, y: 1482, w: 230, h: 47 },
+  cardMeta: { x: 615, y: 1529, w: 230, h: 58 },
+} as const satisfies Record<string, Region>;
+
+const regionStyle = ({ x, y, w, h }: Region): CSSProperties => ({
+  left: `${(x / HOME_ARTBOARD.width) * 100}%`,
+  top: `${(y / HOME_ARTBOARD.height) * 100}%`,
+  width: `${(w / HOME_ARTBOARD.width) * 100}%`,
+  height: `${(h / HOME_ARTBOARD.height) * 100}%`,
+});
+
+const mediaRegionStyle = ({ x, y, w, h }: Region) =>
+  regionStyle({
+    x: x - HOME_MEDIA_BLEED,
+    y: y - HOME_MEDIA_BLEED,
+    w: w + HOME_MEDIA_BLEED * 2,
+    h: h + HOME_MEDIA_BLEED * 2,
+  });
+
+const quickActions = [
+  { href: "/schedule", label: "여행 일정", region: regions.quickSchedule },
+  { href: "/album", label: "사진 공유", region: regions.quickAlbum },
+  { href: "/cards", label: "추억 카드 만들기", region: regions.quickCards },
 ] as const;
+
+const previewLinks = [
+  { href: "/schedule", label: "여행 일정 미리보기", region: regions.previewSchedule },
+  { href: "/album", label: "공유 사진 미리보기", region: regions.previewAlbum },
+  { href: "/cards", label: "추억 카드 미리보기", region: regions.previewCards },
+] as const;
+
+function HomePreviewImage({
+  src,
+  sourceWidth = null,
+  sourceHeight = null,
+  region,
+}: {
+  src: string;
+  sourceWidth?: number | null;
+  sourceHeight?: number | null;
+  region: Region;
+}) {
+  const initialFit = getHomeImageFit(
+    sourceWidth,
+    sourceHeight,
+    region.w,
+    region.h,
+  );
+
+  return (
+    // Only the single selected runtime image URL is mounted.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      fetchPriority="low"
+      data-fit={initialFit.mode}
+      style={{ "--home-media-scale": initialFit.scale } as CSSProperties}
+      onLoad={(event) => {
+        const fit = getHomeImageFit(
+          event.currentTarget.naturalWidth,
+          event.currentTarget.naturalHeight,
+          region.w,
+          region.h,
+        );
+        event.currentTarget.dataset.fit = fit.mode;
+        event.currentTarget.dataset.loaded = "true";
+        event.currentTarget.style.setProperty(
+          "--home-media-scale",
+          String(fit.scale),
+        );
+      }}
+      onError={(event) => {
+        event.currentTarget.hidden = true;
+      }}
+    />
+  );
+}
+
+function HomeScreen() {
+  const { trip } = useCurrentTripSession();
+  const [albumPreview, setAlbumPreview] = useState<{
+    count: number;
+    photo: AlbumPhoto | null;
+  } | null>(null);
+  const [cardPreview, setCardPreview] = useState<{
+    card: MemoryCard | null;
+    photo: AlbumPhoto | null;
+  } | null>(null);
+  const [scheduleImage, setScheduleImage] = useState<string | null>(null);
+  const scheduleImageCache = useRef(new Map<string, string | null>());
+  const schedule = getHomeSchedulePreview();
+  const scheduleImageKey = `${trip.id}:${schedule.dayNo}`;
+  const latestCard = cardPreview?.card;
+  const latestCardTemplate = latestCard
+    ? getMemoryCardTemplateSpec(latestCard.templateKey)?.displayName
+    : null;
+  const albumTitle =
+    albumPreview === null
+      ? "사진을 불러오는 중"
+      : albumPreview.count
+        ? "함께한 순간들"
+        : "아직 공유된 사진이 없어요";
+  const albumMeta = albumPreview?.count ? `사진 ${albumPreview.count}장` : "";
+  const cardTitle =
+    cardPreview === null
+      ? "카드를 불러오는 중"
+      : latestCard
+        ? latestCard.creatorName
+          ? `${latestCard.creatorName}님의 카드`
+          : "가장 최근 추억 카드"
+        : "우리만의 추억 카드를 만들어보세요";
+  const previewAccessibleDetails = {
+    "/schedule": `${schedule.title}, ${schedule.supporting}`,
+    "/album": `${albumTitle}${albumMeta ? `, ${albumMeta}` : ""}`,
+    "/cards": `${cardTitle}${latestCardTemplate ? `, ${latestCardTemplate}` : ""}`,
+  } as const;
+
+  useEffect(() => {
+    let active = true;
+
+    void loadHomeAlbumPreview(trip.id).then(
+      (preview) => {
+        if (active) setAlbumPreview(preview);
+      },
+      () => {
+        if (active) setAlbumPreview({ count: 0, photo: null });
+      },
+    );
+
+    void loadLatestMemoryCard(trip.id).then(
+      async (card) => {
+        if (!active) return;
+        setCardPreview({ card, photo: null });
+
+        const photoId = card?.renderModel?.layout.slots[0]?.photoId;
+        if (!photoId) return;
+
+        const photo = await loadHomeAlbumPhoto(trip.id, photoId).catch(
+          () => null,
+        );
+        if (active) setCardPreview({ card, photo });
+      },
+      () => {
+        if (active) setCardPreview({ card: null, photo: null });
+      },
+    );
+
+    return () => {
+      active = false;
+    };
+  }, [trip.id]);
+
+  useEffect(() => {
+    let active = true;
+
+    void getSupabaseBrowserClient()
+      .from("itinerary_items")
+      .select("*")
+      .eq("trip_id", trip.id)
+      .eq("day_no", schedule.dayNo)
+      .then(({ data }) => {
+        if (!active) return;
+
+        if (!scheduleImageCache.current.has(scheduleImageKey)) {
+          scheduleImageCache.current.set(
+            scheduleImageKey,
+            selectRandomSchedulePreviewImage(
+              (data ?? []) as SchedulePreviewImageItem[],
+            ),
+          );
+        }
+        setScheduleImage(scheduleImageCache.current.get(scheduleImageKey) ?? null);
+      }, () => {
+        if (active) setScheduleImage(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [schedule.dayNo, scheduleImageKey, trip.id]);
+
+  return (
+    <MobileShell className="home-page-shell">
+      <main className="home-artboard" aria-labelledby="home-title">
+        <h1 id="home-title" className="sr-only">
+          후쿠오카 가족여행
+        </h1>
+
+        <Image
+          src="/api/home-visual"
+          alt=""
+          aria-hidden="true"
+          width={HOME_ARTBOARD.width}
+          height={HOME_ARTBOARD.height}
+          draggable="false"
+          priority
+          unoptimized
+          className="home-runtime-base"
+        />
+
+        <div className="home-overlay-root">
+          <div
+            aria-hidden="true"
+            className="home-dynamic-media home-preview-media-mask"
+            style={mediaRegionStyle(regions.scheduleMask)}
+          />
+          <div
+            aria-hidden="true"
+            className="home-dynamic-media home-schedule-clip"
+            data-home-media="schedule"
+            style={mediaRegionStyle(regions.scheduleMedia)}
+          >
+            <div className="home-media-fill home-schedule-media">
+              {scheduleImage && (
+                <HomePreviewImage
+                  src={scheduleImage}
+                  region={regions.scheduleMedia}
+                />
+              )}
+              <span className="home-schedule-badge">{schedule.label}</span>
+            </div>
+          </div>
+          <p
+            className="home-dynamic-copy home-schedule-title"
+            style={regionStyle(regions.scheduleTitle)}
+          >
+            {schedule.title.replaceAll(" · ", "\u00a0· ")}
+          </p>
+          <p
+            className="home-dynamic-copy home-schedule-meta"
+            style={regionStyle(regions.scheduleMeta)}
+          >
+            {schedule.supporting.replaceAll(" · ", "\u00a0· ")}
+          </p>
+
+          <div
+            aria-hidden="true"
+            className="home-dynamic-media home-preview-media-mask"
+            style={mediaRegionStyle(regions.albumMask)}
+          />
+          <div
+            aria-hidden="true"
+            className="home-dynamic-media home-album-photo"
+            data-home-media="album"
+            style={mediaRegionStyle(regions.albumSingle)}
+          >
+            {albumPreview?.photo?.signedUrl && (
+              <HomePreviewImage
+                src={albumPreview.photo.signedUrl}
+                sourceWidth={albumPreview.photo.width}
+                sourceHeight={albumPreview.photo.height}
+                region={regions.albumSingle}
+              />
+            )}
+          </div>
+          <p
+            className="home-dynamic-copy home-album-title"
+            style={regionStyle(regions.albumTitle)}
+          >
+            {albumTitle}
+          </p>
+          <p
+            className="home-dynamic-copy home-album-count"
+            style={regionStyle(regions.albumCount)}
+          >
+            {albumMeta}
+          </p>
+
+          <div
+            aria-hidden="true"
+            className="home-dynamic-media home-preview-media-mask"
+            style={mediaRegionStyle(regions.cardMask)}
+          />
+          <div
+            aria-hidden="true"
+            className={`home-dynamic-media home-memory-clip${cardPreview === null ? " home-memory-thumbnail--loading" : latestCard ? "" : " home-memory-thumbnail--empty"}`}
+            data-home-media="memory-card"
+            style={mediaRegionStyle(regions.cardThumbnail)}
+          >
+            {latestCard && (
+              <div className="home-memory-card-thumbnail">
+                {cardPreview.photo?.signedUrl && (
+                  <HomePreviewImage
+                    src={cardPreview.photo.signedUrl}
+                    sourceWidth={cardPreview.photo.width}
+                    sourceHeight={cardPreview.photo.height}
+                    region={regions.cardThumbnail}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+          <p
+            className="home-dynamic-copy home-card-title"
+            style={regionStyle(regions.cardTitle)}
+          >
+            {cardTitle}
+          </p>
+          <p
+            className="home-dynamic-copy home-card-meta"
+            style={regionStyle(regions.cardMeta)}
+          >
+            {latestCardTemplate ?? ""}
+          </p>
+
+          {quickActions.map(({ href, label, region }) => (
+            <Link
+              key={href}
+              href={href}
+              aria-label={label}
+              className="home-hit-area home-quick-link"
+              style={regionStyle(region)}
+            />
+          ))}
+          {previewLinks.map(({ href, label, region }) => (
+            <Link
+              key={`preview-${href}`}
+              href={href}
+              aria-label={`${label}: ${previewAccessibleDetails[href]}`}
+              className="home-hit-area home-preview-link"
+              style={regionStyle(region)}
+            />
+          ))}
+        </div>
+      </main>
+      <BottomNav activeHref="/home" />
+    </MobileShell>
+  );
+}
 
 export default function HomePage() {
   return (
     <TripAccessGuard>
-      {() => (
-        <MobileShell className="journal-page flex min-h-svh flex-col overflow-hidden">
-      <main className="safe-top safe-x flex-1 pb-8">
-        <header className="home-hero relative isolate min-h-[25rem] overflow-hidden rounded-[2rem] border border-[#d8c9b8] px-6 pt-7 pb-6 shadow-raised">
-          <div aria-hidden="true" className="home-tape absolute top-4 right-7" />
-          <div aria-hidden="true" className="home-postmark absolute right-[-1.25rem] bottom-8 grid size-28 rotate-[-10deg] place-items-center rounded-full border-2 border-accent-primary/25 text-center text-[0.52rem] font-bold tracking-[0.18em] text-accent-primary/45">
-            <span className="absolute inset-2 rounded-full border border-dashed border-current" />
-            FUKUOKA<br />MEMORIES
-          </div>
-
-          <p className="text-[0.65rem] font-bold tracking-[0.25em] text-accent-secondary">A FAMILY TRAVEL JOURNAL</p>
-          <div className="mt-8 max-w-[17rem]">
-            <p className="font-editorial text-[1.15rem] font-semibold text-accent-primary">함께하는 2박 3일</p>
-            <h1 className="font-editorial mt-2 text-[2.8rem] leading-[1.05] font-semibold tracking-[-0.065em]">
-              후쿠오카<br />가족여행
-            </h1>
-          </div>
-
-          <div aria-hidden="true" className="home-collage absolute right-5 bottom-[5.1rem] h-32 w-28">
-            <span className="absolute top-2 right-1 h-20 w-[4.8rem] rotate-6 rounded-sm border-[5px] border-surface bg-accent-secondary/22 shadow-card" />
-            <span className="absolute bottom-0 left-0 h-20 w-[4.8rem] -rotate-6 rounded-sm border-[5px] border-surface bg-accent-primary/18 shadow-card">
-              <span className="absolute inset-x-2 top-3 h-px rotate-[-18deg] bg-accent-primary/45" />
-              <span className="absolute top-3 left-5 h-12 w-px rotate-[42deg] bg-accent-primary/45" />
-              <span className="font-handwritten absolute right-1 bottom-0 text-[0.55rem] text-accent-primary">family</span>
-            </span>
-          </div>
-
-          <div className="absolute right-6 bottom-6 left-6 flex items-end justify-between border-t border-text-primary/15 pt-4">
-            <p className="font-editorial text-lg font-semibold">2026.09.11–13</p>
-            <p className="text-[0.62rem] font-bold tracking-[0.2em] text-text-secondary">VOL. 01 · FUKUOKA</p>
-          </div>
-        </header>
-
-        <section className="mt-8" aria-labelledby="access-title">
-          <div className="flex items-end justify-between border-b border-text-primary/15 pb-3">
-            <div>
-              <p className="text-[0.62rem] font-bold tracking-[0.22em] text-accent-primary">THREE LITTLE CHAPTERS</p>
-              <h2 id="access-title" className="font-editorial mt-1 text-[1.45rem] font-semibold">여행을 펼쳐보세요</h2>
-            </div>
-            <span aria-hidden="true" className="font-handwritten rotate-[-7deg] text-sm text-accent-secondary">with love ♡</span>
-          </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            {accessCards.map((item, index) => {
-              const content = (
-                <>
-                  <span className="relative z-10 block">
-                    <span className="block text-[0.6rem] font-bold tracking-[0.18em] opacity-65">{item.kicker}</span>
-                    <span className="font-editorial mt-5 block break-keep text-[1.35rem] leading-tight font-semibold">{item.title}</span>
-                    <span className="mt-2 block text-xs font-semibold opacity-65">{item.subtitle}</span>
-                  </span>
-                  <span aria-hidden="true" className="absolute right-4 bottom-4 text-[0.65rem] font-bold tracking-[0.14em] opacity-55">{item.number}</span>
-                  <span aria-hidden="true" className={`home-card-motif home-card-motif--${item.motif}`} />
-                  <span className="absolute top-4 right-4 grid size-7 place-items-center rounded-full border border-current/25 text-sm" aria-hidden="true">
-                    {"href" in item ? "↗" : "·"}
-                  </span>
-                </>
-              );
-
-              const className = `home-menu-card home-menu-card--${item.motif} relative min-h-[11.5rem] overflow-hidden rounded-xl p-4 text-left shadow-card ${index === 0 ? "col-span-2 min-h-[9.6rem]" : ""}`;
-
-              return (
-                <a key={item.title} href={item.href} className={`${className} tap-target block`}>
-                  {content}
-                </a>
-              );
-            })}
-          </div>
-        </section>
-      </main>
-
-      <BottomNav
-        items={[
-          { href: "/home", label: "홈", icon: "●", active: true },
-          { href: "/schedule", label: "일정", icon: "□" },
-          { href: "/album", label: "앨범", icon: "▧" },
-          { href: "/cards", label: "카드", icon: "◇" },
-        ]}
-      />
-        </MobileShell>
-      )}
+      {() => <HomeScreen />}
     </TripAccessGuard>
   );
 }

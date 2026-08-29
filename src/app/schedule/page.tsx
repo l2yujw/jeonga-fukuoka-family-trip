@@ -9,7 +9,7 @@ export default function SchedulePage() {
     <TripAccessGuard>
       {() => (
         <MobileShell className="journal-page flex min-h-svh flex-col overflow-hidden">
-      <main className="safe-top safe-x flex-1 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+      <main className="safe-top safe-x flex-1 pb-8">
         <header className="schedule-header relative mb-7 overflow-hidden border-b border-text-primary/15 pb-6">
           <div aria-hidden="true" className="absolute top-0 right-0 text-right text-[0.58rem] font-bold leading-relaxed tracking-[0.18em] text-accent-secondary/65">
             TRAVEL NOTES<br />VOL. 01
@@ -24,14 +24,7 @@ export default function SchedulePage() {
         <ScheduleView />
       </main>
 
-      <BottomNav
-        items={[
-          { href: "/home", label: "홈", icon: "●" },
-          { href: "/schedule", label: "일정", icon: "□", active: true },
-          { href: "/album", label: "앨범", icon: "▧" },
-          { href: "/cards", label: "카드", icon: "◇" },
-        ]}
-      />
+      <BottomNav activeHref="/schedule" />
         </MobileShell>
       )}
     </TripAccessGuard>

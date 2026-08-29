@@ -40,14 +40,7 @@ function AlbumPageContent() {
       </main>
 
       {!isComposerOpen && (
-        <BottomNav
-          items={[
-            { href: "/home", label: "홈", icon: "●" },
-            { href: "/schedule", label: "일정", icon: "□" },
-            { href: "/album", label: "앨범", icon: "▧", active: true },
-            { href: "/cards", label: "카드", icon: "◇" },
-          ]}
-        />
+        <BottomNav activeHref="/album" />
       )}
     </MobileShell>
   );
