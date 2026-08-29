@@ -1,32 +1,55 @@
-export const HOME_TRIP = {
-  startDate: "2026-09-11",
-  endDate: "2026-09-13",
-  displayDate: "2026.09.11 - 09.13",
-} as const;
+import {
+  createScheduleDays,
+  type ItineraryItemRow,
+} from "../schedule/schedule-data";
 
-export const HOME_SCHEDULE_PREVIEWS = [
+export const HOME_SCHEDULE_DAYS = [
   {
     dayNo: 1,
     date: "2026-09-11",
     label: "DAY 1",
-    title: "야나가와 · 다케오 · 우레시노",
-    supporting: "뱃놀이 · 다케오 신사/도서관 · 온천",
   },
   {
     dayNo: 2,
     date: "2026-09-12",
     label: "DAY 2",
-    title: "나가사키 · 그라바엔 · 텐진",
-    supporting: "차이나타운 · 오우라 천주당 · 텐진 자유시간",
   },
   {
     dayNo: 3,
     date: "2026-09-13",
     label: "DAY 3",
-    title: "다자이후 · 라라포트 · 귀국",
-    supporting: "다자이후 텐만구 · 라라포트 후쿠오카",
   },
 ] as const;
+
+const preferredSupportingTypes = new Set(["sightseeing", "meal", "optional"]);
+const excludedSupportingTypes = new Set(["move", "flight", "hotel"]);
+
+export function createHomeSchedulePreviewCopy(
+  rows: ItineraryItemRow[],
+  startDate: string,
+  dayNo: number,
+): { title: string; supporting: string } | null {
+  const day = createScheduleDays(rows, startDate).find(
+    (candidate) => candidate.dayNo === dayNo,
+  );
+  if (!day) return null;
+
+  const preferredTitles = day.items
+    .filter((item) => preferredSupportingTypes.has(item.type))
+    .map((item) => item.title.trim())
+    .filter(Boolean);
+  const supportingTitles = preferredTitles.length
+    ? preferredTitles
+    : day.items
+        .filter((item) => !excludedSupportingTypes.has(item.type))
+        .map((item) => item.title.trim())
+        .filter(Boolean);
+
+  return {
+    title: day.routeSummary.replaceAll(" → ", " · ") || "여행 일정",
+    supporting: supportingTitles.join(" · ") || "일정 보기",
+  };
+}
 
 const localDateKey = (date: Date, timeZone: string) =>
   new Intl.DateTimeFormat("en-CA", {
@@ -41,7 +64,7 @@ export function getHomeSchedulePreview(
   timeZone = "Asia/Seoul",
 ) {
   const today = localDateKey(now, timeZone);
-  if (today < HOME_SCHEDULE_PREVIEWS[1].date) return HOME_SCHEDULE_PREVIEWS[0];
-  if (today < HOME_SCHEDULE_PREVIEWS[2].date) return HOME_SCHEDULE_PREVIEWS[1];
-  return HOME_SCHEDULE_PREVIEWS[2];
+  if (today < HOME_SCHEDULE_DAYS[1].date) return HOME_SCHEDULE_DAYS[0];
+  if (today < HOME_SCHEDULE_DAYS[2].date) return HOME_SCHEDULE_DAYS[1];
+  return HOME_SCHEDULE_DAYS[2];
 }

@@ -2,10 +2,22 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  createHomeSchedulePreviewCopy,
   getHomeSchedulePreview,
-  HOME_SCHEDULE_PREVIEWS,
+  HOME_SCHEDULE_DAYS,
 } from "./home-date-state.ts";
 import { getHomeImageFit } from "./home-preview-fit.ts";
+
+const itineraryRow = (overrides = {}) => ({
+  day_no: 2,
+  sequence: 10,
+  time_label: null,
+  location_name: "후쿠오카",
+  title: "일정",
+  description: null,
+  item_type: "sightseeing",
+  ...overrides,
+});
 
 test("home schedule preview clamps to the Korea-local trip day", () => {
   const cases = [
@@ -30,30 +42,87 @@ test("home schedule preview clamps to the Korea-local trip day", () => {
   );
 });
 
-test("home schedule preview keeps the v14 itinerary copy", () => {
+test("home schedule day constants contain date state only", () => {
   assert.deepEqual(
-    HOME_SCHEDULE_PREVIEWS.map(({ label, title, supporting }) => ({
-      label,
-      title,
-      supporting,
-    })),
+    HOME_SCHEDULE_DAYS,
     [
-      {
-        label: "DAY 1",
-        title: "야나가와 · 다케오 · 우레시노",
-        supporting: "뱃놀이 · 다케오 신사/도서관 · 온천",
-      },
-      {
-        label: "DAY 2",
-        title: "나가사키 · 그라바엔 · 텐진",
-        supporting: "차이나타운 · 오우라 천주당 · 텐진 자유시간",
-      },
-      {
-        label: "DAY 3",
-        title: "다자이후 · 라라포트 · 귀국",
-        supporting: "다자이후 텐만구 · 라라포트 후쿠오카",
-      },
+      { dayNo: 1, date: "2026-09-11", label: "DAY 1" },
+      { dayNo: 2, date: "2026-09-12", label: "DAY 2" },
+      { dayNo: 3, date: "2026-09-13", label: "DAY 3" },
     ],
+  );
+});
+
+test("home schedule copy reflects the selected current-seed-like day", () => {
+  const rows = [
+    itineraryRow({ location_name: "다자이후", title: "다자이후 텐만구" }),
+    itineraryRow({ sequence: 20, location_name: "유후인", title: "유후인 이동", item_type: "move" }),
+    itineraryRow({ sequence: 30, location_name: "유후인", title: "유노쓰보 가이도" }),
+    itineraryRow({ sequence: 40, location_name: "유후인", title: "긴린코 호수" }),
+    itineraryRow({ sequence: 50, location_name: "벳부", title: "벳부 이동", item_type: "move" }),
+    itineraryRow({ sequence: 60, location_name: "벳부", title: "가마도지옥" }),
+  ];
+  const originalRows = structuredClone(rows);
+
+  assert.deepEqual(
+    createHomeSchedulePreviewCopy(rows, "2026-09-11", 2),
+    {
+      title: "다자이후 · 유후인 · 벳부",
+      supporting: "다자이후 텐만구 · 유노쓰보 가이도 · 긴린코 호수 · 가마도지옥",
+    },
+  );
+  assert.deepEqual(rows, originalRows);
+});
+
+test("home supporting copy prefers actual sightseeing, meal, and optional titles", () => {
+  const copy = createHomeSchedulePreviewCopy(
+    [
+      itineraryRow({ title: "공항 도착", item_type: "flight" }),
+      itineraryRow({ sequence: 20, title: "호텔 조식", item_type: "meal" }),
+      itineraryRow({ sequence: 30, title: "관광지", item_type: "sightseeing" }),
+      itineraryRow({ sequence: 40, title: "다음 도시 이동", item_type: "move" }),
+      itineraryRow({ sequence: 50, title: "자유 일정", item_type: "optional" }),
+      itineraryRow({ sequence: 60, title: "호텔 체크인", item_type: "hotel" }),
+    ],
+    "2026-09-11",
+    2,
+  );
+
+  assert.equal(copy?.supporting, "호텔 조식 · 관광지 · 자유 일정");
+  assert.doesNotMatch(copy?.supporting ?? "", /공항 도착|다음 도시 이동|호텔 체크인/);
+});
+
+test("home schedule copy has truthful empty and neutral fallbacks", () => {
+  assert.equal(createHomeSchedulePreviewCopy([], "2026-09-11", 1), null);
+  assert.deepEqual(
+    createHomeSchedulePreviewCopy(
+      [
+        itineraryRow({
+          day_no: 1,
+          location_name: null,
+          title: "현지 안내",
+          item_type: "other",
+        }),
+      ],
+      "2026-09-11",
+      1,
+    ),
+    { title: "여행 일정", supporting: "현지 안내" },
+  );
+  assert.deepEqual(
+    createHomeSchedulePreviewCopy(
+      [
+        itineraryRow({
+          day_no: 1,
+          location_name: null,
+          title: "공항 이동",
+          item_type: "move",
+        }),
+      ],
+      "2026-09-11",
+      1,
+    ),
+    { title: "여행 일정", supporting: "일정 보기" },
   );
 });
 
@@ -79,9 +148,10 @@ test("home preview fit limits crop and preserves extreme source ratios", () => {
   });
 });
 
-test("home implements the v24 fixed progressive previews", async () => {
+test("home implements the v25 itinerary-backed progressive previews", async () => {
   const [
     page,
+    homeDateState,
     route,
     css,
     ui,
@@ -92,6 +162,7 @@ test("home implements the v24 fixed progressive previews", async () => {
     cardRepository,
   ] = await Promise.all([
     readFile(new URL("../../app/home/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("./home-date-state.ts", import.meta.url), "utf8"),
     readFile(new URL("../../app/api/home-visual/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../../components/ui.tsx", import.meta.url), "utf8"),
@@ -198,11 +269,34 @@ test("home implements the v24 fixed progressive previews", async () => {
   assert.match(page, /replaceAll\(" · ", "\\u00a0· "\)/);
   assert.match(
     page,
+    /\.from\("itinerary_items"\)[\s\S]*?\.select\(\s*"day_no,sequence,time_label,location_name,title,description,item_type",?\s*\)[\s\S]*?\.eq\("trip_id", trip\.id\)[\s\S]*?\.eq\("day_no", schedule\.dayNo\)[\s\S]*?\.order\("sequence", \{ ascending: true \}\)/,
+  );
+  assert.doesNotMatch(page, /\.select\(\s*["'`]\*["'`]\s*\)/);
+  assert.match(
+    page,
+    /createHomeSchedulePreviewCopy\([\s\S]*?data[\s\S]*?trip\.startDate,[\s\S]*?schedule\.dayNo/,
+  );
+  assert.match(page, /scheduleCopy\?\.tripId === trip\.id/);
+  assert.match(page, /\{scheduleTitle\.replaceAll\(" · ", "\\u00a0· "\)\}/);
+  assert.match(page, /\{scheduleSupporting\.replaceAll\(" · ", "\\u00a0· "\)\}/);
+  assert.doesNotMatch(homeDateState, /title:\s*".+ · .+"|supporting:\s*".+ · .+"/);
+  assert.match(page, /\(data \?\? \[\]\) as ItineraryItemRow\[\]/);
+  assert.match(page, /\?\? HOME_SCHEDULE_FALLBACK/);
+  assert.match(page, /catch \{[\s\S]*?\.\.\.HOME_SCHEDULE_FALLBACK/);
+  assert.match(page, /<h1 id="home-title" className="sr-only">\s*\{trip\.title\}\s*<\/h1>/);
+  assert.match(
+    page,
+    /<p id="home-trip-summary" className="sr-only">\s*\{trip\.startDate\}부터 \{trip\.endDate\}까지, 가족 10명 여행\s*<\/p>/,
+  );
+  assert.match(page, /aria-describedby="home-trip-summary"/);
+  assert.doesNotMatch(page, /family_members|loadFamilyRoster|rosterCount/);
+  assert.match(
+    page,
     /<div className="home-media-fill home-schedule-media">\s*<span className="home-schedule-badge">\{schedule\.label\}<\/span>\s*<\/div>/,
   );
   assert.doesNotMatch(
-    page,
-    /itinerary_items|selectRandomSchedulePreviewImage|SchedulePreviewImageItem|scheduleImage|getSupabaseBrowserClient/,
+    `${page}\n${homeDateState}`,
+    /image_url|Math\.random|selectRandomSchedulePreviewImage|SchedulePreviewImageItem|scheduleImage/,
   );
   assert.doesNotMatch(page, /MemoryCardPreview/);
 

@@ -16,13 +16,22 @@ import {
 import { loadLatestMemoryCard } from "@/features/cards/memory-card-repository";
 import { getMemoryCardTemplateSpec } from "@/features/cards/memory-card-template-spec";
 import type { MemoryCard } from "@/features/cards/memory-card";
-import { getHomeSchedulePreview } from "@/features/home/home-date-state";
+import {
+  createHomeSchedulePreviewCopy,
+  getHomeSchedulePreview,
+} from "@/features/home/home-date-state";
 import { getHomeImageFit } from "@/features/home/home-preview-fit";
+import type { ItineraryItemRow } from "@/features/schedule/schedule-data";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Region = { x: number; y: number; w: number; h: number };
 
 const HOME_ARTBOARD = { width: 895, height: 1756 } as const;
 const HOME_MEDIA_BLEED = 3;
+const HOME_SCHEDULE_FALLBACK = {
+  title: "여행 일정",
+  supporting: "일정 보기",
+} as const;
 
 const regions = {
   quickSchedule: { x: 20, y: 695, w: 260, h: 259 },
@@ -124,6 +133,12 @@ function HomePreviewImage({
 
 function HomeScreen() {
   const { trip } = useCurrentTripSession();
+  const [scheduleCopy, setScheduleCopy] = useState<{
+    tripId: string;
+    dayNo: number;
+    title: string;
+    supporting: string;
+  } | null>(null);
   const [albumPreview, setAlbumPreview] = useState<{
     count: number;
     photo: AlbumPhoto | null;
@@ -133,6 +148,13 @@ function HomeScreen() {
     photo: AlbumPhoto | null;
   } | null>(null);
   const schedule = getHomeSchedulePreview();
+  const currentScheduleCopy =
+    scheduleCopy?.tripId === trip.id && scheduleCopy.dayNo === schedule.dayNo
+      ? scheduleCopy
+      : null;
+  const scheduleTitle = currentScheduleCopy?.title ?? "여행 일정";
+  const scheduleSupporting =
+    currentScheduleCopy?.supporting ?? "일정을 불러오는 중";
   const latestCard = cardPreview?.card;
   const latestCardTemplate = latestCard
     ? getMemoryCardTemplateSpec(latestCard.templateKey)?.displayName
@@ -153,10 +175,54 @@ function HomeScreen() {
           : "가장 최근 추억 카드"
         : "우리만의 추억 카드를 만들어보세요";
   const previewAccessibleDetails = {
-    "/schedule": `${schedule.title}, ${schedule.supporting}`,
+    "/schedule": `${scheduleTitle}, ${scheduleSupporting}`,
     "/album": `${albumTitle}${albumMeta ? `, ${albumMeta}` : ""}`,
     "/cards": `${cardTitle}${latestCardTemplate ? `, ${latestCardTemplate}` : ""}`,
   } as const;
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadScheduleCopy() {
+      try {
+        const { data, error } = await getSupabaseBrowserClient()
+          .from("itinerary_items")
+          .select(
+            "day_no,sequence,time_label,location_name,title,description,item_type",
+          )
+          .eq("trip_id", trip.id)
+          .eq("day_no", schedule.dayNo)
+          .order("sequence", { ascending: true });
+
+        if (!active) return;
+        if (error) throw error;
+
+        setScheduleCopy({
+          tripId: trip.id,
+          dayNo: schedule.dayNo,
+          ...(createHomeSchedulePreviewCopy(
+            (data ?? []) as ItineraryItemRow[],
+            trip.startDate,
+            schedule.dayNo,
+          ) ?? HOME_SCHEDULE_FALLBACK),
+        });
+      } catch {
+        if (active) {
+          setScheduleCopy({
+            tripId: trip.id,
+            dayNo: schedule.dayNo,
+            ...HOME_SCHEDULE_FALLBACK,
+          });
+        }
+      }
+    }
+
+    void loadScheduleCopy();
+
+    return () => {
+      active = false;
+    };
+  }, [schedule.dayNo, trip.id, trip.startDate]);
 
   useEffect(() => {
     let active = true;
@@ -195,10 +261,17 @@ function HomeScreen() {
 
   return (
     <MobileShell className="home-page-shell">
-      <main className="home-artboard" aria-labelledby="home-title">
+      <main
+        className="home-artboard"
+        aria-labelledby="home-title"
+        aria-describedby="home-trip-summary"
+      >
         <h1 id="home-title" className="sr-only">
-          후쿠오카 가족여행
+          {trip.title}
         </h1>
+        <p id="home-trip-summary" className="sr-only">
+          {trip.startDate}부터 {trip.endDate}까지, 가족 10명 여행
+        </p>
 
         <Image
           src="/api/home-visual"
@@ -232,13 +305,13 @@ function HomeScreen() {
             className="home-dynamic-copy home-schedule-title"
             style={regionStyle(regions.scheduleTitle)}
           >
-            {schedule.title.replaceAll(" · ", "\u00a0· ")}
+            {scheduleTitle.replaceAll(" · ", "\u00a0· ")}
           </p>
           <p
             className="home-dynamic-copy home-schedule-meta"
             style={regionStyle(regions.scheduleMeta)}
           >
-            {schedule.supporting.replaceAll(" · ", "\u00a0· ")}
+            {scheduleSupporting.replaceAll(" · ", "\u00a0· ")}
           </p>
 
           <div
