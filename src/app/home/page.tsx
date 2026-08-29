@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { BottomNav, MobileShell } from "@/components/ui";
 import {
   loadHomeAlbumPhoto,
@@ -16,13 +16,8 @@ import {
 import { loadLatestMemoryCard } from "@/features/cards/memory-card-repository";
 import { getMemoryCardTemplateSpec } from "@/features/cards/memory-card-template-spec";
 import type { MemoryCard } from "@/features/cards/memory-card";
-import {
-  getHomeSchedulePreview,
-  selectRandomSchedulePreviewImage,
-  type SchedulePreviewImageItem,
-} from "@/features/home/home-date-state";
+import { getHomeSchedulePreview } from "@/features/home/home-date-state";
 import { getHomeImageFit } from "@/features/home/home-preview-fit";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Region = { x: number; y: number; w: number; h: number };
 
@@ -137,10 +132,7 @@ function HomeScreen() {
     card: MemoryCard | null;
     photo: AlbumPhoto | null;
   } | null>(null);
-  const [scheduleImage, setScheduleImage] = useState<string | null>(null);
-  const scheduleImageCache = useRef(new Map<string, string | null>());
   const schedule = getHomeSchedulePreview();
-  const scheduleImageKey = `${trip.id}:${schedule.dayNo}`;
   const latestCard = cardPreview?.card;
   const latestCardTemplate = latestCard
     ? getMemoryCardTemplateSpec(latestCard.templateKey)?.displayName
@@ -201,35 +193,6 @@ function HomeScreen() {
     };
   }, [trip.id]);
 
-  useEffect(() => {
-    let active = true;
-
-    void getSupabaseBrowserClient()
-      .from("itinerary_items")
-      .select("*")
-      .eq("trip_id", trip.id)
-      .eq("day_no", schedule.dayNo)
-      .then(({ data }) => {
-        if (!active) return;
-
-        if (!scheduleImageCache.current.has(scheduleImageKey)) {
-          scheduleImageCache.current.set(
-            scheduleImageKey,
-            selectRandomSchedulePreviewImage(
-              (data ?? []) as SchedulePreviewImageItem[],
-            ),
-          );
-        }
-        setScheduleImage(scheduleImageCache.current.get(scheduleImageKey) ?? null);
-      }, () => {
-        if (active) setScheduleImage(null);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [schedule.dayNo, scheduleImageKey, trip.id]);
-
   return (
     <MobileShell className="home-page-shell">
       <main className="home-artboard" aria-labelledby="home-title">
@@ -262,12 +225,6 @@ function HomeScreen() {
             style={mediaRegionStyle(regions.scheduleMedia)}
           >
             <div className="home-media-fill home-schedule-media">
-              {scheduleImage && (
-                <HomePreviewImage
-                  src={scheduleImage}
-                  region={regions.scheduleMedia}
-                />
-              )}
               <span className="home-schedule-badge">{schedule.label}</span>
             </div>
           </div>

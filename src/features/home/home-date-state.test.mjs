@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   getHomeSchedulePreview,
   HOME_SCHEDULE_PREVIEWS,
-  selectRandomSchedulePreviewImage,
 } from "./home-date-state.ts";
 import { getHomeImageFit } from "./home-preview-fit.ts";
 
@@ -58,55 +57,6 @@ test("home schedule preview keeps the v14 itinerary copy", () => {
   );
 });
 
-test("schedule preview image selection filters missing and unsafe values", () => {
-  const items = [
-    {},
-    { image_url: null },
-    { image_url: 42 },
-    { image_url: "" },
-    { image_url: "not-a-url" },
-    { image_url: "http://example.com/insecure.jpg" },
-    { image_url: "//example.com/ambiguous.jpg" },
-    { image_url: "data:image/png;base64,unsafe" },
-    { image_url: " /itinerary/day-1.webp " },
-  ];
-
-  assert.equal(
-    selectRandomSchedulePreviewImage(items, () => 0),
-    "/itinerary/day-1.webp",
-  );
-});
-
-test("schedule preview image selection returns its only valid candidate", () => {
-  assert.equal(
-    selectRandomSchedulePreviewImage(
-      [{ image_url: "https://images.example.com/day-1.jpg" }],
-      () => 0.99,
-    ),
-    "https://images.example.com/day-1.jpg",
-  );
-});
-
-test("schedule preview image selection uses injected RNG deterministically", () => {
-  const items = [
-    { image_url: "/one.jpg" },
-    { image_url: "/two.jpg" },
-    { image_url: "/three.jpg" },
-  ];
-
-  assert.equal(selectRandomSchedulePreviewImage(items, () => 0), "/one.jpg");
-  assert.equal(selectRandomSchedulePreviewImage(items, () => 0.5), "/two.jpg");
-  assert.equal(selectRandomSchedulePreviewImage(items, () => 0.99), "/three.jpg");
-});
-
-test("schedule preview image selection signals fallback with zero candidates", () => {
-  assert.equal(selectRandomSchedulePreviewImage([], () => 0), null);
-  assert.equal(
-    selectRandomSchedulePreviewImage([{ image_url: " " }], () => 0),
-    null,
-  );
-});
-
 test("home preview fit limits crop and preserves extreme source ratios", () => {
   assert.deepEqual(getHomeImageFit(null, null, 1, 1), {
     mode: "cover",
@@ -129,7 +79,7 @@ test("home preview fit limits crop and preserves extreme source ratios", () => {
   });
 });
 
-test("home implements the v21 fixed progressive previews", async () => {
+test("home implements the v24 fixed progressive previews", async () => {
   const [
     page,
     route,
@@ -246,13 +196,14 @@ test("home implements the v21 fixed progressive previews", async () => {
   assert.match(page, /loading="lazy"[\s\S]*decoding="async"[\s\S]*fetchPriority="low"/);
   assert.match(page, /dataset\.loaded = "true"/);
   assert.match(page, /replaceAll\(" · ", "\\u00a0· "\)/);
-  assert.match(page, /\.from\("itinerary_items"\)[\s\S]*\.select\("\*"\)[\s\S]*\.eq\("trip_id", trip\.id\)[\s\S]*\.eq\("day_no", schedule\.dayNo\)/);
-  assert.match(page, /selectRandomSchedulePreviewImage\([\s\S]*\(data \?\? \[\]\) as SchedulePreviewImageItem\[\]/);
-  assert.match(page, /const scheduleImageCache = useRef\(new Map<string, string \| null>\(\)\)/);
-  assert.match(page, /const scheduleImageKey = `\$\{trip\.id\}:\$\{schedule\.dayNo\}`/);
-  assert.match(page, /scheduleImageCache\.current\.has\(scheduleImageKey\)[\s\S]*scheduleImageCache\.current\.set\(/);
-  assert.match(page, /\}, \[schedule\.dayNo, scheduleImageKey, trip\.id\]\);/);
-  assert.match(page, /<div className="home-media-fill home-schedule-media">[\s\S]*\{scheduleImage && \([\s\S]*src=\{scheduleImage\}/);
+  assert.match(
+    page,
+    /<div className="home-media-fill home-schedule-media">\s*<span className="home-schedule-badge">\{schedule\.label\}<\/span>\s*<\/div>/,
+  );
+  assert.doesNotMatch(
+    page,
+    /itinerary_items|selectRandomSchedulePreviewImage|SchedulePreviewImageItem|scheduleImage|getSupabaseBrowserClient/,
+  );
   assert.doesNotMatch(page, /MemoryCardPreview/);
 
   for (const [href, label] of [
@@ -298,6 +249,8 @@ test("home implements the v21 fixed progressive previews", async () => {
   assert.match(css, /\.home-memory-card-thumbnail\s*\{[^}]*width: 92%[^}]*height: 90%[^}]*overflow: hidden[^}]*transform: rotate\(-3deg\)[^}]*background: transparent/s);
   assert.doesNotMatch(css, /\.home-memory-card-thumbnail\s*\{[^}]*(?:padding|box-shadow):/s);
   assert.match(css, /\.home-preview-media-mask\s*\{[^}]*background: #f1e2ca/s);
+  assert.match(css, /\.home-schedule-media\s*\{[^}]*linear-gradient/s);
+  assert.match(css, /\.home-schedule-media::before,[\s\S]*\.home-schedule-media::after/s);
   assert.match(css, /\.home-memory-clip\s*\{[^}]*#f3e5cd[^}]*#e9d5b5/s);
   assert.match(css, /\.home-dynamic-copy\s*\{[^}]*min-width: 0[^}]*overflow: hidden/s);
   assert.match(css, /\.home-schedule-title,[\s\S]*\.home-card-meta\s*\{[^}]*display: block[^}]*white-space: nowrap[^}]*text-overflow: ellipsis/s);

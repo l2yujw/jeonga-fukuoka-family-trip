@@ -28,37 +28,6 @@ export const HOME_SCHEDULE_PREVIEWS = [
   },
 ] as const;
 
-export type SchedulePreviewImageItem = {
-  image_url?: unknown;
-};
-
-const isUsableImageUrl = (value: unknown): value is string => {
-  if (typeof value !== "string" || !value.trim()) return false;
-  const url = value.trim();
-  if (url.startsWith("/")) return !url.startsWith("//");
-
-  try {
-    return new URL(url).protocol === "https:";
-  } catch {
-    return false;
-  }
-};
-
-export function selectRandomSchedulePreviewImage(
-  items: readonly SchedulePreviewImageItem[],
-  random = Math.random,
-) {
-  const candidates = items
-    .map(({ image_url }) => image_url)
-    .filter(isUsableImageUrl)
-    .map((imageUrl) => imageUrl.trim());
-
-  if (!candidates.length) return null;
-  return candidates[
-    Math.min(candidates.length - 1, Math.floor(random() * candidates.length))
-  ];
-}
-
 const localDateKey = (date: Date, timeZone: string) =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone,
