@@ -1,5 +1,6 @@
 import type {
   AlbumPhoto,
+  AlbumUploadDraft,
   LocalPhotoDraft,
   PersistedPhotoRow,
 } from "./album-types";
@@ -29,6 +30,19 @@ export function validateAlbumFile(file: Pick<File, "size" | "type">) {
   return null;
 }
 
+export function partitionAlbumFiles(files: readonly File[]) {
+  const accepted: File[] = [];
+  const rejected: { file: File; error: string }[] = [];
+
+  for (const file of files) {
+    const error = validateAlbumFile(file);
+    if (error) rejected.push({ file, error });
+    else accepted.push(file);
+  }
+
+  return { accepted, rejected };
+}
+
 export function createLocalPhotoDraft(file: File) {
   const objectUrl = URL.createObjectURL(file);
   const ready = new Promise<LocalPhotoDraft>((resolve) => {
@@ -46,6 +60,108 @@ export function createLocalPhotoDraft(file: File) {
   });
 
   return { objectUrl, ready };
+}
+
+export function createAlbumUploadDraft(
+  draft: LocalPhotoDraft,
+  clientId = crypto.randomUUID(),
+): AlbumUploadDraft {
+  return { clientId, draft, caption: "", status: "ready" };
+}
+
+export function appendAlbumUploadDrafts(
+  current: readonly AlbumUploadDraft[],
+  added: readonly AlbumUploadDraft[],
+) {
+  return [...current, ...added];
+}
+
+export function removeAlbumUploadDraft(
+  drafts: readonly AlbumUploadDraft[],
+  clientId: string,
+) {
+  return drafts.filter((draft) => draft.clientId !== clientId);
+}
+
+export function updateAlbumUploadDraftCaption(
+  drafts: readonly AlbumUploadDraft[],
+  clientId: string,
+  caption: string,
+) {
+  return drafts.map((draft) =>
+    draft.clientId === clientId ? { ...draft, caption } : draft,
+  );
+}
+
+export function getUploadableAlbumDrafts(drafts: readonly AlbumUploadDraft[]) {
+  return drafts.filter(({ status }) => status !== "uploading");
+}
+
+export function markAlbumDraftsUploading(
+  drafts: readonly AlbumUploadDraft[],
+  clientIds: ReadonlySet<string>,
+): AlbumUploadDraft[] {
+  return drafts.map((draft) =>
+    clientIds.has(draft.clientId)
+      ? { ...draft, status: "uploading", error: undefined }
+      : draft,
+  );
+}
+
+export function settleAlbumUploadDraft(
+  drafts: readonly AlbumUploadDraft[],
+  clientId: string,
+  error?: string,
+): AlbumUploadDraft[] {
+  if (!error) return removeAlbumUploadDraft(drafts, clientId);
+  return drafts.map((draft) =>
+    draft.clientId === clientId
+      ? { ...draft, status: "failed", error }
+      : draft,
+  );
+}
+
+export type BoundedUploadResult<Result> =
+  | { clientId: string; status: "fulfilled"; value: Result }
+  | { clientId: string; status: "rejected"; reason: unknown };
+
+export async function runBoundedUploads<
+  Item extends { clientId: string },
+  Result,
+>(
+  items: readonly Item[],
+  upload: (item: Item) => Promise<Result>,
+  concurrency: number,
+  onSettled?: (result: BoundedUploadResult<Result>) => void,
+) {
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new Error("invalid-upload-concurrency");
+  }
+
+  const results = new Array<BoundedUploadResult<Result>>(items.length);
+  let nextIndex = 0;
+
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      const item = items[index];
+      try {
+        results[index] = {
+          clientId: item.clientId,
+          status: "fulfilled",
+          value: await upload(item),
+        };
+      } catch (reason) {
+        results[index] = { clientId: item.clientId, status: "rejected", reason };
+      }
+      onSettled?.(results[index]);
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, worker),
+  );
+  return results;
 }
 
 export function normalizeCaption(caption: string) {

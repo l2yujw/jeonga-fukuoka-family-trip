@@ -3,11 +3,20 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   ALBUM_FILE_MAX_BYTES,
+  appendAlbumUploadDrafts,
   buildPhotoInsertPayload,
   buildStoragePath,
+  createAlbumUploadDraft,
   getAlbumPhotoDownloadFilename,
+  getUploadableAlbumDrafts,
   isPhotoOwner,
+  markAlbumDraftsUploading,
   mapPersistedPhotoRows,
+  partitionAlbumFiles,
+  removeAlbumUploadDraft,
+  runBoundedUploads,
+  settleAlbumUploadDraft,
+  updateAlbumUploadDraftCaption,
   validateAlbumFile,
 } from "./album-utils.ts";
 
@@ -28,6 +37,100 @@ test("album accepts only supported non-empty images up to 15MB", () => {
     /15MB/,
   );
   assert.match(validateAlbumFile({ size: 1, type: "image/gif" }), /JPEG/);
+});
+
+test("multi-selection accepts valid files independently and preserves order", () => {
+  const first = albumFile("same.jpg", "image/jpeg");
+  const invalid = albumFile("too-large.png", "image/png", ALBUM_FILE_MAX_BYTES + 1);
+  const second = albumFile("same.jpg", "image/jpeg");
+  const { accepted, rejected } = partitionAlbumFiles([first, invalid, second]);
+
+  assert.deepEqual(accepted, [first, second]);
+  assert.deepEqual(rejected, [
+    { file: invalid, error: "사진은 15MB 이하만 선택할 수 있어요." },
+  ]);
+
+  const existing = [createAlbumUploadDraft(localDraft(albumFile("old.jpg")), "old")];
+  const added = [
+    createAlbumUploadDraft(localDraft(first), "duplicate-1"),
+    createAlbumUploadDraft(localDraft(second), "duplicate-2"),
+  ];
+  const appended = appendAlbumUploadDrafts(existing, added);
+  assert.deepEqual(appended.map(({ clientId }) => clientId), [
+    "old",
+    "duplicate-1",
+    "duplicate-2",
+  ]);
+  assert.notEqual(appended[1].clientId, appended[2].clientId);
+});
+
+test("draft state helpers target client ids and keep failed captions retriable", () => {
+  const drafts = [
+    createAlbumUploadDraft(localDraft(albumFile("same.jpg")), "first"),
+    createAlbumUploadDraft(localDraft(albumFile("same.jpg")), "second"),
+  ];
+  const captioned = updateAlbumUploadDraftCaption(drafts, "second", "둘째 사진");
+  assert.equal(captioned[0].caption, "");
+  assert.equal(captioned[1].caption, "둘째 사진");
+  assert.deepEqual(
+    removeAlbumUploadDraft(captioned, "first").map(({ clientId }) => clientId),
+    ["second"],
+  );
+
+  const uploading = markAlbumDraftsUploading(
+    captioned,
+    new Set(["first", "second"]),
+  );
+  const afterSuccess = settleAlbumUploadDraft(uploading, "first");
+  const afterFailure = settleAlbumUploadDraft(
+    afterSuccess,
+    "second",
+    "retry me",
+  );
+  assert.deepEqual(afterFailure, [
+    {
+      ...captioned[1],
+      status: "failed",
+      error: "retry me",
+    },
+  ]);
+  assert.deepEqual(
+    getUploadableAlbumDrafts(afterFailure).map(({ clientId }) => clientId),
+    ["second"],
+  );
+});
+
+test("bounded uploads limit concurrency and preserve partial-result identity", async () => {
+  const items = ["first", "second", "third", "fourth"].map((clientId) => ({
+    clientId,
+  }));
+  let active = 0;
+  let maximumActive = 0;
+
+  const results = await runBoundedUploads(
+    items,
+    async ({ clientId }) => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      if (clientId === "third") throw new Error("expected failure");
+      return `${clientId}-photo`;
+    },
+    2,
+  );
+
+  assert.equal(maximumActive, 2);
+  assert.deepEqual(results.map(({ clientId }) => clientId), [
+    "first",
+    "second",
+    "third",
+    "fourth",
+  ]);
+  assert.deepEqual(
+    results.map(({ status }) => status),
+    ["fulfilled", "fulfilled", "rejected", "fulfilled"],
+  );
 });
 
 test("storage paths start with trip/auth UUIDs and use MIME extensions", () => {
@@ -182,4 +285,12 @@ function photoRow(overrides = {}) {
     created_at: "2026-09-11T00:00:00Z",
     ...overrides,
   };
+}
+
+function albumFile(name, type = "image/jpeg", size = 1024) {
+  return { name, type, size };
+}
+
+function localDraft(file) {
+  return { file, previewUrl: null, width: null, height: null };
 }
