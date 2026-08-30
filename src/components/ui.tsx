@@ -138,7 +138,7 @@ export function SectionHeader({
 export function MobileShell({ className = "", ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={`mx-auto min-h-svh w-full max-w-mobile bg-background ${className}`}
+      className={`mobile-shell mx-auto min-h-svh w-full max-w-mobile bg-background ${className}`}
       {...props}
     />
   );
@@ -157,24 +157,50 @@ const bottomNavItems = [
 
 function BottomNavIcon({ icon }: { icon: (typeof bottomNavItems)[number]["icon"] }) {
   const paths = {
-    home: <path d="m3.5 11 8.5-7 8.5 7v8.5h-6v-5h-5v5h-6z" />,
+    home: (
+      <>
+        <path d="M2 14.5 18 4l16 10.5M5.5 13v14.3h9v-8.1h7v8.1h9V13" />
+        <g className="bottom-nav-flower bottom-nav-flower--high">
+          <circle cx="25.4" cy="7.4" r="2.5" />
+          <circle cx="29.8" cy="7.4" r="2.5" />
+          <circle cx="27.6" cy="4" r="2.5" />
+          <circle cx="27.6" cy="10.8" r="2.5" />
+          <circle cx="27.6" cy="7.4" r="1.5" />
+        </g>
+      </>
+    ),
     schedule: (
       <>
-        <rect x="3.5" y="5.5" width="17" height="15" rx="2" />
-        <path d="M7.5 3.5v4M16.5 3.5v4M3.5 10h17M7.5 14h2M14.5 14h2" />
+        <rect x="2.5" y="5.5" width="28.5" height="23" rx="3.2" />
+        <path d="M8.5 2.5v6.5M25.5 2.5v6.5M2.5 12h28.5" />
+        <g className="bottom-nav-flower bottom-nav-flower--calendar">
+          <circle cx="14.4" cy="21" r="2.5" />
+          <circle cx="19.6" cy="21" r="2.5" />
+          <circle cx="17" cy="17.2" r="2.5" />
+          <circle cx="17" cy="24.8" r="2.5" />
+          <circle cx="17" cy="21" r="1.5" />
+        </g>
       </>
     ),
     album: (
       <>
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <circle cx="8" cy="9" r="1.5" />
-        <path d="m4.5 18 5-5 3.25 3.25 2.75-2.75 4 4" />
+        <rect x="3" y="4" width="27.5" height="24" rx="3.2" />
+        <circle cx="10.6" cy="10.5" r="2.4" />
+        <path d="m4.5 26 8.6-8.8 5.5 5.2 4.8-4.7 7.7 7.4" />
       </>
     ),
     card: (
       <>
-        <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
-        <path d="M12 17s-5-2.8-5-6.1C7 8 10.7 7.4 12 9.6 13.3 7.4 17 8 17 10.9 17 14.2 12 17 12 17Z" />
+        <rect x="3" y="4" width="27.5" height="24" rx="3.2" />
+        <path d="M16.75 22.8s-7.6-4.2-7.6-9c0-4.3 5.55-5.1 7.6-1.8 2.05-3.3 7.6-2.5 7.6 1.8 0 4.8-7.6 9-7.6 9Z" />
+        <path className="bottom-nav-bookmark" d="M12.2 28v4l4.55-2.8L21.3 32v-4" />
+        <g className="bottom-nav-flower bottom-nav-flower--low">
+          <circle cx="37.5" cy="19" r="2" />
+          <circle cx="41.2" cy="19" r="2" />
+          <circle cx="39.3" cy="16" r="2" />
+          <circle cx="39.3" cy="21.9" r="2" />
+          <circle cx="39.3" cy="19" r="1.1" />
+        </g>
       </>
     ),
   } as const;
@@ -184,14 +210,23 @@ function BottomNavIcon({ icon }: { icon: (typeof bottomNavItems)[number]["icon"]
       aria-hidden="true"
       className="bottom-nav-icon"
       data-icon={icon}
-      viewBox="0 0 24 24"
+      viewBox="0 0 34 32"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2.2"
+      strokeWidth="1.4"
       strokeLinecap="round"
       strokeLinejoin="round"
     >
       {paths[icon]}
+      <g
+        className="bottom-nav-leaves"
+        transform={icon === "card" ? "translate(14.2 16) scale(.55 .47)" : undefined}
+      >
+        <path d="M31.5 29.2c3.1-1.7 6.1-4.6 9.4-9" />
+        <ellipse cx="34.2" cy="26.7" rx="3.2" ry="1.7" transform="rotate(23 34.2 26.7)" />
+        <ellipse cx="38.5" cy="23.7" rx="3.2" ry="1.7" transform="rotate(-43 38.5 23.7)" />
+        <ellipse cx="41.6" cy="21" rx="2.8" ry="1.5" transform="rotate(-35 41.6 21)" />
+      </g>
     </svg>
   );
 }

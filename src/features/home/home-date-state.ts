@@ -21,7 +21,7 @@ export const HOME_SCHEDULE_DAYS = [
   },
 ] as const;
 
-const preferredSupportingTypes = new Set(["sightseeing", "meal", "optional"]);
+const preferredSupportingTypes = new Set(["sightseeing", "meal"]);
 const excludedSupportingTypes = new Set(["move", "flight", "hotel"]);
 
 export function createHomeSchedulePreviewCopy(

@@ -53,42 +53,44 @@ test("home schedule day constants contain date state only", () => {
   );
 });
 
-test("home schedule copy reflects the selected current-seed-like day", () => {
+test("home schedule copy reflects the confirmed Day 2 itinerary", () => {
   const rows = [
-    itineraryRow({ location_name: "다자이후", title: "다자이후 텐만구" }),
-    itineraryRow({ sequence: 20, location_name: "유후인", title: "유후인 이동", item_type: "move" }),
-    itineraryRow({ sequence: 30, location_name: "유후인", title: "유노쓰보 가이도" }),
-    itineraryRow({ sequence: 40, location_name: "유후인", title: "긴린코 호수" }),
-    itineraryRow({ sequence: 50, location_name: "벳부", title: "벳부 이동", item_type: "move" }),
-    itineraryRow({ sequence: 60, location_name: "벳부", title: "가마도지옥" }),
+    itineraryRow({ location_name: "우레시노", title: "호텔 조식", item_type: "meal" }),
+    itineraryRow({ sequence: 20, location_name: "나가사키", title: "나가사키 이동", item_type: "move" }),
+    itineraryRow({ sequence: 30, location_name: "나가사키", title: "나가사키 차이나타운" }),
+    itineraryRow({ sequence: 40, location_name: "나가사키", title: "오우라 천주당" }),
+    itineraryRow({ sequence: 50, location_name: "나가사키", title: "그라바엔" }),
+    itineraryRow({ sequence: 60, location_name: "나가사키", title: "중식", item_type: "meal" }),
+    itineraryRow({ sequence: 70, location_name: "후쿠오카", title: "후쿠오카 이동", item_type: "move" }),
+    itineraryRow({ sequence: 80, location_name: "후쿠오카", title: "텐진거리 자유시간" }),
   ];
   const originalRows = structuredClone(rows);
 
   assert.deepEqual(
     createHomeSchedulePreviewCopy(rows, "2026-09-11", 2),
     {
-      title: "다자이후 · 유후인 · 벳부",
-      supporting: "다자이후 텐만구 · 유노쓰보 가이도 · 긴린코 호수 · 가마도지옥",
+      title: "우레시노 · 나가사키 · 후쿠오카",
+      supporting: "호텔 조식 · 나가사키 차이나타운 · 오우라 천주당 · 그라바엔 · 중식 · 텐진거리 자유시간",
     },
   );
   assert.deepEqual(rows, originalRows);
 });
 
-test("home supporting copy prefers actual sightseeing, meal, and optional titles", () => {
+test("home supporting copy prefers actual sightseeing and meal titles", () => {
   const copy = createHomeSchedulePreviewCopy(
     [
       itineraryRow({ title: "공항 도착", item_type: "flight" }),
       itineraryRow({ sequence: 20, title: "호텔 조식", item_type: "meal" }),
       itineraryRow({ sequence: 30, title: "관광지", item_type: "sightseeing" }),
       itineraryRow({ sequence: 40, title: "다음 도시 이동", item_type: "move" }),
-      itineraryRow({ sequence: 50, title: "자유 일정", item_type: "optional" }),
+      itineraryRow({ sequence: 50, title: "자유시간", item_type: "sightseeing" }),
       itineraryRow({ sequence: 60, title: "호텔 체크인", item_type: "hotel" }),
     ],
     "2026-09-11",
     2,
   );
 
-  assert.equal(copy?.supporting, "호텔 조식 · 관광지 · 자유 일정");
+  assert.equal(copy?.supporting, "호텔 조식 · 관광지 · 자유시간");
   assert.doesNotMatch(copy?.supporting ?? "", /공항 도착|다음 도시 이동|호텔 체크인/);
 });
 
@@ -354,7 +356,10 @@ test("home implements the v25 itinerary-backed progressive previews", async () =
   assert.match(css, /font-size: clamp\(10\.5px, 2\.7vw, 12px\)/);
   assert.match(css, /font-size: clamp\(9px, 2\.35vw, 10\.5px\)/);
   assert.match(css, /font-size: clamp\(9\.5px, 2\.4vw, 10\.5px\)/);
-  assert.doesNotMatch(`${page}\n${homeCss}`, /420 \/ 752|100v[hw]|100sv[hw]|margin-(?:left|right):\s*-/);
+  assert.doesNotMatch(
+    `${page}\n${homeCss}`,
+    /420 \/ 752|100vh|100vw(?! - 32px)|100sv[hw]|margin-(?:left|right):\s*-/,
+  );
   assert.doesNotMatch(css, /\.home-main|\.home-quick-actions|\.home-preview-grid|\.home-memory-banner/);
   assert.match(css, /html\s*\{[^}]*-webkit-text-size-adjust: 100%[^}]*text-size-adjust: 100%/s);
 
@@ -368,11 +373,20 @@ test("home implements the v25 itinerary-backed progressive previews", async () =
   assert.match(page, /<BottomNav activeHref="\/home" \/>/);
   assert.match(
     css,
-    /\.bottom-nav\s*\{[^}]*height: calc\(72px \+ env\(safe-area-inset-bottom\)\)[^}]*padding: 9px 11px calc\(9px \+ env\(safe-area-inset-bottom\)\)/s,
+    /\.bottom-nav\s*\{[^}]*position: fixed[^}]*bottom: calc\(12px \+ env\(safe-area-inset-bottom\)\)[^}]*left: 50%[^}]*width: min\(calc\(100vw - 32px\), 398px\)[^}]*transform: translateX\(-50%\)[^}]*background: transparent/s,
   );
-  assert.match(css, /\.bottom-nav-list\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/s);
+  assert.match(css, /\.bottom-nav-list\s*\{[^}]*aspect-ratio: 1881 \/ 359[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/s);
   assert.match(css, /\.bottom-nav-link\s*\{[^}]*min-height: 44px/s);
-  assert.match(css, /\.bottom-nav-link\[aria-current="page"\]\s*\{[^}]*color: #c83818/s);
+  assert.match(css, /\.bottom-nav-list > li \+ li::before\s*\{[^}]*left: 0[^}]*background: #edbd93/s);
+  assert.match(css, /\.bottom-nav-link\s*\{[^}]*font-family: var\(--font-editorial\)[^}]*font-size: 11px[^}]*font-weight: 600/s);
+  assert.match(css, /\.bottom-nav-link\[aria-current="page"\]::before\s*\{[^}]*left: 50%[^}]*width: 63%[^}]*height: 74%[^}]*background: rgb\(250 170 153 \/ 25%\)/s);
+  assert.match(css, /\.bottom-nav-link\[aria-current="page"\]::after\s*\{[^}]*left: 50%[^}]*width: 37%[^}]*background: #ef3125/s);
+  assert.match(css, /\.bottom-nav-icon\s*\{[^}]*width: 25px[^}]*height: 21px/s);
+  assert.match(css, /\.mobile-shell:has\(> \.bottom-nav\)\s*\{[^}]*padding-bottom: calc\(100px \+ env\(safe-area-inset-bottom\)\)/s);
+  assert.match(ui, /className="bottom-nav-leaves"/);
+  assert.match(ui, /viewBox="0 0 34 32"/);
+  assert.match(ui, /strokeWidth="1\.4"/);
+  assert.match(ui, /aria-current=\{activeHref === href \? "page" : undefined\}/);
 
   assert.doesNotMatch(`${page}\n${route}\n${css}`, /전체 보기|42장/);
   assert.doesNotMatch(

@@ -4,7 +4,6 @@ export type ScheduleItemType =
   | "sightseeing"
   | "meal"
   | "hotel"
-  | "optional"
   | "other";
 
 export type ItineraryItemRow = {
@@ -22,8 +21,7 @@ export type ScheduleItem = {
   title: string;
   description?: string;
   type: ScheduleItemType;
-  timeLabel?: string | null;
-  statusLabel?: string | null;
+  timeLabel?: string;
 };
 
 export type ScheduleDay = {
@@ -40,35 +38,53 @@ const itemTypes = new Set<ScheduleItemType>([
   "sightseeing",
   "meal",
   "hotel",
-  "optional",
 ]);
 
 const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
 
+const localDateKey = (date: Date, timeZone: string) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+
 const readItemType = (value: string | null): ScheduleItemType =>
   itemTypes.has(value as ScheduleItemType) ? (value as ScheduleItemType) : "other";
 
-function readStatusLabel(type: ScheduleItemType, description: string | null) {
-  if (type === "optional") return "선택 일정";
-  if (description?.includes("재확인 필요")) return "재확인 필요";
-  if (type !== "hotel" || !description) return null;
-  if (description.includes("후보 표기")) return "숙소 최종 확정 전";
-  return description.includes("별도 확정")
-    ? "예정 호텔 별도 확정 필요"
-    : null;
-}
-
-function readDescription(type: ScheduleItemType, description: string | null) {
+function readDescription(description: string | null) {
   if (!description) return undefined;
-  return type === "hotel"
-    ? description.split(".", 1)[0]
-    : description.replace(/\.$/, "");
+  return description.replace(/\.$/, "");
 }
 
 function readDate(startDate: string, dayNo: number) {
   const date = new Date(`${startDate}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + dayNo - 1);
   return date;
+}
+
+export function getInitialScheduleDayIndex(
+  days: Pick<ScheduleDay, "date">[],
+  now = new Date(),
+  timeZone = "Asia/Seoul",
+) {
+  if (!days.length) return 0;
+  const today = localDateKey(now, timeZone);
+  const upcomingIndex = days.findIndex(({ date }) => date >= today);
+  return upcomingIndex === -1 ? days.length - 1 : upcomingIndex;
+}
+
+export function resolveScheduleDayNo(
+  days: Pick<ScheduleDay, "dayNo" | "date">[],
+  persistedDayNo: number | null,
+  now = new Date(),
+) {
+  return (
+    days.find(({ dayNo }) => dayNo === persistedDayNo)?.dayNo ??
+    days[getInitialScheduleDayIndex(days, now)]?.dayNo ??
+    null
+  );
 }
 
 export function createScheduleDays(
@@ -92,10 +108,9 @@ export function createScheduleDays(
       return {
         location: row.location_name ?? "",
         title: row.title,
-        description: readDescription(type, row.description),
+        description: readDescription(row.description),
         type,
-        timeLabel: row.time_label,
-        statusLabel: readStatusLabel(type, row.description),
+        timeLabel: row.time_label?.trim() || undefined,
       };
     });
     // ponytail: derive summaries from locations; store explicit summaries if editorial overrides grow.
