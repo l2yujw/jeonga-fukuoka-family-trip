@@ -18,6 +18,14 @@ export type LocalPhotoDraft = {
   height: number | null;
 };
 
+export type AlbumUploadDraft = {
+  clientId: string;
+  draft: LocalPhotoDraft;
+  caption: string;
+  status: "ready" | "uploading" | "failed";
+  error?: string;
+};
+
 export type PersistedPhotoRow = {
   id: string;
   trip_id: string;

@@ -10,13 +10,21 @@ import {
   updateAlbumPhotoCaption,
   uploadAlbumPhoto,
 } from "./album-repository";
-import type { AlbumPhoto, LocalPhotoDraft } from "./album-types";
+import type { AlbumPhoto, AlbumUploadDraft } from "./album-types";
 import {
   ALBUM_CAPTION_MAX_LENGTH,
   ALBUM_FILE_ACCEPT,
+  appendAlbumUploadDrafts,
+  createAlbumUploadDraft,
   createLocalPhotoDraft,
+  getUploadableAlbumDrafts,
   getAlbumPhotoDownloadFilename,
-  validateAlbumFile,
+  markAlbumDraftsUploading,
+  partitionAlbumFiles,
+  removeAlbumUploadDraft,
+  runBoundedUploads,
+  settleAlbumUploadDraft,
+  updateAlbumUploadDraftCaption,
 } from "./album-utils";
 
 type AlbumViewProps = {
@@ -26,8 +34,7 @@ type AlbumViewProps = {
 export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
   const currentTripSession = useCurrentTripSession();
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
-  const [draft, setDraft] = useState<LocalPhotoDraft | null>(null);
-  const [caption, setCaption] = useState("");
+  const [drafts, setDrafts] = useState<AlbumUploadDraft[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editedCaption, setEditedCaption] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +42,15 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isDecoding, setIsDecoding] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    completed: number;
+    succeeded: number;
+    total: number;
+  } | null>(null);
   const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
   const [downloadingPhotoId, setDownloadingPhotoId] = useState<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const captionRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef(new Set<string>());
   const selectionVersion = useRef(0);
 
@@ -66,88 +77,168 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
     const urls = objectUrls.current;
     return () => {
       selectionVersion.current += 1;
-      urls.forEach(URL.revokeObjectURL);
+      urls.forEach((url) => URL.revokeObjectURL(url));
       urls.clear();
     };
   }, []);
 
   useEffect(() => {
-    if (draft) captionRef.current?.focus();
-  }, [draft]);
+    onComposerOpenChange?.(drafts.length > 0 || isDecoding);
+  }, [drafts.length, isDecoding, onComposerOpenChange]);
 
   const revokeUrl = (url: string) => {
     URL.revokeObjectURL(url);
     objectUrls.current.delete(url);
   };
 
-  const clearDraft = () => {
+  const clearDrafts = () => {
     selectionVersion.current += 1;
-    if (draft?.previewUrl) revokeUrl(draft.previewUrl);
-    onComposerOpenChange?.(false);
-    setDraft(null);
-    setCaption("");
+    objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrls.current.clear();
+    setDrafts([]);
     setError(null);
+    setUploadProgress(null);
     setIsDecoding(false);
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    const validationError = validateAlbumFile(file);
-    if (validationError) {
-      setError(validationError);
-      return;
+  const removeDraft = (clientId: string) => {
+    const selected = drafts.find((draft) => draft.clientId === clientId);
+    if (!selected || selected.status === "uploading") return;
+    if (selected.draft.previewUrl) revokeUrl(selected.draft.previewUrl);
+    setDrafts((current) => removeAlbumUploadDraft(current, clientId));
+    if (drafts.length === 1) {
+      setError(null);
+      setUploadProgress(null);
     }
+  };
 
-    if (draft?.previewUrl) revokeUrl(draft.previewUrl);
-    setDraft(null);
-    setCaption("");
-    setError(null);
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length === 0) return;
+
+    const { accepted, rejected } = partitionAlbumFiles(files);
+    const selectionErrors = rejected.map(
+      ({ file, error: reason }) => `${file.name || "이름 없는 파일"}: ${reason}`,
+    );
+    setUploadProgress(null);
+    setError(selectionErrors.length ? selectionErrors.join("\n") : null);
+    if (accepted.length === 0) return;
+
     setIsDecoding(true);
     const version = ++selectionVersion.current;
+    const addedDrafts: AlbumUploadDraft[] = [];
 
     try {
-      const pendingDraft = createLocalPhotoDraft(file);
-      objectUrls.current.add(pendingDraft.objectUrl);
-      const nextDraft = await pendingDraft.ready;
+      for (const file of accepted) {
+        if (version !== selectionVersion.current) return;
+        let objectUrl: string | null = null;
 
-      if (version !== selectionVersion.current) {
-        revokeUrl(pendingDraft.objectUrl);
-        return;
+        try {
+          const pendingDraft = createLocalPhotoDraft(file);
+          objectUrl = pendingDraft.objectUrl;
+          objectUrls.current.add(objectUrl);
+          const nextDraft = await pendingDraft.ready;
+
+          if (version !== selectionVersion.current) {
+            revokeUrl(objectUrl);
+            return;
+          }
+          if (!nextDraft.previewUrl) revokeUrl(objectUrl);
+          addedDrafts.push(createAlbumUploadDraft(nextDraft));
+        } catch {
+          if (objectUrl) revokeUrl(objectUrl);
+          selectionErrors.push(
+            `${file.name || "이름 없는 파일"}: 사진을 준비하지 못했어요.`,
+          );
+        }
       }
-      if (!nextDraft.previewUrl) revokeUrl(pendingDraft.objectUrl);
-      setDraft(nextDraft);
-      onComposerOpenChange?.(true);
-    } catch {
-      if (version !== selectionVersion.current) return;
-      onComposerOpenChange?.(false);
-      setError("사진을 준비하지 못했어요. 다시 선택해주세요.");
+
+      if (version === selectionVersion.current) {
+        setDrafts((current) => appendAlbumUploadDrafts(current, addedDrafts));
+        setError(selectionErrors.length ? selectionErrors.join("\n") : null);
+      }
     } finally {
       if (version === selectionVersion.current) setIsDecoding(false);
     }
   };
 
-  const addPhoto = async () => {
-    if (!draft || isUploading) return;
+  const addPhotos = async () => {
+    if (isUploading) return;
+    const uploadableDrafts = getUploadableAlbumDrafts(drafts);
+    if (uploadableDrafts.length === 0) return;
+
     setIsUploading(true);
     setError(null);
+    setUploadProgress({ completed: 0, succeeded: 0, total: uploadableDrafts.length });
+    const uploadingIds = new Set(uploadableDrafts.map(({ clientId }) => clientId));
+    setDrafts((current) => markAlbumDraftsUploading(current, uploadingIds));
 
     try {
-      const photo = await uploadAlbumPhoto({
-        caption,
-        draft,
-        tripSession: currentTripSession,
-      });
-      setPhotos((current) => [photo, ...current.filter(({ id }) => id !== photo.id)]);
-      if (draft.previewUrl) revokeUrl(draft.previewUrl);
-      setDraft(null);
-      setCaption("");
-      onComposerOpenChange?.(false);
+      const results = await runBoundedUploads(
+        uploadableDrafts,
+        (item) =>
+          uploadAlbumPhoto({
+            caption: item.caption,
+            draft: item.draft,
+            tripSession: currentTripSession,
+          }),
+        3,
+        (result) => {
+          const succeeded = result.status === "fulfilled";
+          const selected = uploadableDrafts.find(
+            ({ clientId }) => clientId === result.clientId,
+          );
+          if (succeeded && selected?.draft.previewUrl) {
+            revokeUrl(selected.draft.previewUrl);
+          }
+          setDrafts((current) =>
+            settleAlbumUploadDraft(
+              current,
+              result.clientId,
+              succeeded ? undefined : "업로드하지 못했어요. 다시 시도해주세요.",
+            ),
+          );
+          setUploadProgress((current) =>
+            current
+              ? {
+                  ...current,
+                  completed: current.completed + 1,
+                  succeeded: current.succeeded + Number(succeeded),
+                }
+              : current,
+          );
+        },
+      );
+      const uploadedPhotos = results.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : [],
+      );
+      const uploadedIds = new Set(uploadedPhotos.map(({ id }) => id));
+      setPhotos((current) => [
+        ...uploadedPhotos,
+        ...current.filter(({ id }) => !uploadedIds.has(id)),
+      ]);
+
+      const failedCount = results.length - uploadedPhotos.length;
+      if (failedCount > 0) {
+        setError(
+          `${results.length}장 중 ${uploadedPhotos.length}장을 업로드했어요. 실패한 ${failedCount}장은 다시 시도할 수 있어요.`,
+        );
+      }
     } catch {
-      setError("사진을 업로드하지 못했어요. 다시 시도해주세요.");
+      setDrafts((current) =>
+        current.map((draft) =>
+          uploadingIds.has(draft.clientId)
+            ? {
+                ...draft,
+                status: "failed",
+                error: "업로드하지 못했어요. 다시 시도해주세요.",
+              }
+            : draft,
+        ),
+      );
+      setError("사진 업로드를 시작하지 못했어요. 다시 시도해주세요.");
     } finally {
       setIsUploading(false);
     }
@@ -238,6 +329,7 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
             id="album-photo-picker"
             type="file"
             accept={ALBUM_FILE_ACCEPT}
+            multiple
             className="sr-only"
             onChange={handleFileChange}
           />
@@ -245,7 +337,11 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
             onClick={() => inputRef.current?.click()}
             disabled={isDecoding || isUploading || isLoading}
           >
-            {isDecoding ? "미리보기 준비 중" : "사진 올리기"}
+            {isDecoding
+              ? "미리보기 준비 중"
+              : drafts.length > 0
+                ? "사진 추가"
+                : "사진 올리기"}
           </Button>
         </div>
       </div>
@@ -253,80 +349,132 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
       {error && (
         <p
           role="alert"
-          className="mt-4 rounded-md border border-danger/30 bg-danger/8 px-4 py-3 text-sm text-danger"
+          className="mt-4 whitespace-pre-line rounded-md border border-danger/30 bg-danger/8 px-4 py-3 text-sm text-danger"
         >
           {error}
         </p>
       )}
 
-      {draft && (
+      {uploadProgress && (
+        <p aria-live="polite" className="mt-3 text-sm text-text-secondary">
+          업로드 {uploadProgress.completed}/{uploadProgress.total} 완료 · 성공 {uploadProgress.succeeded}장
+        </p>
+      )}
+
+      {drafts.length > 0 && (
         <Card
           className="mt-5 overflow-hidden p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
           aria-labelledby="album-composer-title"
         >
-          {draft.previewUrl ? (
-            <div className="overflow-hidden rounded-md bg-line/40">
-              {/* Object URLs are runtime-local and do not need Next image optimization. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={draft.previewUrl}
-                alt={`선택한 사진 미리보기: ${draft.file.name}`}
-                className="max-h-[55svh] w-full object-contain"
-              />
-            </div>
-          ) : (
-            <div className="flex aspect-[4/3] items-center justify-center rounded-md bg-line/40 px-5 text-center text-sm text-text-secondary">
-              이 브라우저에서는 미리보기를 지원하지 않지만 원본 사진은 업로드할 수 있어요.
-            </div>
-          )}
-          <div className="px-1 pt-4 pb-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2
-                  id="album-composer-title"
-                  className="font-editorial text-lg font-semibold"
-                >
-                  이 사진을 앨범에 남길까요?
-                </h2>
-                <p className="mt-1 truncate text-caption text-text-secondary">
-                  {draft.file.name}
-                </p>
-              </div>
-              <span className="shrink-0 text-caption text-text-secondary">
-                {(draft.file.size / 1024 / 1024).toFixed(1)}MB
-              </span>
-            </div>
+          <div className="flex items-center justify-between gap-3 px-1 pb-3">
+            <h2 id="album-composer-title" className="font-editorial text-lg font-semibold">
+              선택한 사진 {drafts.length}장
+            </h2>
+            <Button
+              variant="ghost"
+              className="px-3"
+              disabled={isDecoding || isUploading}
+              onClick={() => inputRef.current?.click()}
+            >
+              사진 추가
+            </Button>
+          </div>
 
-            <div className="mt-4">
-              <div className="flex items-center justify-between gap-3">
-                <label htmlFor="album-caption" className="text-sm font-semibold">
-                  사진 설명{" "}
-                  <span className="font-normal text-text-secondary">(선택)</span>
-                </label>
-                <span className="text-caption text-text-secondary">
-                  {caption.length}/{ALBUM_CAPTION_MAX_LENGTH}
-                </span>
-              </div>
-              <input
-                ref={captionRef}
-                id="album-caption"
-                value={caption}
-                maxLength={ALBUM_CAPTION_MAX_LENGTH}
-                disabled={isUploading}
-                onChange={(event) => setCaption(event.target.value)}
-                placeholder="이 순간을 한 줄로 남겨보세요."
-                className="mt-2 min-h-12 w-full rounded-md border border-line bg-background px-4 py-3 text-sm placeholder:text-text-secondary/75"
-              />
-            </div>
+          <div className="space-y-3">
+            {drafts.map((item) => (
+              <article
+                key={item.clientId}
+                className="overflow-hidden rounded-md border border-line bg-background p-3"
+              >
+                {item.draft.previewUrl ? (
+                  <div className="overflow-hidden rounded-md bg-line/40">
+                    {/* Object URLs are runtime-local and do not need Next image optimization. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.draft.previewUrl}
+                      alt={`선택한 사진 미리보기: ${item.draft.file.name}`}
+                      className="max-h-[44svh] w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex aspect-[4/3] items-center justify-center rounded-md bg-line/40 px-5 text-center text-sm text-text-secondary">
+                    이 브라우저에서는 미리보기를 지원하지 않지만 원본 사진은 업로드할 수 있어요.
+                  </div>
+                )}
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <Button variant="secondary" disabled={isUploading} onClick={clearDraft}>
-                취소
-              </Button>
-              <Button loading={isUploading} onClick={addPhoto}>
-                {isUploading ? "업로드 중" : "앨범에 추가"}
-              </Button>
-            </div>
+                <div className="mt-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-caption text-text-secondary">
+                      {item.draft.file.name}
+                    </p>
+                    {item.status !== "ready" && (
+                      <p className={`mt-1 text-caption font-semibold ${item.status === "failed" ? "text-danger" : "text-accent-primary"}`}>
+                        {item.status === "failed" ? "업로드 실패" : "업로드 중"}
+                      </p>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className="block text-caption text-text-secondary">
+                      {(item.draft.file.size / 1024 / 1024).toFixed(1)}MB
+                    </span>
+                    <button
+                      type="button"
+                      disabled={item.status === "uploading"}
+                      onClick={() => removeDraft(item.clientId)}
+                      className="tap-target mt-1 px-2 text-caption font-semibold text-danger disabled:opacity-50"
+                    >
+                      제거
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <label htmlFor={`album-caption-${item.clientId}`} className="text-sm font-semibold">
+                      사진 설명 <span className="font-normal text-text-secondary">(선택)</span>
+                    </label>
+                    <span className="text-caption text-text-secondary">
+                      {item.caption.length}/{ALBUM_CAPTION_MAX_LENGTH}
+                    </span>
+                  </div>
+                  <input
+                    id={`album-caption-${item.clientId}`}
+                    value={item.caption}
+                    maxLength={ALBUM_CAPTION_MAX_LENGTH}
+                    disabled={item.status === "uploading"}
+                    onChange={(event) =>
+                      setDrafts((current) =>
+                        updateAlbumUploadDraftCaption(
+                          current,
+                          item.clientId,
+                          event.target.value,
+                        ),
+                      )
+                    }
+                    placeholder="이 순간을 한 줄로 남겨보세요."
+                    className="mt-2 min-h-12 w-full rounded-md border border-line bg-surface px-4 py-3 text-sm placeholder:text-text-secondary/75"
+                  />
+                  {item.error && (
+                    <p role="alert" className="mt-2 text-caption text-danger">
+                      {item.error}
+                    </p>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button variant="secondary" disabled={isUploading} onClick={clearDrafts}>
+              전체 취소
+            </Button>
+            <Button loading={isUploading} onClick={addPhotos}>
+              {isUploading
+                ? "업로드 중"
+                : drafts.some(({ status }) => status === "failed")
+                  ? "남은 사진 다시 시도"
+                  : "앨범에 추가"}
+            </Button>
           </div>
         </Card>
       )}
