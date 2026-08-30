@@ -19,15 +19,18 @@ async function requireAuthUserId() {
   return session.user.id;
 }
 
-export async function loadMemoryCards(tripId: string) {
+async function loadMemoryCardsWithLimit(tripId: string, limit?: number) {
   const authUserId = await requireAuthUserId();
   const supabase = getSupabaseBrowserClient();
+  let cardsQuery = supabase
+    .from("memory_cards")
+    .select(MEMORY_CARD_COLUMNS)
+    .eq("trip_id", tripId)
+    .order("created_at", { ascending: false });
+  if (limit) cardsQuery = cardsQuery.limit(limit);
+
   const [cardsResult, rosterResult] = await Promise.all([
-    supabase
-      .from("memory_cards")
-      .select(MEMORY_CARD_COLUMNS)
-      .eq("trip_id", tripId)
-      .order("created_at", { ascending: false }),
+    cardsQuery,
     supabase.from("family_members").select("id,name").eq("trip_id", tripId),
   ]);
 
@@ -39,6 +42,14 @@ export async function loadMemoryCards(tripId: string) {
     new Map((rosterResult.data ?? []).map((member) => [member.id, member.name])),
     authUserId,
   );
+}
+
+export function loadMemoryCards(tripId: string) {
+  return loadMemoryCardsWithLimit(tripId);
+}
+
+export async function loadLatestMemoryCard(tripId: string) {
+  return (await loadMemoryCardsWithLimit(tripId, 1))[0] ?? null;
 }
 
 export async function createMemoryCard({

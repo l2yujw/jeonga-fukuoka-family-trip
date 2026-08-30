@@ -3,6 +3,7 @@ import type {
   HTMLAttributes,
   ReactNode,
 } from "react";
+import Link from "next/link";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "ghost";
@@ -143,55 +144,78 @@ export function MobileShell({ className = "", ...props }: HTMLAttributes<HTMLDiv
   );
 }
 
-export type BottomNavItem = {
-  label: string;
-  href?: string;
-  icon: ReactNode;
-  active?: boolean;
-  disabled?: boolean;
-};
-
 type BottomNavProps = HTMLAttributes<HTMLElement> & {
-  items: BottomNavItem[];
+  activeHref: "/home" | "/schedule" | "/album" | "/cards";
 };
 
-export function BottomNav({ className = "", items, ...props }: BottomNavProps) {
+const bottomNavItems = [
+  { href: "/home", icon: "home", label: "홈" },
+  { href: "/schedule", icon: "schedule", label: "일정" },
+  { href: "/album", icon: "album", label: "앨범" },
+  { href: "/cards", icon: "card", label: "카드" },
+] as const;
+
+function BottomNavIcon({ icon }: { icon: (typeof bottomNavItems)[number]["icon"] }) {
+  const paths = {
+    home: <path d="m3.5 11 8.5-7 8.5 7v8.5h-6v-5h-5v5h-6z" />,
+    schedule: (
+      <>
+        <rect x="3.5" y="5.5" width="17" height="15" rx="2" />
+        <path d="M7.5 3.5v4M16.5 3.5v4M3.5 10h17M7.5 14h2M14.5 14h2" />
+      </>
+    ),
+    album: (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <circle cx="8" cy="9" r="1.5" />
+        <path d="m4.5 18 5-5 3.25 3.25 2.75-2.75 4 4" />
+      </>
+    ),
+    card: (
+      <>
+        <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
+        <path d="M12 17s-5-2.8-5-6.1C7 8 10.7 7.4 12 9.6 13.3 7.4 17 8 17 10.9 17 14.2 12 17 12 17Z" />
+      </>
+    ),
+  } as const;
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="bottom-nav-icon"
+      data-icon={icon}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {paths[icon]}
+    </svg>
+  );
+}
+
+export function BottomNav({ activeHref, className = "", ...props }: BottomNavProps) {
   return (
     <nav
       aria-label="주요 탐색"
-      className={`safe-bottom sticky bottom-0 z-20 border-t border-line/80 bg-surface/95 px-2 pt-2 backdrop-blur ${className}`}
+      className={`bottom-nav ${className}`}
       {...props}
     >
-      <ul className="grid grid-flow-col auto-cols-fr">
-        {items.map(({ active, disabled, href, icon, label }) => {
-          const content = (
-            <>
-              <span aria-hidden="true" className="text-lg leading-none">
-                {icon}
-              </span>
-              {label}
-            </>
-          );
-          const classes = `tap-target flex w-full flex-col items-center justify-center gap-1 rounded-md px-2 py-1 text-caption font-semibold transition-colors ${active ? "text-accent-primary" : "text-text-secondary hover:text-text-primary"}`;
-
-          return (
-            <li key={`${href ?? "disabled"}-${label}`}>
-              {href && !disabled ? (
-                <a
-                  href={href}
-                  aria-current={active ? "page" : undefined}
-                  className={classes}
-                >
-                  {content}
-                </a>
-              ) : (
-                <button type="button" disabled aria-label={`${label}, 준비 중`} className={classes}>
-                  {content}
-                </button>
-              )}
-            </li>
-          );
-        })}
+      <ul className="bottom-nav-list">
+        {bottomNavItems.map(({ href, icon, label }) => (
+          <li key={href}>
+            <Link
+              href={href}
+              aria-current={activeHref === href ? "page" : undefined}
+              className="bottom-nav-link"
+            >
+              <BottomNavIcon icon={icon} />
+              <span>{label}</span>
+            </Link>
+          </li>
+        ))}
       </ul>
     </nav>
   );

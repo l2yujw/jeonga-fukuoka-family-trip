@@ -39,6 +39,14 @@ async function createSignedUrl(storagePath: string) {
   return null;
 }
 
+async function createSignedUrls(rows: readonly PersistedPhotoRow[]) {
+  return new Map(
+    await Promise.all(
+      rows.map(async (row) => [row.storage_path, await createSignedUrl(row.storage_path)] as const),
+    ),
+  );
+}
+
 async function removeStorageObject(storagePath: string) {
   try {
     const { error } = await getSupabaseBrowserClient()
@@ -66,16 +74,54 @@ export async function loadAlbumPhotos(tripId: string) {
   if (rosterResult.error) throw rosterResult.error;
 
   const rows = (photosResult.data ?? []) as PersistedPhotoRow[];
-  const signedUrls = new Map(
-    await Promise.all(
-      rows.map(async (row) => [row.storage_path, await createSignedUrl(row.storage_path)] as const),
-    ),
-  );
+  const signedUrls = await createSignedUrls(rows);
   const uploaderNames = new Map(
     (rosterResult.data ?? []).map((member) => [member.id, member.name]),
   );
 
   return mapPersistedPhotoRows(rows, uploaderNames, authUserId, signedUrls);
+}
+
+export async function loadHomeAlbumPreview(tripId: string) {
+  const authUserId = await requireAuthUserId();
+  const { count, data, error } = await getSupabaseBrowserClient()
+    .from("photos")
+    .select(PHOTO_COLUMNS, { count: "exact" })
+    .eq("trip_id", tripId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as PersistedPhotoRow[];
+  const [photo = null] = mapPersistedPhotoRows(
+    rows,
+    new Map(),
+    authUserId,
+    await createSignedUrls(rows),
+  );
+  return { count: count ?? rows.length, photo };
+}
+
+export async function loadHomeAlbumPhoto(tripId: string, photoId: string) {
+  const authUserId = await requireAuthUserId();
+  const { data, error } = await getSupabaseBrowserClient()
+    .from("photos")
+    .select(PHOTO_COLUMNS)
+    .eq("trip_id", tripId)
+    .eq("id", photoId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const rows = [data as PersistedPhotoRow];
+  return mapPersistedPhotoRows(
+    rows,
+    new Map(),
+    authUserId,
+    await createSignedUrls(rows),
+  )[0] ?? null;
 }
 
 export async function uploadAlbumPhoto({
