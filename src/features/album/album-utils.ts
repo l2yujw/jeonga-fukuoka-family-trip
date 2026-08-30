@@ -228,10 +228,12 @@ export function mapPersistedPhotoRows(
     originalFilename: row.original_filename,
     mimeType: row.mime_type,
     signedUrl: signedUrls.get(row.storage_path) ?? null,
+    uploaderMemberId: row.uploader_member_id,
     uploaderName: uploaderNames.get(row.uploader_member_id) ?? null,
     caption: row.caption,
     width: row.width,
     height: row.height,
+    createdAt: row.created_at,
     isOwner: isPhotoOwner(row, authUserId),
   }));
 }
