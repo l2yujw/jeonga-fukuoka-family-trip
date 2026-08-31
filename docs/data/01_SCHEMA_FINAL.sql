@@ -80,7 +80,14 @@ create table if not exists public.memory_cards (
   creator_member_id uuid not null references public.family_members(id),
   creator_auth_user_id uuid not null references auth.users(id),
   template_key text not null check (
-    template_key in ('polaroid_moodboard', 'four_cut', 'editorial_collage')
+    template_key in (
+      'polaroid_moodboard',
+      'four_cut',
+      'editorial_collage',
+      'postcard_duo',
+      'scrapbook_trio',
+      'film_contact_sheet'
+    )
   ),
   layout_version integer not null default 1,
   layout_json jsonb not null,

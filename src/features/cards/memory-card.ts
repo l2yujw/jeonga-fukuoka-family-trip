@@ -1,6 +1,7 @@
 import {
   getLegacyMemoryCardTemplateSpec,
   getMemoryCardTemplateSpec,
+  getMinimumMemoryCardPhotoCount,
   MEMORY_CARD_TEMPLATE_SPECS,
   type MemoryCardTemplateKey,
 } from "./memory-card-template-spec";
@@ -8,6 +9,7 @@ import {
 export {
   MEMORY_CARD_TEMPLATE_SPECS as MEMORY_CARD_TEMPLATES,
   getMemoryCardTemplateSpec as getMemoryCardTemplate,
+  getMinimumMemoryCardPhotoCount,
 };
 export type { MemoryCardTemplateKey };
 

@@ -1,7 +1,10 @@
 export type MemoryCardTemplateKey =
   | "polaroid_moodboard"
   | "four_cut"
-  | "editorial_collage";
+  | "editorial_collage"
+  | "postcard_duo"
+  | "scrapbook_trio"
+  | "film_contact_sheet";
 
 export type MemoryCardPhotoSlot = {
   id: string;
@@ -199,7 +202,63 @@ export const MEMORY_CARD_TEMPLATE_SPECS = [
       { id: "caption", x: 80, y: 1600, maxWidth: 900, style: "editorial-caption" },
     ],
   },
+  {
+    key: "postcard_duo",
+    displayName: "Travel Postcard",
+    acceptedMin: 2,
+    acceptedMax: 2,
+    backgroundColor: "#e8d6bd",
+    exportBounds: FULL_CANVAS_EXPORT,
+    slots: [
+      { id: "pd1", x: 80, y: 360, w: 920, h: 620, r: 0, z: 1, frame: "plain" },
+      { id: "pd2", x: 570, y: 1040, w: 380, h: 470, r: 4, z: 2, frame: "polaroid" },
+    ],
+    textSlots: [
+      { id: "title", x: 90, y: 170, maxWidth: 900, style: "editorial-title" },
+      { id: "caption", x: 90, y: 1640, maxWidth: 900, style: "editorial-caption" },
+    ],
+  },
+  {
+    key: "scrapbook_trio",
+    displayName: "Scrapbook Trio",
+    acceptedMin: 3,
+    acceptedMax: 3,
+    backgroundColor: "#ddc7a8",
+    exportBounds: FULL_CANVAS_EXPORT,
+    slots: [
+      { id: "st1", x: 90, y: 170, w: 430, h: 540, r: -4, z: 1, frame: "polaroid" },
+      { id: "st2", x: 570, y: 260, w: 420, h: 520, r: 4, z: 2, frame: "polaroid" },
+      { id: "st3", x: 300, y: 840, w: 480, h: 600, r: -2, z: 3, frame: "polaroid" },
+    ],
+    textSlots: [
+      { id: "caption", x: 120, y: 1540, maxWidth: 840, style: "memory-line" },
+    ],
+  },
+  {
+    key: "film_contact_sheet",
+    displayName: "Film Contact Sheet",
+    acceptedMin: 6,
+    acceptedMax: 6,
+    backgroundColor: "#332c28",
+    exportBounds: FULL_CANVAS_EXPORT,
+    slots: [
+      { id: "fc1", x: 90, y: 210, w: 430, h: 340, r: 0, z: 1, frame: "strip" },
+      { id: "fc2", x: 560, y: 210, w: 430, h: 340, r: 0, z: 1, frame: "strip" },
+      { id: "fc3", x: 90, y: 650, w: 430, h: 340, r: 0, z: 1, frame: "strip" },
+      { id: "fc4", x: 560, y: 650, w: 430, h: 340, r: 0, z: 1, frame: "strip" },
+      { id: "fc5", x: 90, y: 1090, w: 430, h: 340, r: 0, z: 1, frame: "strip" },
+      { id: "fc6", x: 560, y: 1090, w: 430, h: 340, r: 0, z: 1, frame: "strip" },
+    ],
+    textSlots: [
+      { id: "caption", x: 90, y: 1580, maxWidth: 900, style: "four-cut-footer" },
+      { id: "t2", x: 90, y: 1680, maxWidth: 900, style: "date-small" },
+    ],
+  },
 ] as const satisfies readonly MemoryCardTemplateSpec[];
+
+export function getMinimumMemoryCardPhotoCount() {
+  return Math.min(...MEMORY_CARD_TEMPLATE_SPECS.map(({ acceptedMin }) => acceptedMin));
+}
 
 export const LEGACY_MEMORY_CARD_TEMPLATE_SPECS = [
   {

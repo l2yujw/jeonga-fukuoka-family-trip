@@ -12,6 +12,7 @@ import {
   buildMemoryCardInsertPayload,
   buildMemoryCardLayoutV2,
   createMemoryCardRenderModel,
+  getMinimumMemoryCardPhotoCount,
   getRandomPhotoCount,
   mapPersistedMemoryCardRows,
   normalizeMemoryCardCaption,
@@ -34,6 +35,11 @@ import {
 const tripId = "11111111-1111-4111-8111-111111111111";
 const memberId = "22222222-2222-4222-8222-222222222222";
 const authUserId = "33333333-3333-4333-8333-333333333333";
+const newTemplateCases = [
+  ["postcard_duo", 2, ["pd1", "pd2"]],
+  ["scrapbook_trio", 3, ["st1", "st2", "st3"]],
+  ["film_contact_sheet", 6, ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6"]],
+];
 
 test("code template coordinates stay synchronized with the canonical document", async () => {
   const canonical = JSON.parse(
@@ -47,6 +53,43 @@ test("code template coordinates stay synchronized with the canonical document", 
     MEMORY_CARD_TEMPLATE_SPECS.map(({ key, slots, textSlots }) => ({ key, slots, textSlots })),
     canonical.templates.map(({ key, slots, textSlots }) => ({ key, slots, textSlots })),
   );
+});
+
+test("template catalog has six valid unique templates inside the canonical canvas", () => {
+  assert.equal(MEMORY_CARD_TEMPLATE_SPECS.length, 6);
+  assert.equal(new Set(MEMORY_CARD_TEMPLATE_SPECS.map(({ key }) => key)).size, 6);
+
+  for (const template of MEMORY_CARD_TEMPLATE_SPECS) {
+    assert.equal(new Set(template.slots.map(({ id }) => id)).size, template.slots.length);
+    assert.ok(template.acceptedMin > 0);
+    assert.ok(template.acceptedMin <= template.acceptedMax);
+    assert.ok(template.acceptedMax <= template.slots.length);
+
+    for (const slot of template.slots) {
+      const radians = Math.abs(slot.r) * Math.PI / 180;
+      const rotatedWidth = Math.abs(slot.w * Math.cos(radians)) + Math.abs(slot.h * Math.sin(radians));
+      const rotatedHeight = Math.abs(slot.w * Math.sin(radians)) + Math.abs(slot.h * Math.cos(radians));
+      const centerX = slot.x + slot.w / 2;
+      const centerY = slot.y + slot.h / 2;
+      assert.ok(centerX - rotatedWidth / 2 >= 0, `${template.key}/${slot.id} clips left`);
+      assert.ok(centerX + rotatedWidth / 2 <= MEMORY_CARD_CANVAS.width, `${template.key}/${slot.id} clips right`);
+      assert.ok(centerY - rotatedHeight / 2 >= 0, `${template.key}/${slot.id} clips top`);
+      assert.ok(centerY + rotatedHeight / 2 <= MEMORY_CARD_CANVAS.height, `${template.key}/${slot.id} clips bottom`);
+    }
+
+    for (const slot of template.textSlots) {
+      const style = MEMORY_CARD_TEXT_STYLES[slot.style];
+      assert.ok(slot.x >= 0 && slot.x + slot.maxWidth <= MEMORY_CARD_CANVAS.width);
+      assert.ok(slot.y >= 0 && slot.y + style.lineHeight * style.maxLines <= MEMORY_CARD_CANVAS.height);
+    }
+  }
+
+  assert.equal(getMinimumMemoryCardPhotoCount(), 2);
+  for (const [key, count] of newTemplateCases) {
+    const template = MEMORY_CARD_TEMPLATE_SPECS.find((item) => item.key === key);
+    assert.equal(template?.acceptedMin, count);
+    assert.equal(template?.acceptedMax, count);
+  }
 });
 
 test("new layouts are strict canonical v2 with template slot counts", () => {
@@ -63,6 +106,20 @@ test("new layouts are strict canonical v2 with template slot counts", () => {
   assert.equal(polaroid.caption, "family");
   assert.deepEqual(fourCut.slots.map(({ slotId }) => slotId), ["f1", "f2", "f3", "f4"]);
   assert.deepEqual(editorial.slots.map(({ slotId }) => slotId), ["e1", "e2", "e3", "e4"]);
+  for (const [key, count, slotIds] of newTemplateCases) {
+    const photoIds = Array.from({ length: count }, (_, index) => `${key}-${index}`);
+    const layout = buildMemoryCardLayoutV2(key, photoIds, " 새 카드 ");
+    assert.deepEqual(layout.slots.map(({ slotId }) => slotId), slotIds);
+    assert.equal(parseMemoryCardLayoutV2(key, layout)?.caption, "새 카드");
+    assert.throws(
+      () => buildMemoryCardLayoutV2(key, photoIds.slice(0, -1)),
+      /invalid-memory-card-photo-count/,
+    );
+    assert.throws(
+      () => buildMemoryCardLayoutV2(key, photoIds.map((id, index) => index === 1 ? photoIds[0] : id)),
+      /duplicate-memory-card-photo/,
+    );
+  }
   assert.throws(() => buildMemoryCardLayoutV2("polaroid_moodboard", ["a", "b"]), /invalid-memory-card-photo-count/);
   assert.throws(() => buildMemoryCardLayoutV2("four_cut", ["a", "a", "c", "d"]), /duplicate-memory-card-photo/);
 });
@@ -168,6 +225,9 @@ test("random fill and reshuffle preserve the canonical v2 shape and caption", ()
   assert.equal(getRandomPhotoCount("polaroid_moodboard", pool.length), 6);
   assert.equal(getRandomPhotoCount("four_cut", pool.length), 4);
   assert.equal(getRandomPhotoCount("editorial_collage", pool.length), 5);
+  for (const [key, count] of newTemplateCases) {
+    assert.equal(getRandomPhotoCount(key, pool.length), count);
+  }
   assert.equal(new Set(randomFillPhotoIds(pool, 6, () => 0.25)).size, 6);
 
   const layout = buildMemoryCardLayoutV2("four_cut", pool.slice(0, 4), "same caption");
@@ -177,6 +237,19 @@ test("random fill and reshuffle preserve the canonical v2 shape and caption", ()
   assert.deepEqual(shuffled.slots.map(({ slotId }) => slotId), ["f1", "f2", "f3", "f4"]);
   assert.notDeepEqual(shuffled.slots.map(({ photoId }) => photoId), layout.slots.map(({ photoId }) => photoId));
   assert.equal(normalizeMemoryCardCaption(" \n "), null);
+});
+
+test("new fixed-count templates reshuffle exact slot counts without duplicates or caption loss", () => {
+  const pool = ["a", "b", "c", "d", "e", "f", "g", "h"];
+  for (const [key, count, slotIds] of newTemplateCases) {
+    const layout = buildMemoryCardLayoutV2(key, pool.slice(0, count), "same caption");
+    const shuffled = reshuffleMemoryCardLayout(key, layout, pool, () => 0.999);
+    const photoIds = shuffled.slots.map(({ photoId }) => photoId);
+    assert.equal(shuffled.slots.length, count);
+    assert.deepEqual(shuffled.slots.map(({ slotId }) => slotId), slotIds);
+    assert.equal(shuffled.caption, "same caption");
+    assert.equal(new Set(photoIds).size, count);
+  }
 });
 
 test("Editorial 4-photo draft stays 4 after reshuffle", () => {
@@ -267,6 +340,41 @@ test("persisted rows preserve ownership and all supported read versions", () => 
   assert.equal(cards[0].isOwner, true);
 });
 
+test("persisted rows map every new template key", () => {
+  const rows = newTemplateCases.map(([templateKey, count], index) => memoryCardRow({
+    id: `new-${index}`,
+    template_key: templateKey,
+    layout_json: buildMemoryCardLayoutV2(
+      templateKey,
+      Array.from({ length: count }, (_, photoIndex) => `${templateKey}-${photoIndex}`),
+    ),
+  }));
+  const cards = mapPersistedMemoryCardRows(rows, new Map(), authUserId);
+  assert.deepEqual(cards.map(({ templateKey }) => templateKey), newTemplateCases.map(([key]) => key));
+  assert.ok(cards.every(({ renderModel }) => renderModel?.layoutVersion === 2));
+});
+
+test("schema snapshot and Feedback #14 migration permit exactly the canonical template keys", async () => {
+  const [schema, migration] = await Promise.all([
+    readFile(new URL("../../../docs/data/01_SCHEMA_FINAL.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../../docs/data/07_FEEDBACK14_CARD_TEMPLATE_KEYS_MIGRATION.sql", import.meta.url), "utf8"),
+  ]);
+  const keys = MEMORY_CARD_TEMPLATE_SPECS.map(({ key }) => key);
+  const schemaCheck = schema.match(/template_key in \(([\s\S]*?)\)\n\s*\),/i)?.[1] ?? "";
+  const migrationCheck = migration.match(/template_key in \(([\s\S]*?)\)\n\);/i)?.[1] ?? "";
+  const quotedValues = (value) => [...value.matchAll(/'([^']+)'/g)].map((match) => match[1]);
+  assert.deepEqual(quotedValues(schemaCheck), keys);
+  assert.deepEqual(quotedValues(migrationCheck), keys);
+  assert.match(migration, /begin;[\s\S]*commit;/i);
+  assert.match(migration, /drop constraint if exists memory_cards_template_key_check/i);
+  assert.match(migration, /add constraint memory_cards_template_key_check check/i);
+  assert.deepEqual(
+    [...migration.matchAll(/constraint(?: if exists)?\s+([a-z_]+)/gi)].map((match) => match[1]),
+    ["memory_cards_template_key_check", "memory_cards_template_key_check"],
+  );
+  assert.doesNotMatch(migration, /row level security|\bpolicy\b|\bstorage\b|\bowner\b/i);
+});
+
 test("caption typography tokens are shared Korean-capable, template-specific styles", async () => {
   assert.match(MEMORY_CARD_FONT_STACKS.editorial, /Noto Serif KR/);
   assert.match(MEMORY_CARD_FONT_STACKS.sans, /Noto Sans KR/);
@@ -312,6 +420,26 @@ test("Four Cut export crops to the black strip while full templates keep their c
   assert.deepEqual(getMemoryCardExportDimensions(editorial, MEMORY_CARD_EXPORT_SIZES[0]), MEMORY_CARD_CANVAS);
   assert.equal(MEMORY_CARD_TEMPLATE_SPECS.find(({ key }) => key === "four_cut").backgroundColor, "#2f2925");
   assert.equal(MEMORY_CARD_TEMPLATE_SPECS.find(({ key }) => key === "editorial_collage").backgroundColor, "#f3eadb");
+});
+
+test("new templates use full-canvas PNG export through the existing path", async () => {
+  let rendered = 0;
+  for (const [templateKey, count] of newTemplateCases) {
+    const input = {
+      ...exportInput(),
+      templateKey,
+      renderModel: createMemoryCardRenderModel(buildMemoryCardLayoutV2(
+        templateKey,
+        Array.from({ length: count }, (_, index) => `${templateKey}-${index}`),
+      )),
+    };
+    assert.deepEqual(getMemoryCardExportDimensions(input, MEMORY_CARD_EXPORT_SIZES[0]), MEMORY_CARD_CANVAS);
+    await exportMemoryCardPng(input, async () => {
+      rendered += 1;
+      return new Blob(["png"], { type: "image/png" });
+    });
+  }
+  assert.equal(rendered, 3);
 });
 
 test("legacy, experimental v1, and v2 saved cards all reach PNG export", async () => {
