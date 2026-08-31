@@ -8,8 +8,8 @@ export default function CardsPage() {
   return (
     <TripAccessGuard>
       {() => (
-        <MobileShell className="journal-page flex min-h-svh flex-col overflow-hidden">
-          <main className="safe-top safe-x flex-1 pb-8">
+        <MobileShell className="cards-page journal-page flex min-h-svh flex-col">
+          <main className="cards-main safe-top safe-x flex-1">
             <header className="mb-6 border-b border-line pb-5">
               <p className="text-caption font-bold tracking-[0.18em] text-accent-primary">FUKUOKA · MEMORY CARDS</p>
               <h1 className="font-editorial mt-2 text-page-title font-semibold tracking-[-0.03em]">추억 카드</h1>
@@ -17,7 +17,7 @@ export default function CardsPage() {
             </header>
             <MemoryCardsView />
           </main>
-          <BottomNav activeHref="/cards" />
+          <BottomNav activeHref="/cards" className="cards-bottom-nav" />
         </MobileShell>
       )}
     </TripAccessGuard>
