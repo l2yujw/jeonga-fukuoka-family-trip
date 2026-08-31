@@ -23,11 +23,11 @@
 
 ## Photo count
 - 0: 카드 생성 불가
-- 1: 카드 생성 불가
-- 2: postcard_duo
-- 3: postcard_duo, scrapbook_trio
-- 4~5: postcard_duo, scrapbook_trio, four_cut, editorial_collage
-- 6+: 모든 6개 template
+- 1: one_moment, instant_memory
+- 2: one_moment, instant_memory, postcard_duo
+- 3: one_moment, instant_memory, postcard_duo, scrapbook_trio
+- 4~5: one_moment, instant_memory, postcard_duo, scrapbook_trio, four_cut, editorial_collage
+- 6+: 모든 8개 template
 
 template별 최소 사진 수를 충족하는 항목만 활성화.
 

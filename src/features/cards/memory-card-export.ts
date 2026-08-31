@@ -9,6 +9,7 @@ import {
   MEMORY_CARD_FONT_STACKS,
   MEMORY_CARD_TEXT_STYLES,
   type MemoryCardCaptionStyle,
+  type MemoryCardDecoration,
   type MemoryCardPhotoSlot,
   type MemoryCardTextSlot,
 } from "./memory-card-template-spec";
@@ -111,6 +112,28 @@ function drawPhotoSlot(
   }
   context.restore();
   context.restore();
+}
+
+function drawDecoration(
+  context: CanvasRenderingContext2D,
+  decoration: MemoryCardDecoration,
+  scale: number,
+) {
+  const gradient = context.createLinearGradient(
+    decoration.x * scale,
+    decoration.y * scale,
+    decoration.x * scale,
+    (decoration.y + decoration.h) * scale,
+  );
+  gradient.addColorStop(0, decoration.fromColor);
+  gradient.addColorStop(1, decoration.toColor);
+  context.fillStyle = gradient;
+  context.fillRect(
+    decoration.x * scale,
+    decoration.y * scale,
+    decoration.w * scale,
+    decoration.h * scale,
+  );
 }
 
 function ellipsize(
@@ -260,6 +283,10 @@ export async function renderMemoryCardPng(
       photoId ? (loadedImages.get(photoId) ?? null) : null,
       scale,
     );
+  }
+
+  for (const decoration of template.decorations ?? []) {
+    drawDecoration(context, decoration, scale);
   }
 
   const caption = input.renderModel.kind === "canonical"

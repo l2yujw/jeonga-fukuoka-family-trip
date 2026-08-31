@@ -14,6 +14,7 @@ import {
   MEMORY_CARD_TEXT_STYLES,
   type ExportBounds,
   type MemoryCardCaptionStyle,
+  type MemoryCardDecoration,
   type MemoryCardPhotoSlot,
   type MemoryCardTextSlot,
 } from "./memory-card-template-spec";
@@ -38,6 +39,21 @@ function photoSlotStyle(
     height: percent(slot.h, bounds.height),
     zIndex: slot.z,
     transform: `rotate(${slot.r}deg)`,
+  };
+}
+
+function decorationStyle(
+  decoration: MemoryCardDecoration,
+  bounds: ExportBounds,
+  zIndex: number,
+): CSSProperties {
+  return {
+    left: percent(decoration.x - bounds.x, bounds.width),
+    top: percent(decoration.y - bounds.y, bounds.height),
+    width: percent(decoration.w, bounds.width),
+    height: percent(decoration.h, bounds.height),
+    zIndex,
+    backgroundImage: `linear-gradient(to bottom, ${decoration.fromColor}, ${decoration.toColor})`,
   };
 }
 
@@ -109,6 +125,7 @@ export function MemoryCardPreview({
   const caption = previewModel.kind === "canonical"
     ? previewModel.layout.caption
     : null;
+  const overlayZ = Math.max(0, ...template.slots.map(({ z }) => z)) + 1;
 
   const scene = (
     <div
@@ -159,6 +176,15 @@ export function MemoryCardPreview({
         );
       })}
 
+      {template.decorations?.map((decoration) => (
+        <div
+          key={decoration.id}
+          aria-hidden="true"
+          className="pointer-events-none absolute"
+          style={decorationStyle(decoration, bounds, overlayZ)}
+        />
+      ))}
+
       {template.textSlots.map((slot) => {
         const value = slot.id === "title"
           ? "FUKUOKA · FAMILY JOURNAL"
@@ -168,7 +194,7 @@ export function MemoryCardPreview({
         return (
           <p
             key={slot.id}
-            style={textSlotStyle(slot, bounds)}
+            style={{ ...textSlotStyle(slot, bounds), zIndex: overlayZ + 1 }}
             className="absolute m-0 overflow-hidden break-words"
           >
             {value}

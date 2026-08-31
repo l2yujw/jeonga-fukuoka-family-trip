@@ -19,6 +19,8 @@
 4. Travel Postcard
 5. Scrapbook Trio
 6. Film Contact Sheet
+7. One Moment
+8. Instant Memory
 
 ## CTA
 Primary: `랜덤 선택으로 생성`
