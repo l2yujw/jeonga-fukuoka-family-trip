@@ -364,7 +364,7 @@ test("home implements the v25 itinerary-backed progressive previews", async () =
   );
   assert.match(schedulePage, /<BottomNav activeHref="\/schedule" \/>/);
   assert.match(albumPage, /<BottomNav activeHref="\/album" \/>/);
-  assert.match(cardsPage, /<BottomNav activeHref="\/cards" \/>/);
+  assert.match(cardsPage, /<BottomNav activeHref="\/cards" className="cards-bottom-nav" \/>/);
   assert.match(page, /<BottomNav activeHref="\/home" \/>/);
   assert.match(
     css,
@@ -373,6 +373,10 @@ test("home implements the v25 itinerary-backed progressive previews", async () =
   assert.match(css, /\.bottom-nav-list\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/s);
   assert.match(css, /\.bottom-nav-link\s*\{[^}]*min-height: 44px/s);
   assert.match(css, /\.bottom-nav-link\[aria-current="page"\]\s*\{[^}]*color: #c83818/s);
+  assert.match(css, /\.cards-page\s*\{[^}]*overflow-x: clip/s);
+  assert.match(css, /\.cards-main\s*\{[^}]*padding-bottom: calc\(92px \+ env\(safe-area-inset-bottom\)\)/s);
+  assert.match(css, /\.cards-bottom-nav\s*\{[^}]*position: fixed[^}]*left: 50%[^}]*transform: translateX\(-50%\)/s);
+  assert.doesNotMatch(cardsPage, /overflow-hidden|overflow-y-(?:auto|scroll)/);
 
   assert.doesNotMatch(`${page}\n${route}\n${css}`, /전체 보기|42장/);
   assert.doesNotMatch(

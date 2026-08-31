@@ -729,6 +729,20 @@ a {
   background: var(--app-color-background);
 }
 
+.cards-page {
+  overflow-x: clip;
+}
+
+.cards-main {
+  padding-bottom: calc(92px + env(safe-area-inset-bottom));
+}
+
+.cards-bottom-nav {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .bottom-nav-list {
   display: grid;
   width: 100%;
