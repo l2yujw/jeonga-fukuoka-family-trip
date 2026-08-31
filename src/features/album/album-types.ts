@@ -4,10 +4,12 @@ export type AlbumPhoto = {
   originalFilename: string | null;
   mimeType: string | null;
   signedUrl: string | null;
+  uploaderMemberId: string;
   uploaderName: string | null;
   caption: string | null;
   width: number | null;
   height: number | null;
+  createdAt: string;
   isOwner: boolean;
 };
 

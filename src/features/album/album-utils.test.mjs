@@ -220,13 +220,16 @@ test("persisted mapping preserves newest-first input and calculates owner", () =
   );
 
   assert.deepEqual(mapped.map(({ id }) => id), ["newer", "older"]);
+  assert.equal(mapped[0].uploaderMemberId, memberId);
   assert.equal(mapped[0].uploaderName, "류정원");
+  assert.equal(mapped[0].createdAt, "2026-09-11T02:00:00Z");
   assert.equal(mapped[0].originalFilename, "original.jpg");
   assert.equal(mapped[0].mimeType, "image/jpeg");
   assert.equal(mapped[0].signedUrl, "https://signed.example/newer");
   assert.equal(mapped[1].signedUrl, null);
   assert.equal(isPhotoOwner(newer, authUserId), true);
   assert.equal(isPhotoOwner(newer, "different-auth-user"), false);
+  assert.equal(mapped[0].isOwner, true);
 });
 
 test("download filenames prefer a sanitized original and safely preserve HEIC fallbacks", () => {
