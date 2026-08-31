@@ -49,6 +49,18 @@
       "photoSlotIds": ["e1", "e2", "e3", "e4", "e5"],
       "acceptedPhotoCounts": [4, 5],
       "fourPhotoBehavior": "Persist e1 through e4; render e5 as an intentional empty slot."
+    },
+    "postcard_duo": {
+      "photoSlotIds": ["pd1", "pd2"],
+      "acceptedPhotoCounts": [2]
+    },
+    "scrapbook_trio": {
+      "photoSlotIds": ["st1", "st2", "st3"],
+      "acceptedPhotoCounts": [3]
+    },
+    "film_contact_sheet": {
+      "photoSlotIds": ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6"],
+      "acceptedPhotoCounts": [6]
     }
   },
   "rules": {

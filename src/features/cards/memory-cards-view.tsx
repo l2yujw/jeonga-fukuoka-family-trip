@@ -12,6 +12,7 @@ import {
 } from "./memory-card-export";
 import {
   getMemoryCardTemplate,
+  getMinimumMemoryCardPhotoCount,
   getRandomPhotoCount,
   MEMORY_CARD_TEMPLATES,
   normalizeMemoryCardCaption,
@@ -41,6 +42,8 @@ const createdAtFormatter = new Intl.DateTimeFormat("ko-KR", {
 function templatePhotoCountLabel(min: number, max: number) {
   return min === max ? `사진 ${min}장` : `사진 ${min}–${max}장`;
 }
+
+const minimumPhotoCount = getMinimumMemoryCardPhotoCount();
 
 export function MemoryCardsView() {
   const tripSession = useCurrentTripSession();
@@ -262,11 +265,11 @@ export function MemoryCardsView() {
           </div>
           <Button variant="ghost" onClick={closeComposer}>닫기</Button>
         </div>
-        {photos.length < 4 && (
+        {photos.length < minimumPhotoCount && (
           <EmptyState
             className="mt-5 bg-surface/60"
             title="카드를 만들 사진이 부족해요."
-            description="템플릿에는 앨범 사진이 최소 4장 필요해요."
+            description={`템플릿에는 앨범 사진이 최소 ${minimumPhotoCount}장 필요해요.`}
             action={<a href="/album" className="tap-target inline-flex items-center font-semibold text-accent-primary">앨범으로 이동</a>}
           />
         )}
@@ -279,10 +282,10 @@ export function MemoryCardsView() {
                 type="button"
                 disabled={!available}
                 onClick={() => selectTemplate(item.key)}
-                className="tap-target grid w-full grid-cols-[7rem_1fr] items-center gap-4 rounded-lg border border-line bg-surface p-3 text-left shadow-card disabled:opacity-45"
+                className="tap-target grid w-full grid-cols-[7rem_minmax(0,1fr)] items-center gap-4 rounded-lg border border-line bg-surface p-3 text-left shadow-card disabled:opacity-45"
               >
                 <MemoryCardPreview templateKey={item.key} photos={[]} dateLabel={dateLabel} />
-                <span>
+                <span className="min-w-0">
                   <span className="font-editorial block text-lg font-semibold">{item.displayName}</span>
                   <span className="mt-1 block text-sm text-text-secondary">
                     {templatePhotoCountLabel(item.acceptedMin, item.acceptedMax)} · {available ? "고정 배치" : `앨범 ${item.acceptedMin}장부터`}
@@ -403,14 +406,14 @@ export function MemoryCardsView() {
     <>
       <div className="flex items-center justify-between gap-3">
         <Badge tone="neutral">{cards.length}장</Badge>
-        <Button disabled={photos.length < 4} onClick={() => setComposerStep("template")}>추억 카드 만들기</Button>
+        <Button disabled={photos.length < minimumPhotoCount} onClick={() => setComposerStep("template")}>추억 카드 만들기</Button>
       </div>
 
       {error && <p role="alert" className="mt-4 rounded-md bg-danger/8 px-4 py-3 text-sm text-danger">{error}</p>}
 
-      {photos.length < 4 && (
+      {photos.length < minimumPhotoCount && (
         <Card className="mt-5 p-4">
-          <p className="font-semibold">카드를 만들려면 사진이 최소 4장 필요해요.</p>
+          <p className="font-semibold">카드를 만들려면 사진이 최소 {minimumPhotoCount}장 필요해요.</p>
           <p className="mt-1 text-sm text-text-secondary">현재 앨범 사진 {photos.length}장 · 사진을 더 추가해주세요.</p>
           <a href="/album" className="tap-target mt-2 inline-flex items-center text-sm font-semibold text-accent-primary">앨범으로 이동 →</a>
         </Card>

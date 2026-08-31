@@ -16,6 +16,9 @@
 1. 폴라로이드 무드보드
 2. 4컷 스트립
 3. 에디토리얼 콜라주
+4. Travel Postcard
+5. Scrapbook Trio
+6. Film Contact Sheet
 
 ## CTA
 Primary: `랜덤 선택으로 생성`

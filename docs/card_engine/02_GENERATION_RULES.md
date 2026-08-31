@@ -23,12 +23,13 @@
 
 ## Photo count
 - 0: 카드 생성 불가
-- 1~3: editorial single/mini fallback을 만들지 않는다면 안내
-- 4: four_cut 사용 가능
-- 4~5: editorial
-- 6+: polaroid/editorial
+- 1: 카드 생성 불가
+- 2: postcard_duo
+- 3: postcard_duo, scrapbook_trio
+- 4~5: postcard_duo, scrapbook_trio, four_cut, editorial_collage
+- 6+: 모든 6개 template
 
-v1에서 template을 늘리지 않으려면 사용 가능한 template만 활성화.
+template별 최소 사진 수를 충족하는 항목만 활성화.
 
 ## Quality Rule
 - rotation ±5° 이내
