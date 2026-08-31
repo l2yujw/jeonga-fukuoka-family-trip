@@ -61,6 +61,16 @@
     "film_contact_sheet": {
       "photoSlotIds": ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6"],
       "acceptedPhotoCounts": [6]
+    },
+    "one_moment": {
+      "photoSlotIds": ["om1"],
+      "acceptedPhotoCounts": [1],
+      "writeCompatibility": "canonicalV2Only"
+    },
+    "instant_memory": {
+      "photoSlotIds": ["im1"],
+      "acceptedPhotoCounts": [1],
+      "writeCompatibility": "canonicalV2Only"
     }
   },
   "rules": {
@@ -71,6 +81,7 @@
     "signedUrlsInLayoutJson": false,
     "storagePathsInLayoutJson": false,
     "resultStoragePath": null,
-    "renderedResultStorage": "deferred"
+    "renderedResultStorage": "deferred",
+    "decorations": "Template metadata only; never persisted in layout_json."
   }
 }

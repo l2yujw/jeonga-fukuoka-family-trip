@@ -86,7 +86,9 @@ create table if not exists public.memory_cards (
       'editorial_collage',
       'postcard_duo',
       'scrapbook_trio',
-      'film_contact_sheet'
+      'film_contact_sheet',
+      'one_moment',
+      'instant_memory'
     )
   ),
   layout_version integer not null default 1,

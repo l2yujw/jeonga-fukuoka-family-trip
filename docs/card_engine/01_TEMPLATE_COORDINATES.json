@@ -8,7 +8,7 @@
     {
       "key": "polaroid_moodboard",
       "requiredMin": 6,
-      "requiredMax": 8,
+      "requiredMax": 6,
       "slots": [
         {
           "id": "p1",
@@ -147,7 +147,7 @@
     {
       "key": "editorial_collage",
       "requiredMin": 4,
-      "requiredMax": 6,
+      "requiredMax": 5,
       "slots": [
         {
           "id": "e1",
@@ -386,6 +386,85 @@
           "y": 1680,
           "maxWidth": 900,
           "style": "date-small"
+        }
+      ]
+    },
+    {
+      "key": "one_moment",
+      "requiredMin": 1,
+      "requiredMax": 1,
+      "slots": [
+        {
+          "id": "om1",
+          "x": 0,
+          "y": 0,
+          "w": 1080,
+          "h": 1920,
+          "r": 0,
+          "z": 1,
+          "frame": "plain"
+        }
+      ],
+      "textSlots": [
+        {
+          "id": "caption",
+          "x": 110,
+          "y": 1540,
+          "maxWidth": 860,
+          "style": "single-overlay-caption"
+        },
+        {
+          "id": "t2",
+          "x": 110,
+          "y": 1740,
+          "maxWidth": 860,
+          "style": "single-overlay-date"
+        }
+      ],
+      "decorations": [
+        {
+          "id": "om-scrim",
+          "kind": "linear-gradient",
+          "x": 0,
+          "y": 1160,
+          "w": 1080,
+          "h": 760,
+          "direction": "vertical",
+          "fromColor": "rgba(34, 26, 22, 0)",
+          "toColor": "rgba(34, 26, 22, 0.64)"
+        }
+      ]
+    },
+    {
+      "key": "instant_memory",
+      "requiredMin": 1,
+      "requiredMax": 1,
+      "slots": [
+        {
+          "id": "im1",
+          "x": 120,
+          "y": 220,
+          "w": 840,
+          "h": 1120,
+          "r": -1,
+          "z": 1,
+          "frame": "polaroid"
+        }
+      ],
+      "textSlots": [
+        {
+          "id": "caption",
+          "x": 120,
+          "y": 1480,
+          "maxWidth": 840,
+          "style": "memory-line"
+        },
+        {
+          "id": "t2",
+          "x": 120,
+          "y": 1680,
+          "maxWidth": 840,
+          "style": "date-dark"
         }
       ]
     }

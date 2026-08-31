@@ -39,7 +39,10 @@ const newTemplateCases = [
   ["postcard_duo", 2, ["pd1", "pd2"]],
   ["scrapbook_trio", 3, ["st1", "st2", "st3"]],
   ["film_contact_sheet", 6, ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6"]],
+  ["one_moment", 1, ["om1"]],
+  ["instant_memory", 1, ["im1"]],
 ];
+const feedback15TemplateCases = newTemplateCases.slice(-2);
 
 test("code template coordinates stay synchronized with the canonical document", async () => {
   const canonical = JSON.parse(
@@ -50,14 +53,22 @@ test("code template coordinates stay synchronized with the canonical document", 
   );
   assert.deepEqual(MEMORY_CARD_CANVAS, canonical.canvas);
   assert.deepEqual(
-    MEMORY_CARD_TEMPLATE_SPECS.map(({ key, slots, textSlots }) => ({ key, slots, textSlots })),
-    canonical.templates.map(({ key, slots, textSlots }) => ({ key, slots, textSlots })),
+    MEMORY_CARD_TEMPLATE_SPECS.map(({ key, acceptedMin: requiredMin, acceptedMax: requiredMax, slots, textSlots, decorations = [] }) => (
+      { key, requiredMin, requiredMax, slots, textSlots, decorations }
+    )),
+    canonical.templates.map(({ key, requiredMin, requiredMax, slots, textSlots, decorations = [] }) => (
+      { key, requiredMin, requiredMax, slots, textSlots, decorations }
+    )),
   );
 });
 
-test("template catalog has six valid unique templates inside the canonical canvas", () => {
-  assert.equal(MEMORY_CARD_TEMPLATE_SPECS.length, 6);
-  assert.equal(new Set(MEMORY_CARD_TEMPLATE_SPECS.map(({ key }) => key)).size, 6);
+test("template catalog has eight valid unique templates inside the canonical canvas", () => {
+  assert.equal(MEMORY_CARD_TEMPLATE_SPECS.length, 8);
+  assert.equal(new Set(MEMORY_CARD_TEMPLATE_SPECS.map(({ key }) => key)).size, 8);
+  assert.deepEqual(
+    MEMORY_CARD_TEMPLATE_SPECS.slice(-2).map(({ key }) => key),
+    ["one_moment", "instant_memory"],
+  );
 
   for (const template of MEMORY_CARD_TEMPLATE_SPECS) {
     assert.equal(new Set(template.slots.map(({ id }) => id)).size, template.slots.length);
@@ -84,12 +95,42 @@ test("template catalog has six valid unique templates inside the canonical canva
     }
   }
 
-  assert.equal(getMinimumMemoryCardPhotoCount(), 2);
+  assert.equal(getMinimumMemoryCardPhotoCount(), 1);
   for (const [key, count] of newTemplateCases) {
     const template = MEMORY_CARD_TEMPLATE_SPECS.find((item) => item.key === key);
     assert.equal(template?.acceptedMin, count);
     assert.equal(template?.acceptedMax, count);
   }
+});
+
+test("Feedback #15 decorations are narrow, valid, and data-driven", () => {
+  const oneMoment = MEMORY_CARD_TEMPLATE_SPECS.find(({ key }) => key === "one_moment");
+  const instantMemory = MEMORY_CARD_TEMPLATE_SPECS.find(({ key }) => key === "instant_memory");
+  assert.deepEqual(oneMoment?.slots, [
+    { id: "om1", x: 0, y: 0, w: 1080, h: 1920, r: 0, z: 1, frame: "plain" },
+  ]);
+  assert.equal(oneMoment?.decorations?.length, 1);
+  assert.equal(instantMemory?.decorations, undefined);
+
+  const decoration = oneMoment.decorations[0];
+  assert.equal(decoration.kind, "linear-gradient");
+  assert.equal(decoration.direction, "vertical");
+  assert.equal(decoration.id, "om-scrim");
+  assert.ok(decoration.x >= 0 && decoration.x + decoration.w <= MEMORY_CARD_CANVAS.width);
+  assert.ok(decoration.y >= 0 && decoration.y + decoration.h <= MEMORY_CARD_CANVAS.height);
+  assert.ok(decoration.fromColor && decoration.toColor);
+  assert.notEqual(decoration.fromColor, decoration.toColor);
+});
+
+test("template availability follows the derived one-photo minimum", () => {
+  const eligibleKeys = (photoCount) => MEMORY_CARD_TEMPLATE_SPECS
+    .filter(({ acceptedMin }) => photoCount >= acceptedMin)
+    .map(({ key }) => key);
+  assert.deepEqual(eligibleKeys(0), []);
+  assert.deepEqual(eligibleKeys(1), ["one_moment", "instant_memory"]);
+  assert.deepEqual(eligibleKeys(2), ["postcard_duo", "one_moment", "instant_memory"]);
+  assert.deepEqual(eligibleKeys(3), ["postcard_duo", "scrapbook_trio", "one_moment", "instant_memory"]);
+  assert.equal(eligibleKeys(6).length, 8);
 });
 
 test("new layouts are strict canonical v2 with template slot counts", () => {
@@ -115,10 +156,16 @@ test("new layouts are strict canonical v2 with template slot counts", () => {
       () => buildMemoryCardLayoutV2(key, photoIds.slice(0, -1)),
       /invalid-memory-card-photo-count/,
     );
-    assert.throws(
-      () => buildMemoryCardLayoutV2(key, photoIds.map((id, index) => index === 1 ? photoIds[0] : id)),
-      /duplicate-memory-card-photo/,
-    );
+    if (count > 1) {
+      assert.throws(
+        () => buildMemoryCardLayoutV2(key, photoIds.map((id, index) => index === 1 ? photoIds[0] : id)),
+        /duplicate-memory-card-photo/,
+      );
+    }
+  }
+  for (const [key] of feedback15TemplateCases) {
+    assert.throws(() => buildMemoryCardLayoutV2(key, []), /invalid-memory-card-photo-count/);
+    assert.throws(() => buildMemoryCardLayoutV2(key, ["a", "b"]), /invalid-memory-card-photo-count/);
   }
   assert.throws(() => buildMemoryCardLayoutV2("polaroid_moodboard", ["a", "b"]), /invalid-memory-card-photo-count/);
   assert.throws(() => buildMemoryCardLayoutV2("four_cut", ["a", "a", "c", "d"]), /duplicate-memory-card-photo/);
@@ -150,6 +197,14 @@ test("canonical experimental v1 is detected before legacy and accepts an optiona
   assert.equal(model?.kind, "canonical");
   assert.equal(model?.layoutVersion, 1);
   assert.equal(model?.layout.caption, "가족 여행");
+});
+
+test("Feedback #15 templates are canonical v2 only", () => {
+  for (const [key, , [slotId]] of feedback15TemplateCases) {
+    const layout = { version: 1, slots: [{ slotId, photoId: "a" }], caption: null };
+    assert.equal(parseCanonicalExperimentalMemoryCardLayoutV1(key, layout), null);
+    assert.equal(parseMemoryCardRenderModel(key, 1, layout), null);
+  }
 });
 
 test("legacy simple v1 parses into its own display model without faking canonical slots", () => {
@@ -198,6 +253,8 @@ test("new insert payload always writes DB and JSON version 2", () => {
     layout: {
       ...layout,
       signedUrl: "not persisted",
+      decorations: [{ kind: "linear-gradient" }],
+      gradient: "not persisted",
       slots: layout.slots.map((slot) => ({ ...slot, storagePath: "not persisted" })),
     },
     memberId,
@@ -209,7 +266,7 @@ test("new insert payload always writes DB and JSON version 2", () => {
   assert.deepEqual(payload.layout_json, layout);
   assert.equal(payload.layout_json.version, 2);
   assert.equal(payload.result_storage_path, null);
-  assert.doesNotMatch(JSON.stringify(payload.layout_json), /signedUrl|storagePath|https?:\/\//i);
+  assert.doesNotMatch(JSON.stringify(payload.layout_json), /signedUrl|storagePath|decorations|gradient|https?:\/\//i);
   assert.throws(() => buildMemoryCardInsertPayload({
     authUserId,
     availablePhotoIds: new Set(["a", "b", "c"]),
@@ -249,6 +306,18 @@ test("new fixed-count templates reshuffle exact slot counts without duplicates o
     assert.deepEqual(shuffled.slots.map(({ slotId }) => slotId), slotIds);
     assert.equal(shuffled.caption, "same caption");
     assert.equal(new Set(photoIds).size, count);
+  }
+});
+
+test("one-photo reshuffle changes the photo when an alternative exists", () => {
+  for (const [key] of feedback15TemplateCases) {
+    const layout = buildMemoryCardLayoutV2(key, ["a"], "same caption");
+    const changed = reshuffleMemoryCardLayout(key, layout, ["a", "b"], () => 0.999);
+    const unchanged = reshuffleMemoryCardLayout(key, layout, ["a"], () => 0.999);
+    assert.deepEqual(changed.slots.map(({ photoId }) => photoId), ["b"]);
+    assert.deepEqual(unchanged.slots.map(({ photoId }) => photoId), ["a"]);
+    assert.equal(changed.caption, "same caption");
+    assert.equal(unchanged.caption, "same caption");
   }
 });
 
@@ -354,10 +423,11 @@ test("persisted rows map every new template key", () => {
   assert.ok(cards.every(({ renderModel }) => renderModel?.layoutVersion === 2));
 });
 
-test("schema snapshot and Feedback #14 migration permit exactly the canonical template keys", async () => {
-  const [schema, migration] = await Promise.all([
+test("schema snapshot and Feedback #15 migration permit exactly the canonical template keys", async () => {
+  const [schema, feedback14Migration, migration] = await Promise.all([
     readFile(new URL("../../../docs/data/01_SCHEMA_FINAL.sql", import.meta.url), "utf8"),
     readFile(new URL("../../../docs/data/07_FEEDBACK14_CARD_TEMPLATE_KEYS_MIGRATION.sql", import.meta.url), "utf8"),
+    readFile(new URL("../../../docs/data/08_FEEDBACK15_SINGLE_PHOTO_TEMPLATE_KEYS_MIGRATION.sql", import.meta.url), "utf8"),
   ]);
   const keys = MEMORY_CARD_TEMPLATE_SPECS.map(({ key }) => key);
   const schemaCheck = schema.match(/template_key in \(([\s\S]*?)\)\n\s*\),/i)?.[1] ?? "";
@@ -365,6 +435,10 @@ test("schema snapshot and Feedback #14 migration permit exactly the canonical te
   const quotedValues = (value) => [...value.matchAll(/'([^']+)'/g)].map((match) => match[1]);
   assert.deepEqual(quotedValues(schemaCheck), keys);
   assert.deepEqual(quotedValues(migrationCheck), keys);
+  assert.deepEqual(
+    quotedValues(feedback14Migration),
+    keys.slice(0, 6),
+  );
   assert.match(migration, /begin;[\s\S]*commit;/i);
   assert.match(migration, /drop constraint if exists memory_cards_template_key_check/i);
   assert.match(migration, /add constraint memory_cards_template_key_check check/i);
@@ -381,6 +455,9 @@ test("caption typography tokens are shared Korean-capable, template-specific sty
   assert.equal(MEMORY_CARD_TEXT_STYLES["memory-line"].textAlign, "center");
   assert.equal(MEMORY_CARD_TEXT_STYLES["four-cut-footer"].fontFamily, "sans");
   assert.equal(MEMORY_CARD_TEXT_STYLES["editorial-caption"].textAlign, "left");
+  assert.equal(MEMORY_CARD_TEXT_STYLES["single-overlay-caption"].maxLines, 2);
+  assert.equal(MEMORY_CARD_TEXT_STYLES["single-overlay-date"].maxLines, 1);
+  assert.equal(MEMORY_CARD_TEXT_STYLES["date-dark"].textAlign, "center");
   const [previewSource, exportSource] = await Promise.all([
     readFile(new URL("./memory-card-preview.tsx", import.meta.url), "utf8"),
     readFile(new URL("./memory-card-export.ts", import.meta.url), "utf8"),
@@ -388,6 +465,13 @@ test("caption typography tokens are shared Korean-capable, template-specific sty
   assert.match(previewSource, /MEMORY_CARD_TEXT_STYLES/);
   assert.match(exportSource, /MEMORY_CARD_TEXT_STYLES/);
   assert.match(exportSource, /document\.fonts\?\.ready/);
+  assert.match(previewSource, /template\.decorations\?\.map/);
+  assert.match(previewSource, /linear-gradient\(to bottom/);
+  assert.match(exportSource, /template\.decorations \?\? \[\]/);
+  assert.match(exportSource, /createLinearGradient/);
+  assert.ok(exportSource.indexOf("for (const decoration") < exportSource.indexOf("for (const slot of template.textSlots)"));
+  assert.doesNotMatch(previewSource, /templateKey === ["'](?:one_moment|instant_memory)/);
+  assert.doesNotMatch(exportSource, /templateKey === ["'](?:one_moment|instant_memory)/);
   assert.doesNotMatch(exportSource, /Georgia/);
 });
 
@@ -439,7 +523,7 @@ test("new templates use full-canvas PNG export through the existing path", async
       return new Blob(["png"], { type: "image/png" });
     });
   }
-  assert.equal(rendered, 3);
+  assert.equal(rendered, 5);
 });
 
 test("legacy, experimental v1, and v2 saved cards all reach PNG export", async () => {

@@ -171,6 +171,7 @@ export function parseCanonicalExperimentalMemoryCardLayoutV1(
   templateKey: MemoryCardTemplateKey,
   value: unknown,
 ) {
+  if (templateKey === "one_moment" || templateKey === "instant_memory") return null;
   return parseCanonicalLayout(templateKey, value, 1, false) as
     | CanonicalExperimentalMemoryCardLayoutV1
     | null;
@@ -281,10 +282,17 @@ export function reshuffleMemoryCardLayout(
   const currentIds = layout.slots.map(({ photoId }) => photoId);
   let nextIds = randomFillPhotoIds(availablePhotoIds, count, random);
   if (
-    nextIds.length > 1 &&
+    nextIds.length > 0 &&
     nextIds.every((photoId, index) => photoId === currentIds[index])
   ) {
-    nextIds = [...nextIds.slice(1), nextIds[0]];
+    if (nextIds.length === 1) {
+      const alternative = [...new Set(availablePhotoIds)].find(
+        (photoId) => photoId !== currentIds[0],
+      );
+      if (alternative) nextIds = [alternative];
+    } else {
+      nextIds = [...nextIds.slice(1), nextIds[0]];
+    }
   }
   return buildMemoryCardLayoutV2(templateKey, nextIds, layout.caption);
 }

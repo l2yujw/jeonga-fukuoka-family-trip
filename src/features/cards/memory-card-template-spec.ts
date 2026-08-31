@@ -4,7 +4,9 @@ export type MemoryCardTemplateKey =
   | "editorial_collage"
   | "postcard_duo"
   | "scrapbook_trio"
-  | "film_contact_sheet";
+  | "film_contact_sheet"
+  | "one_moment"
+  | "instant_memory";
 
 export type MemoryCardPhotoSlot = {
   id: string;
@@ -21,8 +23,11 @@ export type MemoryCardTextStyleKey =
   | "memory-line"
   | "four-cut-footer"
   | "date-small"
+  | "date-dark"
   | "editorial-title"
-  | "editorial-caption";
+  | "editorial-caption"
+  | "single-overlay-caption"
+  | "single-overlay-date";
 
 export type MemoryCardTextSlot = {
   id: string;
@@ -43,6 +48,18 @@ export type MemoryCardCaptionStyle = {
   letterSpacing?: number;
 };
 
+export type MemoryCardDecoration = {
+  id: string;
+  kind: "linear-gradient";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  direction: "vertical";
+  fromColor: string;
+  toColor: string;
+};
+
 export type ExportBounds = {
   x: number;
   y: number;
@@ -60,6 +77,7 @@ export type MemoryCardTemplateSpec = {
   exportBounds: ExportBounds;
   slots: readonly MemoryCardPhotoSlot[];
   textSlots: readonly MemoryCardTextSlot[];
+  decorations?: readonly MemoryCardDecoration[];
 };
 
 export const MEMORY_CARD_CANVAS = { width: 1080, height: 1920 } as const;
@@ -98,6 +116,16 @@ export const MEMORY_CARD_TEXT_STYLES = {
     maxLines: 1,
     letterSpacing: 0.8,
   },
+  "date-dark": {
+    fontFamily: "sans",
+    fontSize: 22,
+    fontWeight: 500,
+    lineHeight: 30,
+    color: "#6f5c4b",
+    textAlign: "center",
+    maxLines: 1,
+    letterSpacing: 0.8,
+  },
   "editorial-title": {
     fontFamily: "editorial",
     fontSize: 42,
@@ -116,6 +144,25 @@ export const MEMORY_CARD_TEXT_STYLES = {
     color: "#4b392d",
     textAlign: "left",
     maxLines: 2,
+  },
+  "single-overlay-caption": {
+    fontFamily: "editorial",
+    fontSize: 44,
+    fontWeight: 500,
+    lineHeight: 60,
+    color: "#fff9ec",
+    textAlign: "center",
+    maxLines: 2,
+  },
+  "single-overlay-date": {
+    fontFamily: "sans",
+    fontSize: 24,
+    fontWeight: 500,
+    lineHeight: 32,
+    color: "rgba(255, 249, 236, 0.84)",
+    textAlign: "center",
+    maxLines: 1,
+    letterSpacing: 0.8,
   },
 } as const satisfies Record<MemoryCardTextStyleKey, MemoryCardCaptionStyle>;
 
@@ -254,6 +301,49 @@ export const MEMORY_CARD_TEMPLATE_SPECS = [
       { id: "t2", x: 90, y: 1680, maxWidth: 900, style: "date-small" },
     ],
   },
+  {
+    key: "one_moment",
+    displayName: "One Moment",
+    acceptedMin: 1,
+    acceptedMax: 1,
+    backgroundColor: "#221a16",
+    exportBounds: FULL_CANVAS_EXPORT,
+    slots: [
+      { id: "om1", x: 0, y: 0, w: 1080, h: 1920, r: 0, z: 1, frame: "plain" },
+    ],
+    textSlots: [
+      { id: "caption", x: 110, y: 1540, maxWidth: 860, style: "single-overlay-caption" },
+      { id: "t2", x: 110, y: 1740, maxWidth: 860, style: "single-overlay-date" },
+    ],
+    decorations: [
+      {
+        id: "om-scrim",
+        kind: "linear-gradient",
+        x: 0,
+        y: 1160,
+        w: 1080,
+        h: 760,
+        direction: "vertical",
+        fromColor: "rgba(34, 26, 22, 0)",
+        toColor: "rgba(34, 26, 22, 0.64)",
+      },
+    ],
+  },
+  {
+    key: "instant_memory",
+    displayName: "Instant Memory",
+    acceptedMin: 1,
+    acceptedMax: 1,
+    backgroundColor: "#ead9bd",
+    exportBounds: FULL_CANVAS_EXPORT,
+    slots: [
+      { id: "im1", x: 120, y: 220, w: 840, h: 1120, r: -1, z: 1, frame: "polaroid" },
+    ],
+    textSlots: [
+      { id: "caption", x: 120, y: 1480, maxWidth: 840, style: "memory-line" },
+      { id: "t2", x: 120, y: 1680, maxWidth: 840, style: "date-dark" },
+    ],
+  },
 ] as const satisfies readonly MemoryCardTemplateSpec[];
 
 export function getMinimumMemoryCardPhotoCount() {
@@ -303,10 +393,10 @@ export const LEGACY_MEMORY_CARD_TEMPLATE_SPECS = [
   },
 ] as const satisfies readonly MemoryCardTemplateSpec[];
 
-export function getMemoryCardTemplateSpec(key: string) {
+export function getMemoryCardTemplateSpec(key: string): MemoryCardTemplateSpec | null {
   return MEMORY_CARD_TEMPLATE_SPECS.find((template) => template.key === key) ?? null;
 }
 
-export function getLegacyMemoryCardTemplateSpec(key: string) {
+export function getLegacyMemoryCardTemplateSpec(key: string): MemoryCardTemplateSpec | null {
   return LEGACY_MEMORY_CARD_TEMPLATE_SPECS.find((template) => template.key === key) ?? null;
 }

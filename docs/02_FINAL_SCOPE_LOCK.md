@@ -34,7 +34,7 @@
 ### Memory Card
 - 사진 직접 선택
 - 사진 랜덤 선택
-- 6개 template
+- 8개 template
 - template slot에 사진 random mapping
 - 다시 섞기
 - 카드용 caption 변경
