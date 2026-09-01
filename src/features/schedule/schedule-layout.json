@@ -1,0 +1,45 @@
+{
+  "logicalWidth": 695,
+  "pixelRatio": 2,
+  "dayRowCounts": {
+    "1": 11,
+    "2": 9,
+    "3": 7
+  },
+  "route": {
+    "x": 28,
+    "y": 8,
+    "width": 644,
+    "height": 134,
+    "artX": 458,
+    "artY": 16,
+    "artWidth": 205,
+    "artHeight": 118
+  },
+  "row": {
+    "firstY": 161,
+    "height": 148,
+    "gap": 16,
+    "timelineX": 57,
+    "cardX": 91,
+    "cardWidth": 580,
+    "cardRadius": 20,
+    "iconX": 20,
+    "iconWidth": 74,
+    "iconHeight": 90,
+    "untimedTextX": 113,
+    "timeX": 111,
+    "timedDividerX": 200,
+    "timedTextX": 213,
+    "chipYOffset": 17,
+    "chipHeight": 34,
+    "artX": 400,
+    "artWidth": 265,
+    "artInsetY": 5
+  },
+  "memo": {
+    "gap": 20,
+    "height": 133,
+    "bottomMargin": 8
+  }
+}

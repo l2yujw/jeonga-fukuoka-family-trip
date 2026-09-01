@@ -33,12 +33,11 @@
 - Supabase SDK 연결
 부터 Codex를 시작한다.
 
-## 현재 확정되지 않아도 개발 가능한 항목
-- 가족 9명 중 류정원 외 실제 이름/역할
-- 최종 호텔
-- LJ261 출발시간 06:05 vs 06:50 충돌
+## 남은 production data 항목
+- 류정원 외 가족의 실제 이름/역할
+- invite token hash
 
-이 값은 production seed 직전에 교체 가능한 content/data 항목이다.
+일정·항공·호텔 정보는 최종 여행 안내문 기준으로 `docs/data/04_SEED_DRAFT.sql`에 확정되었다.
 
 ## 먼저 볼 파일
 1. `10_precodex_final/00_PRECODEX_STATUS.md`
