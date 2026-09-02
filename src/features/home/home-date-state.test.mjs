@@ -319,6 +319,9 @@ test("home implements the v25 itinerary-backed progressive previews", async () =
   );
   assert.match(route, /resolveInviteTrip\(request\)/);
   assert.match(route, /serveLandingVisual/);
+  assert.match(route, /'"home-visual-v16"'/);
+  assert.match(route, /private, max-age=0, must-revalidate/);
+  assert.match(route, /request\.headers\.get\("if-none-match"\)/);
   assert.doesNotMatch(route, /searchParams|request-controlled|homeVisualFiles/);
 
   assert.match(

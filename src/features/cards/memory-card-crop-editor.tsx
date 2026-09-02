@@ -33,6 +33,7 @@ type MemoryCardCropEditorProps = {
   slotNumber: number;
   onApply: (placement: MemoryCardPhotoPlacement) => void;
   onCancel: () => void;
+  onPhotoError: () => void;
 };
 
 type SafariGestureEvent = Event & {
@@ -44,6 +45,7 @@ export function MemoryCardCropEditor({
   initialPlacement,
   onApply,
   onCancel,
+  onPhotoError,
   photo,
   slot,
   slotNumber,
@@ -252,6 +254,7 @@ export function MemoryCardCropEditor({
             src={photo.signedUrl}
             alt=""
             draggable={false}
+            onError={onPhotoError}
             onLoad={({ currentTarget }) => {
               const nextDimensions = {
                 width: currentTarget.naturalWidth,

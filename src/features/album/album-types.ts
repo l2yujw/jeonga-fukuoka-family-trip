@@ -1,9 +1,12 @@
+export type PhotoMediaState = "idle" | "loading" | "ready" | "error";
+
 export type AlbumPhoto = {
   id: string;
   storagePath: string;
   originalFilename: string | null;
   mimeType: string | null;
   signedUrl: string | null;
+  mediaState: PhotoMediaState;
   uploaderMemberId: string;
   uploaderName: string | null;
   caption: string | null;

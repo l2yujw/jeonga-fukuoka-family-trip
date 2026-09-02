@@ -1,15 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  memo,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import { Badge, Button, Card, EmptyState, LoadingState } from "@/components/ui";
 import { useCurrentTripSession } from "@/features/boarding/trip-access-guard";
 import {
   deleteAlbumPhoto,
   downloadAlbumPhoto,
-  loadAlbumPhotos,
+  loadAlbumPhotoMetadata,
+  loadAlbumPhotoSignedUrls,
   updateAlbumPhotoCaption,
   uploadAlbumPhoto,
 } from "./album-repository";
+import {
+  ALBUM_HIGH_PRIORITY_MEDIA_COUNT,
+  ALBUM_INITIAL_MEDIA_PREWARM_COUNT,
+  getInitialMediaPrewarmCandidates,
+} from "./album-media-observer";
+import {
+  useNearViewportPhoto,
+  type AlbumPhotoMediaChange,
+} from "./album-media-visibility";
 import type { AlbumPhoto, AlbumUploadDraft } from "./album-types";
 import {
   UNKNOWN_UPLOADER_LABEL,
@@ -24,6 +42,7 @@ import {
 import {
   ALBUM_CAPTION_MAX_LENGTH,
   ALBUM_FILE_ACCEPT,
+  applyAlbumPhotoSignedUrls,
   appendAlbumUploadDrafts,
   createAlbumUploadDraft,
   createLocalPhotoDraft,
@@ -34,12 +53,61 @@ import {
   removeAlbumUploadDraft,
   runBoundedUploads,
   settleAlbumUploadDraft,
+  updateAlbumPhotoMedia,
   updateAlbumUploadDraftCaption,
 } from "./album-utils";
 
 type AlbumViewProps = {
   onComposerOpenChange?: (isOpen: boolean) => void;
 };
+
+const AlbumPhotoMedia = memo(function AlbumPhotoMedia({
+  alt,
+  fetchPriority,
+  onMediaChange,
+  photo,
+}: {
+  alt: string;
+  fetchPriority: "high" | "auto";
+  onMediaChange: AlbumPhotoMediaChange;
+  photo: AlbumPhoto;
+}) {
+  const { mediaState, observe, onError, signedUrl } = useNearViewportPhoto(
+    photo,
+    onMediaChange,
+  );
+
+  return (
+    <div
+      ref={observe}
+      className="flex w-full items-center justify-center overflow-hidden rounded-md bg-line/40 px-3 text-center text-caption text-text-secondary"
+      style={{
+        aspectRatio: photo.width && photo.height
+          ? `${photo.width} / ${photo.height}`
+          : "4 / 5",
+      }}
+    >
+      {mediaState === "ready" && signedUrl ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={signedUrl}
+          alt={alt}
+          loading="eager"
+          decoding="async"
+          fetchPriority={fetchPriority}
+          width={photo.width ?? undefined}
+          height={photo.height ?? undefined}
+          onError={onError}
+          className="size-full bg-line/30 object-cover"
+        />
+      ) : mediaState === "error" ? (
+        "이 사진은 현재 브라우저에서 표시할 수 없어요."
+      ) : (
+        <span className="sr-only">사진 불러오는 중</span>
+      )}
+    </div>
+  );
+});
 
 export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
   const currentTripSession = useCurrentTripSession();
@@ -71,7 +139,7 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
   useEffect(() => {
     let active = true;
 
-    loadAlbumPhotos(currentTripSession.trip.id)
+    loadAlbumPhotoMetadata(currentTripSession.trip.id)
       .then((loadedPhotos) => {
         if (active) {
           setPhotos(loadedPhotos);
@@ -120,6 +188,17 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
   const photoGroups = useMemo(
     () => groupAlbumPhotosByUploader(filteredPhotos, sort),
     [filteredPhotos, sort],
+  );
+  const displayedPhotos = useMemo(
+    () => groupMode === "flat"
+      ? visiblePhotos
+      : photoGroups.flatMap(({ photos: groupPhotos }) => groupPhotos),
+    [groupMode, photoGroups, visiblePhotos],
+  );
+  const highPriorityPhotoIds = new Set(
+    displayedPhotos
+      .slice(0, ALBUM_HIGH_PRIORITY_MEDIA_COUNT)
+      .map(({ id }) => id),
   );
   const selectedUploaderLabel = uploaderFilter
     ? (uploaderOptions.find(({ memberId }) => memberId === uploaderFilter)?.label ??
@@ -357,13 +436,37 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
     }
   };
 
-  const markPhotoUnavailable = (photoId: string) => {
-    setPhotos((current) =>
-      current.map((photo) =>
-        photo.id === photoId ? { ...photo, signedUrl: null } : photo,
-      ),
+  const handlePhotoMediaChange = useCallback<AlbumPhotoMediaChange>((
+    photoId,
+    mediaState,
+    signedUrl,
+  ) => {
+    setPhotos((current) => updateAlbumPhotoMedia(
+      current,
+      photoId,
+      mediaState,
+      signedUrl,
+    ));
+  }, []);
+
+  useEffect(() => {
+    const candidates = getInitialMediaPrewarmCandidates(
+      displayedPhotos,
+      ALBUM_INITIAL_MEDIA_PREWARM_COUNT,
     );
-  };
+    if (candidates.length === 0) return;
+
+    void loadAlbumPhotoSignedUrls(
+      candidates.map(({ storagePath }) => storagePath),
+    ).then(
+      (signedUrls) => setPhotos((current) =>
+        applyAlbumPhotoSignedUrls(current, signedUrls)),
+      () => setPhotos((current) => applyAlbumPhotoSignedUrls(
+        current,
+        new Map(candidates.map(({ storagePath }) => [storagePath, null])),
+      )),
+    );
+  }, [displayedPhotos]);
 
   const renderAlbumPhoto = (photo: AlbumPhoto) => {
     const uploaderLabel = photo.uploaderName?.trim() || UNKNOWN_UPLOADER_LABEL;
@@ -372,25 +475,14 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
         key={photo.id}
         className="min-w-0 overflow-hidden rounded-lg border border-line/70 bg-surface p-1.5 shadow-card"
       >
-        {photo.signedUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={photo.signedUrl}
-            alt={
-              photo.caption
-                ? `${uploaderLabel}님이 올린 사진: ${photo.caption}`
-                : `${uploaderLabel}님이 올린 여행 사진`
-            }
-            width={photo.width ?? undefined}
-            height={photo.height ?? undefined}
-            onError={() => markPhotoUnavailable(photo.id)}
-            className="h-auto w-full rounded-md bg-line/30 object-cover"
-          />
-        ) : (
-          <div className="flex aspect-[4/5] items-center justify-center rounded-md bg-line/40 px-3 text-center text-caption text-text-secondary">
-            이 사진은 현재 브라우저에서 표시할 수 없어요.
-          </div>
-        )}
+        <AlbumPhotoMedia
+          photo={photo}
+          onMediaChange={handlePhotoMediaChange}
+          fetchPriority={highPriorityPhotoIds.has(photo.id) ? "high" : "auto"}
+          alt={photo.caption
+            ? `${uploaderLabel}님이 올린 사진: ${photo.caption}`
+            : `${uploaderLabel}님이 올린 여행 사진`}
+        />
         <div className="px-2 pt-2 pb-1.5">
           <p className="truncate text-caption font-semibold">{uploaderLabel}</p>
           <button
