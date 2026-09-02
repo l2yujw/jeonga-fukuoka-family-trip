@@ -19,17 +19,35 @@
       "slotIds": "Canonical p/f/e IDs in coordinate-document order.",
       "caption": "Optional string or null; absent and whitespace normalize to null in memory.",
       "behavior": "Read before attempting legacy-simple-v1 detection. Never mutate the row merely by reading."
+    },
+    "canonicalV2": {
+      "dbLayoutVersion": 2,
+      "jsonVersion": 2,
+      "slotIds": "Canonical IDs in coordinate-document order.",
+      "behavior": "Read and render every occupied slot as centered cover. Never rewrite the row merely by reading."
+    },
+    "canonicalV3": {
+      "dbLayoutVersion": 3,
+      "jsonVersion": 3,
+      "slotIds": "Canonical IDs in coordinate-document order.",
+      "behavior": "Read and render each occupied slot with its validated persisted placement."
     }
   },
   "newWriteFormat": {
-    "name": "canonicalV2",
-    "dbLayoutVersion": 2,
+    "name": "canonicalV3",
+    "dbLayoutVersion": 3,
     "layoutJson": {
-      "version": 2,
+      "version": 3,
       "slots": [
         {
           "slotId": "canonical-slot-id",
-          "photoId": "uuid"
+          "photoId": "uuid",
+          "placement": {
+            "zoom": 1,
+            "rotation": 0,
+            "offsetX": 0,
+            "offsetY": 0
+          }
         }
       ],
       "caption": null
@@ -65,18 +83,43 @@
     "one_moment": {
       "photoSlotIds": ["om1"],
       "acceptedPhotoCounts": [1],
-      "writeCompatibility": "canonicalV2Only"
+      "writeCompatibility": "canonicalV3Only"
     },
     "instant_memory": {
       "photoSlotIds": ["im1"],
       "acceptedPhotoCounts": [1],
-      "writeCompatibility": "canonicalV2Only"
+      "writeCompatibility": "canonicalV3Only"
     }
   },
   "rules": {
     "canonicalSlotOrderOnly": true,
     "photoIdsOnly": true,
     "uniquePhotoPerSlot": true,
+    "photoPlacement": {
+      "defaultPlacement": {
+        "zoom": "coverScale / containScale",
+        "rotation": 0,
+        "offsetX": 0,
+        "offsetY": 0
+      },
+      "containScale": "min(viewportWidth/imageWidth, viewportHeight/imageHeight)",
+      "coverScale": "max(viewportWidth/imageWidth, viewportHeight/imageHeight)",
+      "coverZoom": "coverScale / containScale",
+      "default": "Centered cover at rotation 0 for the selected photo and exact slot inner viewport.",
+      "zoomRange": "[1, max(6, coverZoom*4)] for the resolved photo and viewport",
+      "zoomMeaning": "effectiveScale / containScale. Zoom 1 displays the entire unrotated original image.",
+      "rotationRange": "[-180, 180)",
+      "offsetMeaning": "imageCenterX=viewportWidth*(0.5+offsetX), imageCenterY=viewportHeight*(0.5+offsetY).",
+      "pan": "Free left/right/up/down movement; clamp only enough to retain 10% of the shorter viewport dimension as visible overlap.",
+      "rotation": "Rotation never changes the persisted zoom. Surface background may remain visible.",
+      "actions": {
+        "사진 전체": "rotation 0, centered contain zoom 1",
+        "프레임 채우기": "rotation 0, centered cover zoom coverZoom",
+        "초기화": "rotation 0, centered cover zoom coverZoom"
+      },
+      "slotBackground": "#FFFDF8 surface token is painted before the photo and shared by editor, DOM preview, saved preview, and PNG export.",
+      "previewExportParity": "Editor, DOM preview, saved preview, and PNG export use the same pure placement geometry against the inner photo viewport after frame padding and footer."
+    },
     "caption": "Card-specific text; empty or whitespace normalizes to null and never updates photos.caption.",
     "signedUrlsInLayoutJson": false,
     "storagePathsInLayoutJson": false,

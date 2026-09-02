@@ -1,6 +1,7 @@
 import type { AlbumPhoto } from "@/features/album/album-types";
 import {
   getMemoryCardRenderTemplate,
+  resolveMemoryCardSlots,
   type MemoryCardRenderModel,
   type MemoryCardTemplateKey,
 } from "./memory-card";
@@ -13,6 +14,12 @@ import {
   type MemoryCardPhotoSlot,
   type MemoryCardTextSlot,
 } from "./memory-card-template-spec";
+import {
+  getMemoryCardPhotoViewport,
+  getPlacedImageRect,
+  MEMORY_CARD_PHOTO_BACKGROUND_COLOR,
+  type MemoryCardPhotoPlacement,
+} from "./memory-card-photo-placement";
 
 export const MEMORY_CARD_EXPORT_SIZES = [
   { width: 1080, height: 1920 },
@@ -50,40 +57,16 @@ function canvasToPngBlob(canvas: HTMLCanvasElement) {
   });
 }
 
-function drawCover(
-  context: CanvasRenderingContext2D,
-  image: HTMLImageElement,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-) {
-  const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
-  const sourceWidth = width / scale;
-  const sourceHeight = height / scale;
-  context.drawImage(
-    image,
-    (image.naturalWidth - sourceWidth) / 2,
-    (image.naturalHeight - sourceHeight) / 2,
-    sourceWidth,
-    sourceHeight,
-    x,
-    y,
-    width,
-    height,
-  );
-}
-
 function drawPhotoSlot(
   context: CanvasRenderingContext2D,
   slot: MemoryCardPhotoSlot,
   image: HTMLImageElement | null,
+  placement: MemoryCardPhotoPlacement | null,
   scale: number,
 ) {
   const width = slot.w * scale;
   const height = slot.h * scale;
-  const padding = (slot.frame === "polaroid" ? 18 : slot.frame === "strip" ? 8 : 0) * scale;
-  const footer = (slot.frame === "polaroid" ? 52 : 0) * scale;
+  const viewport = getMemoryCardPhotoViewport(slot);
 
   context.save();
   context.translate((slot.x + slot.w / 2) * scale, (slot.y + slot.h / 2) * scale);
@@ -96,19 +79,40 @@ function drawPhotoSlot(
   context.fillRect(-width / 2, -height / 2, width, height);
   context.shadowColor = "transparent";
 
-  const imageX = -width / 2 + padding;
-  const imageY = -height / 2 + padding;
-  const imageWidth = width - padding * 2;
-  const imageHeight = height - padding * 2 - footer;
+  const imageX = (-slot.w / 2 + viewport.x) * scale;
+  const imageY = (-slot.h / 2 + viewport.y) * scale;
+  const imageWidth = viewport.width * scale;
+  const imageHeight = viewport.height * scale;
   context.save();
   context.beginPath();
   context.rect(imageX, imageY, imageWidth, imageHeight);
   context.clip();
+  context.fillStyle = MEMORY_CARD_PHOTO_BACKGROUND_COLOR;
+  context.fillRect(imageX, imageY, imageWidth, imageHeight);
   if (image) {
-    drawCover(context, image, imageX, imageY, imageWidth, imageHeight);
-  } else {
-    context.fillStyle = "#ded7cc";
-    context.fillRect(imageX, imageY, imageWidth, imageHeight);
+    const placed = getPlacedImageRect(
+      image.naturalWidth,
+      image.naturalHeight,
+      viewport.width,
+      viewport.height,
+      placement,
+    );
+    if (placed) {
+      context.save();
+      context.translate(
+        imageX + (placed.x + placed.width / 2) * scale,
+        imageY + (placed.y + placed.height / 2) * scale,
+      );
+      context.rotate((placed.rotation * Math.PI) / 180);
+      context.drawImage(
+        image,
+        -placed.width * scale / 2,
+        -placed.height * scale / 2,
+        placed.width * scale,
+        placed.height * scale,
+      );
+      context.restore();
+    }
   }
   context.restore();
   context.restore();
@@ -264,10 +268,15 @@ export async function renderMemoryCardPng(
     );
   }
 
-  const photoIds = new Map(
-    input.renderModel.layout.slots.map(({ slotId, photoId }) => [slotId, photoId]),
-  );
   const photos = new Map(input.photos.map((photo) => [photo.id, photo]));
+  const resolvedSlots = resolveMemoryCardSlots(
+    input.templateKey,
+    input.renderModel,
+    photos,
+  );
+  const resolvedBySlot = new Map(
+    resolvedSlots.map((slot) => [slot.slotId, slot]),
+  );
   const loadedImages = new Map<string, HTMLImageElement | null>();
   await Promise.all(input.renderModel.layout.slots.map(async ({ photoId }) => {
     const url = photos.get(photoId)?.signedUrl;
@@ -276,11 +285,13 @@ export async function renderMemoryCardPng(
   }));
 
   for (const slot of [...template.slots].sort((a, b) => a.z - b.z)) {
-    const photoId = photoIds.get(slot.id);
+    const resolved = resolvedBySlot.get(slot.id);
+    const photoId = resolved?.photoId;
     drawPhotoSlot(
       context,
       slot,
       photoId ? (loadedImages.get(photoId) ?? null) : null,
+      resolved?.placement ?? null,
       scale,
     );
   }
