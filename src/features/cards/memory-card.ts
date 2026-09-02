@@ -5,6 +5,11 @@ import {
   MEMORY_CARD_TEMPLATE_SPECS,
   type MemoryCardTemplateKey,
 } from "./memory-card-template-spec";
+import {
+  DEFAULT_MEMORY_CARD_PHOTO_PLACEMENT,
+  reconcileMemoryCardPhotoPlacements,
+  type MemoryCardPhotoPlacement,
+} from "./memory-card-photo-placement";
 
 export {
   MEMORY_CARD_TEMPLATE_SPECS as MEMORY_CARD_TEMPLATES,
@@ -18,11 +23,23 @@ type MemoryCardSlotMapping = {
   photoId: string;
 };
 
+export type MemoryCardSlotMappingV3 = MemoryCardSlotMapping & {
+  placement: MemoryCardPhotoPlacement;
+};
+
 export type MemoryCardLayoutV2 = {
   version: 2;
   slots: MemoryCardSlotMapping[];
   caption: string | null;
 };
+
+export type MemoryCardLayoutV3 = {
+  version: 3;
+  slots: MemoryCardSlotMappingV3[];
+  caption: string | null;
+};
+
+export type { MemoryCardPhotoPlacement };
 
 export type CanonicalExperimentalMemoryCardLayoutV1 = {
   version: 1;
@@ -38,8 +55,11 @@ export type LegacyMemoryCardLayoutV1 = {
 export type MemoryCardRenderModel =
   | {
       kind: "canonical";
-      layoutVersion: 1 | 2;
-      layout: CanonicalExperimentalMemoryCardLayoutV1 | MemoryCardLayoutV2;
+      layoutVersion: 1 | 2 | 3;
+      layout:
+        | CanonicalExperimentalMemoryCardLayoutV1
+        | MemoryCardLayoutV2
+        | MemoryCardLayoutV3;
     }
   | {
       kind: "legacy-simple-v1";
@@ -160,11 +180,127 @@ export function buildMemoryCardLayoutV2(
   };
 }
 
+export function buildMemoryCardLayoutV3(
+  templateKey: MemoryCardTemplateKey,
+  photoIds: readonly string[],
+  caption: string | null = null,
+  placementBySlotId: Readonly<Record<string, MemoryCardPhotoPlacement>> = {},
+): MemoryCardLayoutV3 {
+  const template = getMemoryCardTemplateSpec(templateKey);
+  if (
+    !template ||
+    photoIds.length < template.acceptedMin ||
+    photoIds.length > template.acceptedMax
+  ) {
+    throw new Error("invalid-memory-card-photo-count");
+  }
+  if (new Set(photoIds).size !== photoIds.length) {
+    throw new Error("duplicate-memory-card-photo");
+  }
+
+  return {
+    version: 3,
+    slots: photoIds.map((photoId, index) => ({
+      slotId: template.slots[index].id,
+      photoId,
+      placement: {
+        ...(placementBySlotId[template.slots[index].id] ??
+          DEFAULT_MEMORY_CARD_PHOTO_PLACEMENT),
+      },
+    })),
+    caption: normalizeMemoryCardCaption(caption ?? ""),
+  };
+}
+
 export function parseMemoryCardLayoutV2(
   templateKey: MemoryCardTemplateKey,
   value: unknown,
 ) {
   return parseCanonicalLayout(templateKey, value, 2, true) as MemoryCardLayoutV2 | null;
+}
+
+function isMemoryCardPhotoPlacement(
+  value: unknown,
+): value is MemoryCardPhotoPlacement {
+  if (!value || typeof value !== "object") return false;
+  const placement = value as Partial<MemoryCardPhotoPlacement>;
+  return (
+    typeof placement.zoom === "number" &&
+    Number.isFinite(placement.zoom) &&
+    placement.zoom >= 1 &&
+    typeof placement.rotation === "number" &&
+    Number.isFinite(placement.rotation) &&
+    placement.rotation >= -180 &&
+    placement.rotation < 180 &&
+    typeof placement.offsetX === "number" &&
+    Number.isFinite(placement.offsetX) &&
+    typeof placement.offsetY === "number" &&
+    Number.isFinite(placement.offsetY)
+  );
+}
+
+export function parseMemoryCardLayoutV3(
+  templateKey: MemoryCardTemplateKey,
+  value: unknown,
+): MemoryCardLayoutV3 | null {
+  const template = getMemoryCardTemplateSpec(templateKey);
+  if (!template || !value || typeof value !== "object") return null;
+  const candidate = value as {
+    version?: unknown;
+    slots?: unknown;
+    caption?: unknown;
+  };
+  if (
+    candidate.version !== 3 ||
+    !Array.isArray(candidate.slots) ||
+    candidate.slots.length < template.acceptedMin ||
+    candidate.slots.length > template.acceptedMax ||
+    !Object.prototype.hasOwnProperty.call(candidate, "caption") ||
+    (candidate.caption !== null && typeof candidate.caption !== "string")
+  ) {
+    return null;
+  }
+
+  const slots = candidate.slots as Array<{
+    slotId?: unknown;
+    photoId?: unknown;
+    placement?: unknown;
+  }>;
+  const photoIds = new Set<string>();
+  for (const [index, slot] of slots.entries()) {
+    if (
+      !slot ||
+      typeof slot !== "object" ||
+      slot.slotId !== template.slots[index].id ||
+      typeof slot.photoId !== "string" ||
+      !slot.photoId ||
+      photoIds.has(slot.photoId) ||
+      !isMemoryCardPhotoPlacement(slot.placement)
+    ) {
+      return null;
+    }
+    photoIds.add(slot.photoId);
+  }
+
+  return {
+    version: 3,
+    slots: slots.map(({ slotId, photoId, placement }) => {
+      const parsedPlacement = placement as MemoryCardPhotoPlacement;
+      return {
+        slotId: slotId as string,
+        photoId: photoId as string,
+        placement: {
+          zoom: parsedPlacement.zoom,
+          rotation: parsedPlacement.rotation,
+          offsetX: parsedPlacement.offsetX,
+          offsetY: parsedPlacement.offsetY,
+        },
+      };
+    }),
+    caption: normalizeMemoryCardCaption(
+      typeof candidate.caption === "string" ? candidate.caption : "",
+    ),
+  };
 }
 
 export function parseCanonicalExperimentalMemoryCardLayoutV1(
@@ -222,6 +358,10 @@ export function parseMemoryCardRenderModel(
   layoutVersion: number,
   value: unknown,
 ): MemoryCardRenderModel | null {
+  if (layoutVersion === 3) {
+    const layout = parseMemoryCardLayoutV3(templateKey, value);
+    return layout ? { kind: "canonical", layoutVersion: 3, layout } : null;
+  }
   if (layoutVersion === 2) {
     const layout = parseMemoryCardLayoutV2(templateKey, value);
     return layout ? { kind: "canonical", layoutVersion: 2, layout } : null;
@@ -239,9 +379,9 @@ export function parseMemoryCardRenderModel(
 }
 
 export function createMemoryCardRenderModel(
-  layout: MemoryCardLayoutV2,
+  layout: MemoryCardLayoutV2 | MemoryCardLayoutV3,
 ): MemoryCardRenderModel {
-  return { kind: "canonical", layoutVersion: 2, layout };
+  return { kind: "canonical", layoutVersion: layout.version, layout };
 }
 
 export function randomFillPhotoIds(
@@ -273,10 +413,23 @@ export function reshuffleMemoryCardLayout(
   templateKey: MemoryCardTemplateKey,
   layout: MemoryCardLayoutV2,
   availablePhotoIds: readonly string[],
+  random?: () => number,
+): MemoryCardLayoutV2;
+export function reshuffleMemoryCardLayout(
+  templateKey: MemoryCardTemplateKey,
+  layout: MemoryCardLayoutV3,
+  availablePhotoIds: readonly string[],
+  random?: () => number,
+): MemoryCardLayoutV3;
+export function reshuffleMemoryCardLayout(
+  templateKey: MemoryCardTemplateKey,
+  layout: MemoryCardLayoutV2 | MemoryCardLayoutV3,
+  availablePhotoIds: readonly string[],
   random = Math.random,
 ) {
   const count = layout.slots.length;
-  if (getRandomPhotoCount(templateKey, count) !== count) {
+  const template = getMemoryCardTemplateSpec(templateKey);
+  if (!template || getRandomPhotoCount(templateKey, count) !== count) {
     throw new Error("invalid-memory-card-photo-count");
   }
   const currentIds = layout.slots.map(({ photoId }) => photoId);
@@ -294,7 +447,20 @@ export function reshuffleMemoryCardLayout(
       nextIds = [...nextIds.slice(1), nextIds[0]];
     }
   }
-  return buildMemoryCardLayoutV2(templateKey, nextIds, layout.caption);
+  if (layout.version === 2) {
+    return buildMemoryCardLayoutV2(templateKey, nextIds, layout.caption);
+  }
+  return buildMemoryCardLayoutV3(
+    templateKey,
+    nextIds,
+    layout.caption,
+    reconcileMemoryCardPhotoPlacements(
+      template.slots.map(({ id }) => id),
+      currentIds,
+      nextIds,
+      Object.fromEntries(layout.slots.map(({ slotId, placement }) => [slotId, placement])),
+    ),
+  );
 }
 
 export function getMemoryCardRenderTemplate(
@@ -311,16 +477,26 @@ export function resolveMemoryCardSlots<T>(
   renderModel: MemoryCardRenderModel,
   photosById: ReadonlyMap<string, T>,
 ) {
-  const selected = new Map(
-    renderModel.layout.slots.map((slot) => [slot.slotId, slot.photoId]),
+  const selected = new Map<string, {
+    photoId: string;
+    placement: MemoryCardPhotoPlacement | null;
+  }>(
+    renderModel.layout.slots.map((slot) => [slot.slotId, {
+      photoId: slot.photoId,
+      placement: "placement" in slot
+        ? (slot as MemoryCardSlotMappingV3).placement
+        : null,
+    }]),
   );
   const template = getMemoryCardRenderTemplate(templateKey, renderModel);
   return (template?.slots ?? []).map((slot, index) => {
-    const photoId = selected.get(slot.id) ?? null;
+    const mapping = selected.get(slot.id) ?? null;
+    const photoId = mapping?.photoId ?? null;
     return {
       slotId: slot.id,
       photoId,
       photo: photoId ? (photosById.get(photoId) ?? null) : null,
+      placement: mapping?.placement ?? null,
       optionalEmpty:
         renderModel.kind === "canonical" &&
         index >= renderModel.layout.slots.length &&
@@ -370,7 +546,7 @@ export function buildMemoryCardInsertPayload({
   templateKey: MemoryCardTemplateKey;
   tripId: string;
 }) {
-  const validatedLayout = parseMemoryCardLayoutV2(templateKey, layout);
+  const validatedLayout = parseMemoryCardLayoutV3(templateKey, layout);
   if (!validatedLayout) throw new Error("invalid-memory-card-layout");
   if (
     validatedLayout.slots.some(
@@ -385,7 +561,7 @@ export function buildMemoryCardInsertPayload({
     creator_member_id: memberId,
     creator_auth_user_id: authUserId,
     template_key: templateKey,
-    layout_version: 2,
+    layout_version: 3,
     layout_json: validatedLayout,
     result_storage_path: null,
   };

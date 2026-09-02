@@ -6,6 +6,14 @@ import { loadAlbumPhotos } from "@/features/album/album-repository";
 import type { AlbumPhoto } from "@/features/album/album-types";
 import { useCurrentTripSession } from "@/features/boarding/trip-access-guard";
 import {
+  DEFAULT_MEMORY_CARD_PHOTO_PLACEMENT,
+  getMemoryCardCenteredCoverPlacement,
+  getMemoryCardPhotoViewport,
+  reconcileMemoryCardPhotoPlacements,
+  type MemoryCardPhotoPlacement,
+} from "./memory-card-photo-placement";
+import { MemoryCardCropEditor } from "./memory-card-crop-editor";
+import {
   downloadMemoryCardPng,
   exportMemoryCardPng,
   shareOrDownloadMemoryCardPng,
@@ -19,7 +27,7 @@ import {
   randomFillPhotoIds,
   reshuffleMemoryCardLayout,
   type MemoryCard,
-  type MemoryCardLayoutV2,
+  type MemoryCardLayoutV3,
   type MemoryCardRenderModel,
   type MemoryCardTemplateKey,
 } from "./memory-card";
@@ -29,6 +37,7 @@ import {
   loadMemoryCards,
 } from "./memory-card-repository";
 import { MemoryCardPreview } from "./memory-card-preview";
+import type { MemoryCardPhotoSlot } from "./memory-card-template-spec";
 
 type ComposerStep = "template" | "photos" | "preview";
 type ExportAction = "download" | "share";
@@ -45,13 +54,38 @@ function templatePhotoCountLabel(min: number, max: number) {
 
 const minimumPhotoCount = getMinimumMemoryCardPhotoCount();
 
+type PhotoDraft = {
+  photoIds: string[];
+  placementBySlotId: Record<string, MemoryCardPhotoPlacement>;
+};
+
+function getDefaultMemoryCardPhotoPlacement(
+  photo: AlbumPhoto | undefined,
+  slot: MemoryCardPhotoSlot | undefined,
+) {
+  if (!photo?.width || !photo.height || !slot) {
+    return { ...DEFAULT_MEMORY_CARD_PHOTO_PLACEMENT };
+  }
+  const viewport = getMemoryCardPhotoViewport(slot);
+  return getMemoryCardCenteredCoverPlacement(
+    photo.width,
+    photo.height,
+    viewport.width,
+    viewport.height,
+  );
+}
+
 export function MemoryCardsView() {
   const tripSession = useCurrentTripSession();
   const [cards, setCards] = useState<MemoryCard[]>([]);
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
   const [composerStep, setComposerStep] = useState<ComposerStep | null>(null);
   const [templateKey, setTemplateKey] = useState<MemoryCardTemplateKey | null>(null);
-  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
+  const [photoDraft, setPhotoDraft] = useState<PhotoDraft>({
+    photoIds: [],
+    placementBySlotId: {},
+  });
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [cardCaption, setCardCaption] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -87,22 +121,42 @@ export function MemoryCardsView() {
   }, [reloadVersion, tripSession.trip.id]);
 
   const template = templateKey ? getMemoryCardTemplate(templateKey) : null;
-  const draftLayout = useMemo<MemoryCardLayoutV2 | null>(() => {
+  const selectedPhotoIds = photoDraft.photoIds;
+  const draftLayout = useMemo<MemoryCardLayoutV3 | null>(() => {
     if (!template) return null;
     return {
-      version: 2,
+      version: 3,
       slots: selectedPhotoIds.map((photoId, index) => ({
         slotId: template.slots[index].id,
         photoId,
+        placement: {
+          ...(photoDraft.placementBySlotId[template.slots[index].id] ??
+            getDefaultMemoryCardPhotoPlacement(
+              photos.find(({ id }) => id === photoId),
+              template.slots[index],
+            )),
+        },
       })),
       caption: normalizeMemoryCardCaption(cardCaption),
     };
-  }, [cardCaption, selectedPhotoIds, template]);
+  }, [cardCaption, photoDraft.placementBySlotId, photos, selectedPhotoIds, template]);
   const draftRenderModel = useMemo<MemoryCardRenderModel | null>(() =>
     draftLayout
-      ? { kind: "canonical", layoutVersion: 2, layout: draftLayout }
+      ? { kind: "canonical", layoutVersion: 3, layout: draftLayout }
       : null,
   [draftLayout]);
+  const selectedSlot = draftLayout?.slots.find(
+    ({ slotId }) => slotId === selectedSlotId,
+  ) ?? null;
+  const selectedSlotIndex = selectedSlot
+    ? draftLayout?.slots.findIndex(({ slotId }) => slotId === selectedSlot.slotId) ?? -1
+    : -1;
+  const selectedTemplateSlot = selectedSlotIndex >= 0
+    ? template?.slots[selectedSlotIndex] ?? null
+    : null;
+  const selectedPhoto = selectedSlot
+    ? photos.find(({ id }) => id === selectedSlot.photoId) ?? null
+    : null;
   const canPreview = Boolean(
     template &&
     selectedPhotoIds.length >= template.acceptedMin &&
@@ -117,7 +171,8 @@ export function MemoryCardsView() {
   const closeComposer = () => {
     setComposerStep(null);
     setTemplateKey(null);
-    setSelectedPhotoIds([]);
+    setPhotoDraft({ photoIds: [], placementBySlotId: {} });
+    setSelectedSlotId(null);
     setCardCaption("");
     setError(null);
   };
@@ -126,38 +181,95 @@ export function MemoryCardsView() {
     const nextTemplate = getMemoryCardTemplate(nextTemplateKey);
     if (!nextTemplate || photos.length < nextTemplate.acceptedMin) return;
     setTemplateKey(nextTemplateKey);
-    setSelectedPhotoIds([]);
+    setPhotoDraft({ photoIds: [], placementBySlotId: {} });
+    setSelectedSlotId(null);
     setComposerStep("photos");
     setError(null);
   };
 
   const togglePhoto = (photoId: string) => {
     if (!template) return;
-    setSelectedPhotoIds((current) => {
-      if (current.includes(photoId)) return current.filter((id) => id !== photoId);
-      if (current.length >= template.acceptedMax) return current;
-      return [...current, photoId];
+    setPhotoDraft((current) => {
+      const nextPhotoIds = current.photoIds.includes(photoId)
+        ? current.photoIds.filter((id) => id !== photoId)
+        : current.photoIds.length >= template.acceptedMax
+          ? current.photoIds
+          : [...current.photoIds, photoId];
+      return {
+        photoIds: nextPhotoIds,
+        placementBySlotId: reconcileMemoryCardPhotoPlacements(
+          template.slots.map(({ id }) => id),
+          current.photoIds,
+          nextPhotoIds,
+          current.placementBySlotId,
+          (nextPhotoId, index) => getDefaultMemoryCardPhotoPlacement(
+            photos.find(({ id }) => id === nextPhotoId),
+            template.slots[index],
+          ),
+        ),
+      };
     });
   };
 
   const fillRandomly = () => {
-    if (!templateKey) return;
-    setSelectedPhotoIds(
-      randomFillPhotoIds(
+    if (!templateKey || !template) return;
+    setPhotoDraft((current) => {
+      const nextPhotoIds = randomFillPhotoIds(
         photos.map(({ id }) => id),
         getRandomPhotoCount(templateKey, photos.length),
-      ),
-    );
+      );
+      return {
+        photoIds: nextPhotoIds,
+        placementBySlotId: reconcileMemoryCardPhotoPlacements(
+          template.slots.map(({ id }) => id),
+          current.photoIds,
+          nextPhotoIds,
+          current.placementBySlotId,
+          (nextPhotoId, index) => getDefaultMemoryCardPhotoPlacement(
+            photos.find(({ id }) => id === nextPhotoId),
+            template.slots[index],
+          ),
+        ),
+      };
+    });
   };
 
   const reshuffle = () => {
-    if (!templateKey || !draftLayout) return;
+    if (!templateKey || !template || !draftLayout) return;
     const reshuffled = reshuffleMemoryCardLayout(
       templateKey,
       draftLayout,
       photos.map(({ id }) => id),
     );
-    setSelectedPhotoIds(reshuffled.slots.map(({ photoId }) => photoId));
+    const nextPhotoIds = reshuffled.slots.map(({ photoId }) => photoId);
+    setPhotoDraft({
+      photoIds: nextPhotoIds,
+      placementBySlotId: reconcileMemoryCardPhotoPlacements(
+        template.slots.map(({ id }) => id),
+        photoDraft.photoIds,
+        nextPhotoIds,
+        photoDraft.placementBySlotId,
+        (nextPhotoId, index) => getDefaultMemoryCardPhotoPlacement(
+          photos.find(({ id }) => id === nextPhotoId),
+          template.slots[index],
+        ),
+      ),
+    });
+  };
+
+  const updateSelectedPlacement = (
+    placement: MemoryCardPhotoPlacement,
+  ) => {
+    if (!selectedSlot) return;
+    setPhotoDraft((current) => {
+      return {
+        ...current,
+        placementBySlotId: {
+          ...current.placementBySlotId,
+          [selectedSlot.slotId]: { ...placement },
+        },
+      };
+    });
   };
 
   const saveCard = async () => {
@@ -168,8 +280,7 @@ export function MemoryCardsView() {
     try {
       const saved = await createMemoryCard({
         availablePhotoIds: photos.map(({ id }) => id),
-        caption: cardCaption,
-        photoIds: selectedPhotoIds,
+        layout: draftLayout!,
         templateKey,
         tripSession,
       });
@@ -358,7 +469,10 @@ export function MemoryCardsView() {
           fullWidth
           className="mt-5"
           disabled={!canPreview}
-          onClick={() => setComposerStep("preview")}
+          onClick={() => {
+            setSelectedSlotId(draftLayout.slots[0]?.slotId ?? null);
+            setComposerStep("preview");
+          }}
         >
           카드 미리보기
         </Button>
@@ -374,8 +488,61 @@ export function MemoryCardsView() {
         <h2 id="preview-title" className="font-editorial mt-1 text-section font-semibold">카드 미리보기</h2>
         <p className="mt-1 text-sm text-text-secondary">{template.displayName}</p>
         <Card className="mt-5 p-3">
-          <MemoryCardPreview templateKey={template.key} renderModel={draftRenderModel} photos={photos} dateLabel={dateLabel} />
+          <MemoryCardPreview
+            templateKey={template.key}
+            renderModel={draftRenderModel}
+            photos={photos}
+            dateLabel={dateLabel}
+            selectedSlotId={selectedSlotId}
+            onSelectSlot={setSelectedSlotId}
+          />
         </Card>
+
+        <div className="mt-5 rounded-lg border border-line bg-surface p-4">
+          <h3 className="font-semibold">조정할 사진</h3>
+          <p className="mt-1 text-sm text-text-secondary">미리보기의 사진을 눌러도 열 수 있어요.</p>
+          <div className="mt-3 grid grid-cols-3 gap-2" aria-label="조정할 사진 선택">
+            {draftLayout.slots.map((slot, index) => (
+              <button
+                key={slot.slotId}
+                type="button"
+                aria-pressed={slot.slotId === selectedSlotId}
+                onClick={() => setSelectedSlotId(slot.slotId)}
+                className={`min-h-11 rounded-md border px-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary ${
+                  slot.slotId === selectedSlotId
+                    ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
+                    : "border-line bg-background"
+                }`}
+              >
+                사진 {index + 1}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {selectedSlot && selectedTemplateSlot && selectedPhoto && (
+          <MemoryCardCropEditor
+            key={`${selectedSlot.slotId}:${selectedSlot.photoId}`}
+            initialPlacement={selectedSlot.placement}
+            photo={selectedPhoto}
+            slot={selectedTemplateSlot}
+            slotNumber={selectedSlotIndex + 1}
+            onCancel={() => setSelectedSlotId(null)}
+            onApply={(placement) => {
+              updateSelectedPlacement(placement);
+              setSelectedSlotId(null);
+            }}
+          />
+        )}
+
+        {selectedSlot && (!selectedTemplateSlot || !selectedPhoto) && (
+          <div className="mt-5 rounded-lg border border-line bg-surface p-4">
+            <p className="text-sm text-text-secondary">이 사진의 편집 정보를 불러올 수 없어요.</p>
+            <button type="button" onClick={() => setSelectedSlotId(null)} className="mt-3 min-h-11 w-full rounded-md border border-line px-4 text-sm font-semibold">
+              닫기
+            </button>
+          </div>
+        )}
 
         <label className="mt-5 block text-sm font-semibold" htmlFor="memory-card-caption">카드 문구</label>
         <textarea

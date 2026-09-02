@@ -3,9 +3,9 @@ import { getCurrentAuthSession } from "@/features/boarding/current-trip-session"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   buildMemoryCardInsertPayload,
-  buildMemoryCardLayoutV2,
   mapPersistedMemoryCardRows,
   type MemoryCard,
+  type MemoryCardLayoutV3,
   type MemoryCardTemplateKey,
   type PersistedMemoryCardRow,
 } from "./memory-card";
@@ -54,19 +54,16 @@ export async function loadLatestMemoryCard(tripId: string) {
 
 export async function createMemoryCard({
   availablePhotoIds,
-  caption,
-  photoIds,
+  layout,
   templateKey,
   tripSession,
 }: {
   availablePhotoIds: readonly string[];
-  caption: string;
-  photoIds: readonly string[];
+  layout: MemoryCardLayoutV3;
   templateKey: MemoryCardTemplateKey;
   tripSession: CurrentTripSession;
 }) {
   const authUserId = await requireAuthUserId();
-  const layout = buildMemoryCardLayoutV2(templateKey, photoIds, caption);
   const payload = buildMemoryCardInsertPayload({
     authUserId,
     availablePhotoIds: new Set(availablePhotoIds),

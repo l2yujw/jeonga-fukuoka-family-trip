@@ -3,6 +3,11 @@
 import { useState, type CSSProperties } from "react";
 import type { AlbumPhoto } from "@/features/album/album-types";
 import {
+  getMemoryCardPhotoViewport,
+  getPlacedImageRect,
+  MEMORY_CARD_PHOTO_BACKGROUND_COLOR,
+} from "./memory-card-photo-placement";
+import {
   getMemoryCardRenderTemplate,
   resolveMemoryCardSlots,
   type MemoryCardRenderModel,
@@ -24,6 +29,8 @@ type MemoryCardPreviewProps = {
   renderModel?: MemoryCardRenderModel | null;
   photos: readonly AlbumPhoto[];
   dateLabel?: string;
+  selectedSlotId?: string | null;
+  onSelectSlot?: (slotId: string) => void;
 };
 
 const percent = (value: number, total: number) => `${(value / total) * 100}%`;
@@ -83,13 +90,18 @@ function textSlotStyle(
 
 export function MemoryCardPreview({
   dateLabel = "",
+  onSelectSlot,
   renderModel,
   photos,
+  selectedSlotId,
   templateKey,
 }: MemoryCardPreviewProps) {
   const [unavailablePhotoIds, setUnavailablePhotoIds] = useState<Set<string>>(
     new Set(),
   );
+  const [naturalDimensions, setNaturalDimensions] = useState<
+    Record<string, { width: number; height: number }>
+  >({});
 
   if (renderModel === null) {
     return (
@@ -119,8 +131,8 @@ export function MemoryCardPreview({
   const resolvedBySlot = new Map(slots.map((slot) => [slot.slotId, slot]));
   const frameClass = {
     plain: "bg-surface",
-    polaroid: "bg-surface p-[3.5%] pb-[12%] shadow-card",
-    strip: "bg-text-primary p-[1.6%]",
+    polaroid: "bg-surface shadow-card",
+    strip: "bg-text-primary",
   } as const;
   const caption = previewModel.kind === "canonical"
     ? previewModel.layout.caption
@@ -138,40 +150,110 @@ export function MemoryCardPreview({
       {[...template.slots].sort((a, b) => a.z - b.z).map((slot) => {
         const resolved = resolvedBySlot.get(slot.id);
         const photo = resolved?.photo;
+        const viewport = getMemoryCardPhotoViewport(slot);
+        const dimensions = photo
+          ? naturalDimensions[photo.id] ?? (
+              photo.width && photo.height
+                ? { width: photo.width, height: photo.height }
+                : null
+            )
+          : null;
+        const placed = dimensions
+          ? getPlacedImageRect(
+              dimensions.width,
+              dimensions.height,
+              viewport.width,
+              viewport.height,
+              resolved?.placement ?? null,
+            )
+          : null;
         const canRender = Boolean(
           photo?.signedUrl &&
           resolved?.photoId &&
           !unavailablePhotoIds.has(resolved.photoId),
         );
-
-        return (
+        const slotNumber = previewModel.layout.slots.findIndex(
+          ({ slotId }) => slotId === slot.id,
+        ) + 1;
+        const selected = Boolean(resolved?.photoId && selectedSlotId === slot.id);
+        const className = `absolute overflow-hidden ${frameClass[slot.frame]} ${
+          selected ? "ring-2 ring-inset ring-accent-primary" : ""
+        }`;
+        const content = (
           <div
+            className="absolute overflow-hidden"
+            style={{
+              left: percent(viewport.x, slot.w),
+              top: percent(viewport.y, slot.h),
+              width: percent(viewport.width, slot.w),
+              height: percent(viewport.height, slot.h),
+              backgroundColor: MEMORY_CARD_PHOTO_BACKGROUND_COLOR,
+            }}
+          >
+            {canRender ? (
+              /* Signed URLs are short-lived runtime values from private Storage. */
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={photo!.signedUrl!}
+                alt={photo!.caption ?? "추억 카드에 선택한 여행 사진"}
+                onLoad={({ currentTarget }) => {
+                  const next = {
+                    width: currentTarget.naturalWidth,
+                    height: currentTarget.naturalHeight,
+                  };
+                  setNaturalDimensions((current) =>
+                    current[photo!.id]?.width === next.width &&
+                    current[photo!.id]?.height === next.height
+                      ? current
+                      : { ...current, [photo!.id]: next },
+                  );
+                }}
+                onError={() =>
+                  setUnavailablePhotoIds((current) =>
+                    new Set(current).add(resolved!.photoId!),
+                  )
+                }
+                className="absolute block max-w-none"
+                style={placed
+                  ? {
+                      left: percent(placed.x, viewport.width),
+                      top: percent(placed.y, viewport.height),
+                      width: percent(placed.width, viewport.width),
+                      height: percent(placed.height, viewport.height),
+                      transform: `rotate(${placed.rotation}deg)`,
+                    }
+                  : { inset: 0, width: "100%", height: "100%" }}
+                draggable={false}
+              />
+            ) : resolved?.optionalEmpty ? null : (
+              <span className="flex size-full items-center justify-center bg-line/45 px-1 text-center text-[clamp(6px,2vw,10px)] font-semibold text-text-secondary">
+                {resolved?.photoId
+                  ? "사진을 표시할 수 없어요"
+                  : "사진 선택"}
+              </span>
+            )}
+          </div>
+        );
+
+        return onSelectSlot && resolved?.photoId ? (
+          <button
             key={slot.id}
-            className={`absolute overflow-hidden ${frameClass[slot.frame]}`}
+            type="button"
+            aria-label={`사진 ${slotNumber} 위치 조정`}
+            aria-pressed={selected}
+            onClick={() => onSelectSlot(slot.id)}
+            className={`${className} cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary`}
             style={photoSlotStyle(slot, bounds)}
           >
-            <div className="relative size-full overflow-hidden bg-line/40">
-              {canRender ? (
-                /* Signed URLs are short-lived runtime values from private Storage. */
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={photo!.signedUrl!}
-                  alt={photo!.caption ?? "추억 카드에 선택한 여행 사진"}
-                  onError={() =>
-                    setUnavailablePhotoIds((current) =>
-                      new Set(current).add(resolved!.photoId!),
-                    )
-                  }
-                  className="size-full object-cover object-center"
-                />
-              ) : resolved?.optionalEmpty ? null : (
-                <span className="flex size-full items-center justify-center bg-line/45 px-1 text-center text-[clamp(6px,2vw,10px)] font-semibold text-text-secondary">
-                  {resolved?.photoId
-                    ? "사진을 표시할 수 없어요"
-                    : "사진 선택"}
-                </span>
-              )}
-            </div>
+            {content}
+          </button>
+        ) : (
+          <div
+            key={slot.id}
+            className={className}
+            style={photoSlotStyle(slot, bounds)}
+          >
+            {content}
           </div>
         );
       })}
