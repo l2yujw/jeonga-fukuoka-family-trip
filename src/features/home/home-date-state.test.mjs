@@ -53,22 +53,24 @@ test("home schedule day constants contain date state only", () => {
   );
 });
 
-test("home schedule copy reflects the selected current-seed-like day", () => {
+test("home schedule copy reflects the confirmed Day 2 itinerary", () => {
   const rows = [
-    itineraryRow({ location_name: "다자이후", title: "다자이후 텐만구" }),
-    itineraryRow({ sequence: 20, location_name: "유후인", title: "유후인 이동", item_type: "move" }),
-    itineraryRow({ sequence: 30, location_name: "유후인", title: "유노쓰보 가이도" }),
-    itineraryRow({ sequence: 40, location_name: "유후인", title: "긴린코 호수" }),
-    itineraryRow({ sequence: 50, location_name: "벳부", title: "벳부 이동", item_type: "move" }),
-    itineraryRow({ sequence: 60, location_name: "벳부", title: "가마도지옥" }),
+    itineraryRow({ location_name: "우레시노", title: "호텔 조식", item_type: "meal" }),
+    itineraryRow({ sequence: 20, location_name: "나가사키", title: "나가사키 이동", item_type: "move" }),
+    itineraryRow({ sequence: 30, location_name: "나가사키", title: "나가사키 차이나타운" }),
+    itineraryRow({ sequence: 40, location_name: "나가사키", title: "오우라 천주당" }),
+    itineraryRow({ sequence: 50, location_name: "나가사키", title: "그라바엔" }),
+    itineraryRow({ sequence: 60, location_name: "나가사키", title: "중식", item_type: "meal" }),
+    itineraryRow({ sequence: 70, location_name: "후쿠오카", title: "후쿠오카 이동", item_type: "move" }),
+    itineraryRow({ sequence: 80, location_name: "후쿠오카", title: "텐진거리 자유시간" }),
   ];
   const originalRows = structuredClone(rows);
 
   assert.deepEqual(
     createHomeSchedulePreviewCopy(rows, "2026-09-11", 2),
     {
-      title: "다자이후 · 유후인 · 벳부",
-      supporting: "다자이후 텐만구 · 유노쓰보 가이도 · 긴린코 호수 · 가마도지옥",
+      title: "우레시노 · 나가사키 · 후쿠오카",
+      supporting: "호텔 조식 · 나가사키 차이나타운 · 오우라 천주당 · 그라바엔 · 중식 · 텐진거리 자유시간",
     },
   );
   assert.deepEqual(rows, originalRows);
