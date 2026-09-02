@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import {
+  useNearViewportPhoto,
+  type AlbumPhotoMediaChange,
+} from "@/features/album/album-media-visibility";
 import type { AlbumPhoto } from "@/features/album/album-types";
 import {
   getMemoryCardPhotoViewport,
   getPlacedImageRect,
   MEMORY_CARD_PHOTO_BACKGROUND_COLOR,
+  type PlacedImageRect,
 } from "./memory-card-photo-placement";
 import {
   getMemoryCardRenderTemplate,
@@ -31,6 +36,7 @@ type MemoryCardPreviewProps = {
   dateLabel?: string;
   selectedSlotId?: string | null;
   onSelectSlot?: (slotId: string) => void;
+  onPhotoMediaChange?: AlbumPhotoMediaChange;
 };
 
 const percent = (value: number, total: number) => `${(value / total) * 100}%`;
@@ -88,6 +94,64 @@ function textSlotStyle(
   };
 }
 
+function MemoryCardPhoto({
+  onDimensions,
+  onMediaChange,
+  photo,
+  placed,
+  viewport,
+}: {
+  onDimensions: (width: number, height: number) => void;
+  onMediaChange?: AlbumPhotoMediaChange;
+  photo: AlbumPhoto;
+  placed: PlacedImageRect | null;
+  viewport: { width: number; height: number };
+}) {
+  const { mediaState, observe, onError, signedUrl } = useNearViewportPhoto(
+    photo,
+    onMediaChange,
+  );
+
+  return (
+    <span
+      ref={observe}
+      className="flex size-full items-center justify-center bg-line/45 px-1 text-center text-[clamp(6px,2vw,10px)] font-semibold text-text-secondary"
+    >
+      {mediaState === "ready" && signedUrl ? (
+        /* Signed URLs are short-lived runtime values from private Storage. */
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={signedUrl}
+          alt={photo.caption ?? "추억 카드에 선택한 여행 사진"}
+          loading="eager"
+          decoding="async"
+          width={photo.width ?? undefined}
+          height={photo.height ?? undefined}
+          onLoad={({ currentTarget }) =>
+            onDimensions(currentTarget.naturalWidth, currentTarget.naturalHeight)
+          }
+          onError={onError}
+          className="absolute block max-w-none"
+          style={placed
+            ? {
+                left: percent(placed.x, viewport.width),
+                top: percent(placed.y, viewport.height),
+                width: percent(placed.width, viewport.width),
+                height: percent(placed.height, viewport.height),
+                transform: `rotate(${placed.rotation}deg)`,
+              }
+            : { inset: 0, width: "100%", height: "100%" }}
+          draggable={false}
+        />
+      ) : mediaState === "error" ? (
+        "사진을 표시할 수 없어요"
+      ) : (
+        <span className="sr-only">사진 불러오는 중</span>
+      )}
+    </span>
+  );
+}
+
 export function MemoryCardPreview({
   dateLabel = "",
   onSelectSlot,
@@ -95,10 +159,8 @@ export function MemoryCardPreview({
   photos,
   selectedSlotId,
   templateKey,
+  onPhotoMediaChange,
 }: MemoryCardPreviewProps) {
-  const [unavailablePhotoIds, setUnavailablePhotoIds] = useState<Set<string>>(
-    new Set(),
-  );
   const [naturalDimensions, setNaturalDimensions] = useState<
     Record<string, { width: number; height: number }>
   >({});
@@ -167,11 +229,6 @@ export function MemoryCardPreview({
               resolved?.placement ?? null,
             )
           : null;
-        const canRender = Boolean(
-          photo?.signedUrl &&
-          resolved?.photoId &&
-          !unavailablePhotoIds.has(resolved.photoId),
-        );
         const slotNumber = previewModel.layout.slots.findIndex(
           ({ slotId }) => slotId === slot.id,
         ) + 1;
@@ -190,40 +247,20 @@ export function MemoryCardPreview({
               backgroundColor: MEMORY_CARD_PHOTO_BACKGROUND_COLOR,
             }}
           >
-            {canRender ? (
-              /* Signed URLs are short-lived runtime values from private Storage. */
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={photo!.signedUrl!}
-                alt={photo!.caption ?? "추억 카드에 선택한 여행 사진"}
-                onLoad={({ currentTarget }) => {
-                  const next = {
-                    width: currentTarget.naturalWidth,
-                    height: currentTarget.naturalHeight,
-                  };
+            {photo && resolved?.photoId ? (
+              <MemoryCardPhoto
+                photo={photo}
+                placed={placed}
+                viewport={viewport}
+                onMediaChange={onPhotoMediaChange}
+                onDimensions={(width, height) => {
                   setNaturalDimensions((current) =>
-                    current[photo!.id]?.width === next.width &&
-                    current[photo!.id]?.height === next.height
+                    current[photo.id]?.width === width &&
+                    current[photo.id]?.height === height
                       ? current
-                      : { ...current, [photo!.id]: next },
+                      : { ...current, [photo.id]: { width, height } },
                   );
                 }}
-                onError={() =>
-                  setUnavailablePhotoIds((current) =>
-                    new Set(current).add(resolved!.photoId!),
-                  )
-                }
-                className="absolute block max-w-none"
-                style={placed
-                  ? {
-                      left: percent(placed.x, viewport.width),
-                      top: percent(placed.y, viewport.height),
-                      width: percent(placed.width, viewport.width),
-                      height: percent(placed.height, viewport.height),
-                      transform: `rotate(${placed.rotation}deg)`,
-                    }
-                  : { inset: 0, width: "100%", height: "100%" }}
-                draggable={false}
               />
             ) : resolved?.optionalEmpty ? null : (
               <span className="flex size-full items-center justify-center bg-line/45 px-1 text-center text-[clamp(6px,2vw,10px)] font-semibold text-text-secondary">

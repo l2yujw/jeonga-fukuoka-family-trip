@@ -1,9 +1,30 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Button, Card, EmptyState, LoadingState } from "@/components/ui";
-import { loadAlbumPhotos } from "@/features/album/album-repository";
+import {
+  useNearViewportPhoto,
+  type AlbumPhotoMediaChange,
+} from "@/features/album/album-media-visibility";
+import {
+  CARDS_HIGH_PRIORITY_MEDIA_COUNT,
+  CARDS_INITIAL_MEDIA_PREWARM_COUNT,
+  getFirstViewFetchPriority,
+  getInitialMediaPrewarmCandidates,
+} from "@/features/album/album-media-observer";
+import {
+  loadAlbumPhotoCount,
+  loadAlbumPhotoMetadata,
+  loadAlbumPhotoSignedUrls,
+  loadAlbumPhotosByIds,
+  refreshAlbumPhotoSignedUrl,
+} from "@/features/album/album-repository";
 import type { AlbumPhoto } from "@/features/album/album-types";
+import {
+  applyAlbumPhotoSignedUrls,
+  mergeAlbumPhotos,
+  updateAlbumPhotoMedia,
+} from "@/features/album/album-utils";
 import { useCurrentTripSession } from "@/features/boarding/trip-access-guard";
 import {
   DEFAULT_MEMORY_CARD_PHOTO_PLACEMENT,
@@ -20,6 +41,8 @@ import {
 } from "./memory-card-export";
 import {
   getMemoryCardTemplate,
+  getMemoryCardReferencedPhotoIds,
+  getMemoryCardRenderPhotoIds,
   getMinimumMemoryCardPhotoCount,
   getRandomPhotoCount,
   MEMORY_CARD_TEMPLATES,
@@ -75,10 +98,51 @@ function getDefaultMemoryCardPhotoPlacement(
   );
 }
 
+const ComposerPhotoThumbnail = memo(function ComposerPhotoThumbnail({
+  fetchPriority,
+  onMediaChange,
+  photo,
+}: {
+  fetchPriority: "high" | "auto";
+  onMediaChange: AlbumPhotoMediaChange;
+  photo: AlbumPhoto;
+}) {
+  const { mediaState, observe, onError, signedUrl } = useNearViewportPhoto(
+    photo,
+    onMediaChange,
+  );
+
+  return (
+    <span ref={observe} className="flex size-full items-center justify-center px-2 text-[10px] text-text-secondary">
+      {mediaState === "ready" && signedUrl ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={signedUrl}
+          alt={photo.caption ?? "앨범 여행 사진"}
+          loading="eager"
+          decoding="async"
+          fetchPriority={fetchPriority}
+          width={photo.width ?? undefined}
+          height={photo.height ?? undefined}
+          onError={onError}
+          className="size-full object-cover object-center"
+        />
+      ) : mediaState === "error" ? (
+        "표시할 수 없는 사진"
+      ) : (
+        <span className="sr-only">사진 불러오는 중</span>
+      )}
+    </span>
+  );
+});
+
 export function MemoryCardsView() {
   const tripSession = useCurrentTripSession();
   const [cards, setCards] = useState<MemoryCard[]>([]);
   const [photos, setPhotos] = useState<AlbumPhoto[]>([]);
+  const [albumPhotoCount, setAlbumPhotoCount] = useState(0);
+  const [composerPhotosLoaded, setComposerPhotosLoaded] = useState(false);
+  const [isLoadingComposerPhotos, setIsLoadingComposerPhotos] = useState(false);
   const [composerStep, setComposerStep] = useState<ComposerStep | null>(null);
   const [templateKey, setTemplateKey] = useState<MemoryCardTemplateKey | null>(null);
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft>({
@@ -94,26 +158,39 @@ export function MemoryCardsView() {
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [cropPhotoReadyKey, setCropPhotoReadyKey] = useState<string | null>(null);
+  const [cropPhotoFailedKey, setCropPhotoFailedKey] = useState<string | null>(null);
+  const [cropRefreshVersion, setCropRefreshVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
 
-    Promise.all([
-      loadMemoryCards(tripSession.trip.id),
-      loadAlbumPhotos(tripSession.trip.id),
-    ])
-      .then(([loadedCards, loadedPhotos]) => {
+    void (async () => {
+      try {
+        const [loadedCards, photoCount] = await Promise.all([
+          loadMemoryCards(tripSession.trip.id),
+          loadAlbumPhotoCount(tripSession.trip.id),
+        ]);
+        const referencedPhotoIds = getMemoryCardReferencedPhotoIds(loadedCards);
+        const referencedPhotos = await loadAlbumPhotosByIds(
+          tripSession.trip.id,
+          referencedPhotoIds,
+        );
+        const signedUrls = await loadAlbumPhotoSignedUrls(
+          referencedPhotos.map(({ storagePath }) => storagePath),
+        );
         if (!active) return;
         setCards(loadedCards);
-        setPhotos(loadedPhotos);
+        setAlbumPhotoCount(photoCount);
+        setPhotos(applyAlbumPhotoSignedUrls(referencedPhotos, signedUrls));
+        setComposerPhotosLoaded(false);
         setLoadError(false);
-      })
-      .catch(() => {
+      } catch {
         if (active) setLoadError(true);
-      })
-      .finally(() => {
+      } finally {
         if (active) setIsLoading(false);
-      });
+      }
+    })();
 
     return () => {
       active = false;
@@ -157,6 +234,11 @@ export function MemoryCardsView() {
   const selectedPhoto = selectedSlot
     ? photos.find(({ id }) => id === selectedSlot.photoId) ?? null
     : null;
+  const selectedCropKey = selectedSlot
+    ? `${selectedSlot.slotId}:${selectedSlot.photoId}`
+    : null;
+  const selectedPhotoId = selectedPhoto?.id ?? null;
+  const selectedPhotoStoragePath = selectedPhoto?.storagePath ?? null;
   const canPreview = Boolean(
     template &&
     selectedPhotoIds.length >= template.acceptedMin &&
@@ -168,13 +250,114 @@ export function MemoryCardsView() {
   );
   const dateLabel = `${tripSession.trip.startDate.replaceAll("-", ".")} – ${tripSession.trip.endDate.replaceAll("-", ".")}`;
 
+  const handlePhotoMediaChange = useCallback<AlbumPhotoMediaChange>((
+    photoId,
+    mediaState,
+    signedUrl,
+  ) => {
+    setPhotos((current) => updateAlbumPhotoMedia(
+      current,
+      photoId,
+      mediaState,
+      signedUrl,
+    ));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCropKey || !selectedPhotoId || !selectedPhotoStoragePath) return;
+    let active = true;
+    queueMicrotask(() => {
+      if (active) handlePhotoMediaChange(selectedPhotoId, "loading");
+    });
+    const request = cropRefreshVersion > 0
+      ? refreshAlbumPhotoSignedUrl(selectedPhotoStoragePath)
+      : loadAlbumPhotoSignedUrls([selectedPhotoStoragePath]).then(
+          (urls) => urls.get(selectedPhotoStoragePath) ?? null,
+        );
+    void request.then(
+      (signedUrl) => {
+        if (!active) return;
+        if (signedUrl) {
+          handlePhotoMediaChange(selectedPhotoId, "ready", signedUrl);
+          setCropPhotoReadyKey(selectedCropKey);
+          setCropPhotoFailedKey(null);
+        } else {
+          handlePhotoMediaChange(selectedPhotoId, "error");
+          setCropPhotoReadyKey(null);
+          setCropPhotoFailedKey(selectedCropKey);
+        }
+      },
+      () => {
+        if (!active) return;
+        handlePhotoMediaChange(selectedPhotoId, "error");
+        setCropPhotoReadyKey(null);
+        setCropPhotoFailedKey(selectedCropKey);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [
+    cropRefreshVersion,
+    handlePhotoMediaChange,
+    selectedCropKey,
+    selectedPhotoId,
+    selectedPhotoStoragePath,
+  ]);
+
+  const openComposer = async () => {
+    if (isLoadingComposerPhotos) return;
+    if (composerPhotosLoaded) {
+      setComposerStep("template");
+      return;
+    }
+
+    setIsLoadingComposerPhotos(true);
+    setError(null);
+    try {
+      const albumPhotos = await loadAlbumPhotoMetadata(tripSession.trip.id);
+      const firstViewPhotos = getInitialMediaPrewarmCandidates(
+        albumPhotos,
+        CARDS_INITIAL_MEDIA_PREWARM_COUNT,
+      );
+      setPhotos((current) => mergeAlbumPhotos(albumPhotos, current));
+      setAlbumPhotoCount(albumPhotos.length);
+      setComposerPhotosLoaded(true);
+      setComposerStep("template");
+      void loadAlbumPhotoSignedUrls(
+        firstViewPhotos.map(({ storagePath }) => storagePath),
+      ).then(
+        (signedUrls) => setPhotos((current) =>
+          applyAlbumPhotoSignedUrls(current, signedUrls)),
+        () => setPhotos((current) => applyAlbumPhotoSignedUrls(
+          current,
+          new Map(firstViewPhotos.map(({ storagePath }) => [storagePath, null])),
+        )),
+      );
+    } catch {
+      setError("앨범 사진을 불러오지 못했어요. 다시 시도해주세요.");
+    } finally {
+      setIsLoadingComposerPhotos(false);
+    }
+  };
+
   const closeComposer = () => {
     setComposerStep(null);
     setTemplateKey(null);
     setPhotoDraft({ photoIds: [], placementBySlotId: {} });
     setSelectedSlotId(null);
+    setCropPhotoReadyKey(null);
+    setCropPhotoFailedKey(null);
+    setCropRefreshVersion(0);
     setCardCaption("");
     setError(null);
+  };
+
+  const selectSlotForCrop = (slotId: string | null) => {
+    setCropPhotoReadyKey(null);
+    setCropPhotoFailedKey(null);
+    setCropRefreshVersion(0);
+    setSelectedSlotId(slotId);
   };
 
   const selectTemplate = (nextTemplateKey: MemoryCardTemplateKey) => {
@@ -303,10 +486,29 @@ export function MemoryCardsView() {
     setExportingKey(`${key}-${action}`);
     setError(null);
     try {
+      const requiredPhotoIds = getMemoryCardRenderPhotoIds(renderModel);
+      const requiredPhotoIdSet = new Set(requiredPhotoIds);
+      const requiredPhotos = photos.filter(({ id }) => requiredPhotoIdSet.has(id));
+      const signedUrls = await loadAlbumPhotoSignedUrls(
+        requiredPhotos.map(({ storagePath }) => storagePath),
+      );
+      const hydratedRequiredPhotos = applyAlbumPhotoSignedUrls(
+        requiredPhotos,
+        signedUrls,
+      );
+      const hydratedPhotos = applyAlbumPhotoSignedUrls(photos, signedUrls);
+      setPhotos((current) => mergeAlbumPhotos(current, hydratedRequiredPhotos));
+      if (
+        requiredPhotoIds.some(
+          (photoId) => !hydratedPhotos.find(({ id }) => id === photoId)?.signedUrl,
+        )
+      ) {
+        throw new Error("memory-card-export-photo-unavailable");
+      }
       const blob = await exportMemoryCardPng({
         templateKey: exportTemplateKey,
         renderModel,
-        photos,
+        photos: hydratedPhotos,
         dateLabel,
       });
       const filename = `fukuoka-memory-card-${exportTemplateKey}.png`;
@@ -376,7 +578,7 @@ export function MemoryCardsView() {
           </div>
           <Button variant="ghost" onClick={closeComposer}>닫기</Button>
         </div>
-        {photos.length < minimumPhotoCount && (
+        {albumPhotoCount < minimumPhotoCount && (
           <EmptyState
             className="mt-5 bg-surface/60"
             title="카드를 만들 사진이 부족해요."
@@ -386,7 +588,7 @@ export function MemoryCardsView() {
         )}
         <div className="mt-5 space-y-4">
           {MEMORY_CARD_TEMPLATES.map((item) => {
-            const available = photos.length >= item.acceptedMin;
+            const available = albumPhotoCount >= item.acceptedMin;
             return (
               <button
                 key={item.key}
@@ -425,7 +627,13 @@ export function MemoryCardsView() {
         </div>
 
         <Card className="mt-5 p-3">
-          <MemoryCardPreview templateKey={template.key} renderModel={draftRenderModel} photos={photos} dateLabel={dateLabel} />
+          <MemoryCardPreview
+            templateKey={template.key}
+            renderModel={draftRenderModel}
+            photos={photos}
+            dateLabel={dateLabel}
+            onPhotoMediaChange={handlePhotoMediaChange}
+          />
         </Card>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -440,7 +648,7 @@ export function MemoryCardsView() {
         )}
 
         <div className="mt-5 grid grid-cols-3 gap-2" aria-label="카드에 넣을 사진 선택">
-          {photos.map((photo) => {
+          {photos.map((photo, index) => {
             const selectionIndex = selectedPhotoIds.indexOf(photo.id);
             const selected = selectionIndex >= 0;
             const selectionFull = !selected && selectedPhotoIds.length >= template.acceptedMax;
@@ -453,12 +661,14 @@ export function MemoryCardsView() {
                 onClick={() => togglePhoto(photo.id)}
                 className={`relative aspect-square overflow-hidden rounded-md border-2 bg-line/40 disabled:opacity-45 ${selected ? "border-accent-primary" : "border-transparent"}`}
               >
-                {photo.signedUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={photo.signedUrl} alt={photo.caption ?? "앨범 여행 사진"} className="size-full object-cover object-center" />
-                ) : (
-                  <span className="flex size-full items-center justify-center px-2 text-[10px] text-text-secondary">표시할 수 없는 사진</span>
-                )}
+                <ComposerPhotoThumbnail
+                  photo={photo}
+                  onMediaChange={handlePhotoMediaChange}
+                  fetchPriority={getFirstViewFetchPriority(
+                    index,
+                    CARDS_HIGH_PRIORITY_MEDIA_COUNT,
+                  )}
+                />
                 {selected && <span className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-accent-primary text-caption font-bold text-white">{selectionIndex + 1}</span>}
               </button>
             );
@@ -470,7 +680,7 @@ export function MemoryCardsView() {
           className="mt-5"
           disabled={!canPreview}
           onClick={() => {
-            setSelectedSlotId(draftLayout.slots[0]?.slotId ?? null);
+            selectSlotForCrop(draftLayout.slots[0]?.slotId ?? null);
             setComposerStep("preview");
           }}
         >
@@ -494,7 +704,8 @@ export function MemoryCardsView() {
             photos={photos}
             dateLabel={dateLabel}
             selectedSlotId={selectedSlotId}
-            onSelectSlot={setSelectedSlotId}
+            onSelectSlot={selectSlotForCrop}
+            onPhotoMediaChange={handlePhotoMediaChange}
           />
         </Card>
 
@@ -507,7 +718,7 @@ export function MemoryCardsView() {
                 key={slot.slotId}
                 type="button"
                 aria-pressed={slot.slotId === selectedSlotId}
-                onClick={() => setSelectedSlotId(slot.slotId)}
+                onClick={() => selectSlotForCrop(slot.slotId)}
                 className={`min-h-11 rounded-md border px-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary ${
                   slot.slotId === selectedSlotId
                     ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
@@ -520,25 +731,64 @@ export function MemoryCardsView() {
           </div>
         </div>
 
-        {selectedSlot && selectedTemplateSlot && selectedPhoto && (
+        {selectedSlot && selectedTemplateSlot && selectedPhoto &&
+          cropPhotoReadyKey === selectedCropKey && selectedPhoto.signedUrl && (
           <MemoryCardCropEditor
             key={`${selectedSlot.slotId}:${selectedSlot.photoId}`}
             initialPlacement={selectedSlot.placement}
             photo={selectedPhoto}
             slot={selectedTemplateSlot}
             slotNumber={selectedSlotIndex + 1}
-            onCancel={() => setSelectedSlotId(null)}
+            onCancel={() => selectSlotForCrop(null)}
+            onPhotoError={() => {
+              setCropPhotoReadyKey(null);
+              if (cropRefreshVersion === 0) {
+                setCropPhotoFailedKey(null);
+                setCropRefreshVersion(1);
+              } else {
+                handlePhotoMediaChange(selectedPhoto.id, "error");
+                setCropPhotoFailedKey(selectedCropKey);
+              }
+            }}
             onApply={(placement) => {
               updateSelectedPlacement(placement);
-              setSelectedSlotId(null);
+              selectSlotForCrop(null);
             }}
           />
+        )}
+
+        {selectedSlot && selectedTemplateSlot && selectedPhoto &&
+          cropPhotoReadyKey !== selectedCropKey &&
+          cropPhotoFailedKey !== selectedCropKey && (
+          <LoadingState className="mt-5" label="편집할 사진을 불러오고 있어요" />
+        )}
+
+        {selectedSlot && selectedTemplateSlot && selectedPhoto &&
+          cropPhotoFailedKey === selectedCropKey && (
+          <div className="mt-5 rounded-lg border border-line bg-surface p-4">
+            <p className="text-sm text-text-secondary">이 사진을 불러오지 못했어요.</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => selectSlotForCrop(null)} className="min-h-11 rounded-md border border-line px-4 text-sm font-semibold">
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCropPhotoFailedKey(null);
+                  setCropRefreshVersion((version) => version + 1);
+                }}
+                className="min-h-11 rounded-md bg-accent-primary px-4 text-sm font-semibold text-white"
+              >
+                다시 시도
+              </button>
+            </div>
+          </div>
         )}
 
         {selectedSlot && (!selectedTemplateSlot || !selectedPhoto) && (
           <div className="mt-5 rounded-lg border border-line bg-surface p-4">
             <p className="text-sm text-text-secondary">이 사진의 편집 정보를 불러올 수 없어요.</p>
-            <button type="button" onClick={() => setSelectedSlotId(null)} className="mt-3 min-h-11 w-full rounded-md border border-line px-4 text-sm font-semibold">
+            <button type="button" onClick={() => selectSlotForCrop(null)} className="mt-3 min-h-11 w-full rounded-md border border-line px-4 text-sm font-semibold">
               닫기
             </button>
           </div>
@@ -573,15 +823,21 @@ export function MemoryCardsView() {
     <>
       <div className="flex items-center justify-between gap-3">
         <Badge tone="neutral">{cards.length}장</Badge>
-        <Button disabled={photos.length < minimumPhotoCount} onClick={() => setComposerStep("template")}>추억 카드 만들기</Button>
+        <Button
+          loading={isLoadingComposerPhotos}
+          disabled={albumPhotoCount < minimumPhotoCount}
+          onClick={openComposer}
+        >
+          추억 카드 만들기
+        </Button>
       </div>
 
       {error && <p role="alert" className="mt-4 rounded-md bg-danger/8 px-4 py-3 text-sm text-danger">{error}</p>}
 
-      {photos.length < minimumPhotoCount && (
+      {albumPhotoCount < minimumPhotoCount && (
         <Card className="mt-5 p-4">
           <p className="font-semibold">카드를 만들려면 사진이 최소 {minimumPhotoCount}장 필요해요.</p>
-          <p className="mt-1 text-sm text-text-secondary">현재 앨범 사진 {photos.length}장 · 사진을 더 추가해주세요.</p>
+          <p className="mt-1 text-sm text-text-secondary">현재 앨범 사진 {albumPhotoCount}장 · 사진을 더 추가해주세요.</p>
           <a href="/album" className="tap-target mt-2 inline-flex items-center text-sm font-semibold text-accent-primary">앨범으로 이동 →</a>
         </Card>
       )}
@@ -608,7 +864,13 @@ export function MemoryCardsView() {
               const cardBusy = exportingKey?.startsWith(`${card.id}-`);
               return (
                 <article key={card.id} className="overflow-hidden rounded-lg border border-line/70 bg-surface p-3 shadow-card">
-                  <MemoryCardPreview templateKey={card.templateKey} renderModel={card.renderModel} photos={photos} dateLabel={dateLabel} />
+                  <MemoryCardPreview
+                    templateKey={card.templateKey}
+                    renderModel={card.renderModel}
+                    photos={photos}
+                    dateLabel={dateLabel}
+                    onPhotoMediaChange={handlePhotoMediaChange}
+                  />
                   <div className="flex items-start justify-between gap-3 px-1 pt-3">
                     <div>
                       <h3 className="font-editorial font-semibold">{savedTemplate.displayName}</h3>

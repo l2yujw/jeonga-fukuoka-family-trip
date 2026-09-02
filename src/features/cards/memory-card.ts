@@ -89,6 +89,24 @@ export type MemoryCard = {
   isOwner: boolean;
 };
 
+export function getMemoryCardRenderPhotoIds(
+  renderModel: MemoryCardRenderModel,
+) {
+  return [...new Set(renderModel.layout.slots.map(({ photoId }) => photoId))];
+}
+
+export function getMemoryCardReferencedPhotoIds(
+  cards: readonly Pick<MemoryCard, "renderModel">[],
+) {
+  return [
+    ...new Set(
+      cards.flatMap(({ renderModel }) =>
+        renderModel ? getMemoryCardRenderPhotoIds(renderModel) : [],
+      ),
+    ),
+  ];
+}
+
 export function normalizeMemoryCardCaption(value: string) {
   return value.normalize("NFC").trim() || null;
 }

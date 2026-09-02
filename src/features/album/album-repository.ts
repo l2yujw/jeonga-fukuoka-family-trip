@@ -7,6 +7,10 @@ import type {
   PersistedPhotoRow,
 } from "./album-types";
 import {
+  ALBUM_SIGNED_URL_LIFETIME_SECONDS,
+  albumSignedUrlBroker,
+} from "./album-signed-url-cache";
+import {
   buildPhotoInsertPayload,
   buildStoragePath,
   mapPersistedPhotoRows,
@@ -14,7 +18,6 @@ import {
 } from "./album-utils";
 
 const PHOTO_BUCKET = "trip-photos";
-const SIGNED_URL_LIFETIME_SECONDS = 3600;
 const PHOTO_COLUMNS =
   "id,trip_id,uploader_member_id,uploader_auth_user_id,storage_path,original_filename,mime_type,caption,taken_at,width,height,created_at";
 
@@ -24,27 +27,60 @@ async function requireAuthUserId() {
   return session.user.id;
 }
 
-async function createSignedUrl(storagePath: string) {
+let batchedAuthUserId: Promise<string> | null = null;
+
+function requireBatchedAuthUserId() {
+  if (batchedAuthUserId) return batchedAuthUserId;
+  const request = requireAuthUserId();
+  batchedAuthUserId = request;
+  const clear = () => setTimeout(() => {
+    if (batchedAuthUserId === request) batchedAuthUserId = null;
+  }, 0);
+  void request.then(clear, clear);
+  return request;
+}
+
+async function signStoragePaths(storagePaths: readonly string[]) {
+  const signedUrls = new Map<string, string | null>(
+    storagePaths.map((storagePath) => [storagePath, null] as const),
+  );
   try {
     const { data, error } = await getSupabaseBrowserClient()
       .storage.from(PHOTO_BUCKET)
-      .createSignedUrl(storagePath, SIGNED_URL_LIFETIME_SECONDS);
+      .createSignedUrls([...storagePaths], ALBUM_SIGNED_URL_LIFETIME_SECONDS);
 
-    if (!error) return data.signedUrl;
+    if (error) return signedUrls;
+    for (const [index, item] of data.entries()) {
+      const storagePath = item.path && signedUrls.has(item.path)
+        ? item.path
+        : storagePaths[index];
+      if (storagePath && !item.error && item.signedUrl) {
+        signedUrls.set(storagePath, item.signedUrl);
+      }
+    }
   } catch {
-    // A single unavailable object must not prevent the album metadata from loading.
+    // A failed signing batch leaves each path independently unavailable.
   }
-
-  console.warn("[album] signed URL unavailable");
-  return null;
+  return signedUrls;
 }
 
-async function createSignedUrls(rows: readonly PersistedPhotoRow[]) {
-  return new Map(
-    await Promise.all(
-      rows.map(async (row) => [row.storage_path, await createSignedUrl(row.storage_path)] as const),
-    ),
-  );
+function resolveSignedUrls(authUserId: string, storagePaths: readonly string[]) {
+  return albumSignedUrlBroker.resolve(authUserId, storagePaths, signStoragePaths);
+}
+
+export async function loadAlbumPhotoSignedUrls(
+  storagePaths: readonly string[],
+) {
+  const authUserId = await requireBatchedAuthUserId();
+  return resolveSignedUrls(authUserId, storagePaths);
+}
+
+export async function refreshAlbumPhotoSignedUrl(storagePath: string) {
+  const authUserId = await requireAuthUserId();
+  albumSignedUrlBroker.invalidate(authUserId, storagePath);
+  return (
+    await resolveSignedUrls(authUserId, [storagePath])
+  ).get(storagePath) ?? null;
 }
 
 async function removeStorageObject(storagePath: string) {
@@ -58,7 +94,7 @@ async function removeStorageObject(storagePath: string) {
   }
 }
 
-export async function loadAlbumPhotos(tripId: string) {
+export async function loadAlbumPhotoMetadata(tripId: string) {
   const authUserId = await requireAuthUserId();
   const supabase = getSupabaseBrowserClient();
   const [photosResult, rosterResult] = await Promise.all([
@@ -74,12 +110,55 @@ export async function loadAlbumPhotos(tripId: string) {
   if (rosterResult.error) throw rosterResult.error;
 
   const rows = (photosResult.data ?? []) as PersistedPhotoRow[];
-  const signedUrls = await createSignedUrls(rows);
   const uploaderNames = new Map(
     (rosterResult.data ?? []).map((member) => [member.id, member.name]),
   );
 
-  return mapPersistedPhotoRows(rows, uploaderNames, authUserId, signedUrls);
+  return mapPersistedPhotoRows(rows, uploaderNames, authUserId, new Map());
+}
+
+export async function loadAlbumPhotos(tripId: string) {
+  return loadAlbumPhotoMetadata(tripId);
+}
+
+export async function loadAlbumPhotosByIds(
+  tripId: string,
+  photoIds: readonly string[],
+) {
+  const uniquePhotoIds = [...new Set(photoIds)];
+  if (uniquePhotoIds.length === 0) return [];
+
+  const authUserId = await requireAuthUserId();
+  const supabase = getSupabaseBrowserClient();
+  const [photosResult, rosterResult] = await Promise.all([
+    supabase
+      .from("photos")
+      .select(PHOTO_COLUMNS)
+      .eq("trip_id", tripId)
+      .in("id", uniquePhotoIds)
+      .order("created_at", { ascending: false }),
+    supabase.from("family_members").select("id,name").eq("trip_id", tripId),
+  ]);
+
+  if (photosResult.error) throw photosResult.error;
+  if (rosterResult.error) throw rosterResult.error;
+
+  return mapPersistedPhotoRows(
+    (photosResult.data ?? []) as PersistedPhotoRow[],
+    new Map((rosterResult.data ?? []).map((member) => [member.id, member.name])),
+    authUserId,
+    new Map(),
+  );
+}
+
+export async function loadAlbumPhotoCount(tripId: string) {
+  await requireAuthUserId();
+  const { count, error } = await getSupabaseBrowserClient()
+    .from("photos")
+    .select("id", { count: "exact", head: true })
+    .eq("trip_id", tripId);
+  if (error) throw error;
+  return count ?? 0;
 }
 
 export async function loadHomeAlbumPreview(tripId: string) {
@@ -98,7 +177,10 @@ export async function loadHomeAlbumPreview(tripId: string) {
     rows,
     new Map(),
     authUserId,
-    await createSignedUrls(rows),
+    await resolveSignedUrls(
+      authUserId,
+      rows.map(({ storage_path }) => storage_path),
+    ),
   );
   return { count: count ?? rows.length, photo };
 }
@@ -120,7 +202,10 @@ export async function loadHomeAlbumPhoto(tripId: string, photoId: string) {
     rows,
     new Map(),
     authUserId,
-    await createSignedUrls(rows),
+    await resolveSignedUrls(
+      authUserId,
+      rows.map(({ storage_path }) => storage_path),
+    ),
   )[0] ?? null;
 }
 
@@ -174,7 +259,7 @@ export async function uploadAlbumPhoto({
     [row],
     new Map([[tripSession.member.id, tripSession.member.name]]),
     authUserId,
-    new Map([[storagePath, await createSignedUrl(storagePath)]]),
+    await resolveSignedUrls(authUserId, [storagePath]),
   )[0];
 }
 

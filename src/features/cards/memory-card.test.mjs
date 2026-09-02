@@ -15,6 +15,8 @@ import {
   createMemoryCardRenderModel,
   getMinimumMemoryCardPhotoCount,
   getRandomPhotoCount,
+  getMemoryCardReferencedPhotoIds,
+  getMemoryCardRenderPhotoIds,
   mapPersistedMemoryCardRows,
   normalizeMemoryCardCaption,
   parseCanonicalExperimentalMemoryCardLayoutV1,
@@ -658,6 +660,61 @@ test("legacy simple v1 parses into its own display model without faking canonica
     assert.equal(model?.kind, "legacy-simple-v1");
     assert.deepEqual(model?.layout.slots.map(({ slotId }) => slotId), slotIds);
   }
+});
+
+test("saved-card photo IDs support v1/v2/v3, dedupe, and ignore unreadable layouts", () => {
+  const legacy = parseMemoryCardRenderModel("polaroid_moodboard", 1, {
+    version: 1,
+    slots: [
+      { slotId: "hero", photoId: "a" },
+      { slotId: "left", photoId: "b" },
+      { slotId: "right", photoId: "c" },
+    ],
+  });
+  const v2 = parseMemoryCardRenderModel(
+    "postcard_duo",
+    2,
+    buildMemoryCardLayoutV2("postcard_duo", ["c", "d"]),
+  );
+  const v3 = parseMemoryCardRenderModel(
+    "one_moment",
+    3,
+    buildMemoryCardLayoutV3("one_moment", ["a"]),
+  );
+  assert.ok(legacy && v2 && v3);
+  assert.deepEqual(getMemoryCardRenderPhotoIds(v3), ["a"]);
+  assert.deepEqual(
+    getMemoryCardReferencedPhotoIds([
+      { renderModel: legacy },
+      { renderModel: v2 },
+      { renderModel: v3 },
+      { renderModel: null },
+    ]),
+    ["a", "b", "c", "d"],
+  );
+});
+
+test("Cards startup is referenced-only and composer/export hydration is deferred", async () => {
+  const [source, cropSource] = await Promise.all([
+    readFile(new URL("./memory-cards-view.tsx", import.meta.url), "utf8"),
+    readFile(new URL("./memory-card-crop-editor.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(source, /loadMemoryCards\(tripSession\.trip\.id\)[\s\S]*loadAlbumPhotoCount\(tripSession\.trip\.id\)/);
+  assert.match(source, /getMemoryCardReferencedPhotoIds\(loadedCards\)/);
+  assert.match(source, /loadAlbumPhotosByIds\([\s\S]*referencedPhotoIds/);
+  assert.match(source, /const openComposer = async \(\) => \{[\s\S]*loadAlbumPhotoMetadata/);
+  assert.match(source, /composerPhotosLoaded/);
+  assert.match(source, /getMemoryCardRenderPhotoIds\(renderModel\)[\s\S]*loadAlbumPhotoSignedUrls/);
+  assert.match(source, /requiredPhotoIds\.some\([\s\S]*memory-card-export-photo-unavailable/);
+  assert.match(source, /cropPhotoReadyKey/);
+  assert.match(source, /refreshAlbumPhotoSignedUrl\(selectedPhotoStoragePath\)/);
+  assert.match(source, /setCropRefreshVersion\(\(version\) => version \+ 1\)/);
+  assert.match(source, />\s*다시 시도\s*</);
+  assert.match(cropSource, /onError=\{onPhotoError\}/);
+  assert.match(source, /mergeAlbumPhotos/);
+  assert.match(source, /updateAlbumPhotoMedia/);
+  assert.match(source, /onPhotoMediaChange=\{handlePhotoMediaChange\}/);
+  assert.doesNotMatch(source, /\bloadAlbumPhotos\b/);
 });
 
 test("legacy slots keep missing-photo fallbacks", () => {

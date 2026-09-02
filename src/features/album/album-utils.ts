@@ -3,6 +3,7 @@ import type {
   AlbumUploadDraft,
   LocalPhotoDraft,
   PersistedPhotoRow,
+  PhotoMediaState,
 } from "./album-types";
 
 export const ALBUM_FILE_ACCEPT =
@@ -222,20 +223,93 @@ export function mapPersistedPhotoRows(
   authUserId: string,
   signedUrls: ReadonlyMap<string, string | null>,
 ): AlbumPhoto[] {
-  return rows.map((row) => ({
-    id: row.id,
-    storagePath: row.storage_path,
-    originalFilename: row.original_filename,
-    mimeType: row.mime_type,
-    signedUrl: signedUrls.get(row.storage_path) ?? null,
-    uploaderMemberId: row.uploader_member_id,
-    uploaderName: uploaderNames.get(row.uploader_member_id) ?? null,
-    caption: row.caption,
-    width: row.width,
-    height: row.height,
-    createdAt: row.created_at,
-    isOwner: isPhotoOwner(row, authUserId),
-  }));
+  return rows.map((row) => {
+    const signedUrl = signedUrls.get(row.storage_path) ?? null;
+    return {
+      id: row.id,
+      storagePath: row.storage_path,
+      originalFilename: row.original_filename,
+      mimeType: row.mime_type,
+      signedUrl,
+      mediaState: signedUrl ? "ready" : "idle",
+      uploaderMemberId: row.uploader_member_id,
+      uploaderName: uploaderNames.get(row.uploader_member_id) ?? null,
+      caption: row.caption,
+      width: row.width,
+      height: row.height,
+      createdAt: row.created_at,
+      isOwner: isPhotoOwner(row, authUserId),
+    };
+  });
+}
+
+export function mergeAlbumPhotos(
+  current: readonly AlbumPhoto[],
+  incoming: readonly AlbumPhoto[],
+) {
+  const merged: AlbumPhoto[] = [];
+  const indexById = new Map<string, number>();
+
+  for (const photo of [...current, ...incoming]) {
+    const index = indexById.get(photo.id);
+    if (index === undefined) {
+      indexById.set(photo.id, merged.length);
+      merged.push(photo);
+      continue;
+    }
+    const existing = merged[index];
+    const signedUrl = photo.signedUrl ?? existing.signedUrl;
+    merged[index] = {
+      ...existing,
+      ...photo,
+      signedUrl,
+      mediaState: signedUrl
+        ? "ready"
+        : photo.mediaState === "idle"
+          ? existing.mediaState
+          : photo.mediaState,
+    };
+  }
+  return merged;
+}
+
+export function applyAlbumPhotoSignedUrls(
+  photos: AlbumPhoto[],
+  signedUrls: ReadonlyMap<string, string | null>,
+): AlbumPhoto[] {
+  let changed = false;
+  const next = photos.map((photo) => {
+    if (!signedUrls.has(photo.storagePath)) return photo;
+    const signedUrl = signedUrls.get(photo.storagePath) ?? null;
+    if (!signedUrl && photo.mediaState === "ready" && photo.signedUrl) return photo;
+    const mediaState: PhotoMediaState = signedUrl ? "ready" : "error";
+    if (photo.signedUrl === signedUrl && photo.mediaState === mediaState) {
+      return photo;
+    }
+    changed = true;
+    return { ...photo, signedUrl, mediaState };
+  });
+  return changed ? next : photos;
+}
+
+export function updateAlbumPhotoMedia(
+  photos: AlbumPhoto[],
+  photoId: string,
+  mediaState: PhotoMediaState,
+  signedUrl: string | null = null,
+): AlbumPhoto[] {
+  let changed = false;
+  const next = photos.map((photo) => {
+    if (photo.id !== photoId) return photo;
+    if (photo.mediaState === "ready" && mediaState === "loading") return photo;
+    const nextUrl = mediaState === "ready" ? signedUrl : null;
+    if (photo.mediaState === mediaState && photo.signedUrl === nextUrl) {
+      return photo;
+    }
+    changed = true;
+    return { ...photo, mediaState, signedUrl: nextUrl };
+  });
+  return changed ? next : photos;
 }
 
 export function getAlbumPhotoDownloadFilename(
