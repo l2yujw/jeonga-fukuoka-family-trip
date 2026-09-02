@@ -1,9 +1,11 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const detailDirectory = path.join(root, "public/assets/schedule/detail");
+await mkdir(detailDirectory, { recursive: true });
 const layout = JSON.parse(
   await readFile(path.join(root, "src/features/schedule/schedule-layout.json"), "utf8"),
 );
@@ -29,12 +31,12 @@ const days = [
     routeTitle: "첫째 날, 설레는 출발",
     routePath: "인천 → 후쿠오카 → 야나가와 → 다케오 → 우레시노",
     memoColor: "#db3e60",
-    memoLines: ["설레는 시작, 함께하는 여정의 첫걸음."],
+    memoLines: ["설레는 시작,", "함께하는 여정의 첫걸음."],
     rows: [
       { id: "d1-incheon-meeting", time: "07:00", type: "항공", location: "인천", title: "인천국제공항 1터미널 집결", description: ["탑승수속 및 출발 준비"], narrowArt: true },
       { id: "d1-incheon-departure", time: "09:30", type: "항공", location: "인천", title: "인천국제공항 출발", description: ["제주항공 7C1403"], narrowArt: true },
-      { id: "d1-fukuoka-arrival", time: "11:00", type: "항공", location: "후쿠오카", title: "후쿠오카공항 도착", description: ["1명 합류 후 일정 시작"], narrowArt: true },
-      { id: "d1-move-yanagawa", type: "이동", location: "야나가와", title: "야나가와 이동", description: ["약 1시간 20분 · 이동 중 간식 제공"] },
+      { id: "d1-fukuoka-arrival", time: "11:00", type: "항공", location: "후쿠오카", title: "후쿠오카공항 도착", description: ["후쿠오카 도착 후 일정 시작"], narrowArt: true },
+      { id: "d1-move-yanagawa", type: "이동", location: "야나가와", title: "야나가와 이동", description: ["약 1시간 20분 소요"] },
       { id: "d1-lunch-yanagawa", type: "식사", location: "야나가와", title: "중식 · 현지식", description: ["야나가와 도착 후 점심 식사"] },
       { id: "d1-yanagawa-boat", type: "관광", location: "야나가와", title: "야나가와 뱃놀이", description: ["운하를 따라 즐기는 여름 뱃놀이"] },
       { id: "d1-move-takeo", type: "이동", location: "다케오", title: "다케오 이동", description: ["약 1시간 10분 소요"] },
@@ -52,7 +54,7 @@ const days = [
     routeTitle: "둘째 날, 나가사키의 여름 산책",
     routePath: "우레시노 → 나가사키 → 후쿠오카",
     memoColor: "#3f9548",
-    memoLines: ["푸른 하늘 아래, 나가사키에서의 추억을 마음에 담아요."],
+    memoLines: ["푸른 하늘 아래,", "나가사키에서의 추억을 마음에 담아요."],
     rows: [
       { id: "d2-hotel-breakfast", type: "식사", location: "우레시노", title: "호텔 조식", description: ["호텔식으로 여유로운 아침"] },
       { id: "d2-move-nagasaki", type: "이동", location: "나가사키", title: "나가사키 이동", description: ["약 50분 소요"] },
@@ -107,6 +109,7 @@ const chipColors = {
   관광: ["#e8ecd0", "#47743e"],
   숙소: ["#eadde8", "#714866"],
 };
+const TIMED_ROW_TIME_FONT_SIZE = 21;
 const day3IconCrops = {
   식사: { left: 20, top: 321, width: 95, height: 100 },
   관광: { left: 20, top: 502, width: 95, height: 105 },
@@ -145,7 +148,7 @@ function baseSvg(day, rows, height, memoY) {
     <rect x="${route.x}" y="${route.y}" width="${route.width}" height="${route.height}" rx="20" fill="#fcf8f3" stroke="#e4c1af" stroke-width="1.15" filter="url(#shadow)"/>
     <line x1="${rowLayout.timelineX}" y1="${rowLayout.firstY + rowLayout.height / 2}" x2="${rowLayout.timelineX}" y2="${timelineEnd}" stroke="#dc535f" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 11"/>
     ${cards}
-    <rect x="${route.x}" y="${memoY}" width="${route.width}" height="${memo.height}" rx="19" fill="#fefaf4" stroke="#e4c1af" stroke-width="1.15" filter="url(#shadow)"/>
+    <rect x="${rowLayout.cardX}" y="${memoY}" width="${rowLayout.cardWidth}" height="${rowLayout.height}" rx="${rowLayout.cardRadius}" fill="#fefaf4" stroke="#e4c1af" stroke-width="1.15" filter="url(#shadow)"/>
     <rect width="100%" height="100%" filter="url(#grain)" opacity=".38"/>
   `);
 }
@@ -178,20 +181,20 @@ function textSvg(day, rows, height, memoY) {
       ${descriptions}
     `;
   }).join("");
-  const memoSize = day.day === 2 ? 15 : 18;
-  const memoTextStartY = memoY + (day.memoLines.length === 1 ? 94 : 82);
+  const memoSize = day.day === 1 ? 18 : 15;
+  const memoTextStartY = memoY + 87;
   const memoLines = day.memoLines.map((line, index) =>
-    `<text x="61" y="${memoTextStartY + index * 27}" class="memo" font-size="${memoSize}">${escapeXml(line)}</text>`,
+    `<text x="${rowLayout.cardX + 22}" y="${memoTextStartY + index * 27}" class="memo" font-size="${memoSize}">${escapeXml(line)}</text>`,
   ).join("");
 
   return svg(height, `
     <style>
-      .route-title,.title{font-family:AppleMyungjo,serif;font-weight:700;fill:#17130f;stroke:#17130f;stroke-width:.55px;paint-order:stroke fill}.route-path{font-family:Pretendard,sans-serif;font-weight:600;fill:#2c2520}.chip{font-family:Pretendard,sans-serif;font-size:17px;font-weight:700}.time{font-family:AppleMyungjo,serif;font-size:29px;font-weight:700;fill:#17130f;stroke:#17130f;stroke-width:.55px;paint-order:stroke fill}.desc{font-family:Pretendard,sans-serif;font-weight:500;fill:#2c2520}.memo{font-family:AppleMyungjo,serif;font-weight:700;fill:#2c2520;stroke:#2c2520;stroke-width:.2px;paint-order:stroke fill}.memo-label{font-family:Pretendard,sans-serif;font-size:17px;font-weight:800;fill:white}</style>
+      .route-title,.title{font-family:AppleMyungjo,serif;font-weight:700;fill:#17130f;stroke:#17130f;stroke-width:.55px;paint-order:stroke fill}.route-path{font-family:Pretendard,sans-serif;font-weight:600;fill:#2c2520}.chip{font-family:Pretendard,sans-serif;font-size:17px;font-weight:700}.time{font-family:AppleMyungjo,serif;font-size:${TIMED_ROW_TIME_FONT_SIZE}px;font-weight:600;fill:#17130f;stroke:#17130f;stroke-width:.55px;paint-order:stroke fill}.desc{font-family:Pretendard,sans-serif;font-weight:500;fill:#2c2520}.memo{font-family:AppleMyungjo,serif;font-weight:700;fill:#2c2520;stroke:#2c2520;stroke-width:.2px;paint-order:stroke fill}.memo-label{font-family:Pretendard,sans-serif;font-size:17px;font-weight:800;fill:white}</style>
     <text x="113" y="63" class="route-title" font-size="${day.routeTitleSize ?? 28}">${escapeXml(day.routeTitle)}</text>
     <text x="115" y="100" class="route-path" font-size="${day.routePathSize ?? 16}">${escapeXml(day.routePath)}</text>
     ${renderedRows}
-    <rect x="59" y="${memoY + 7}" width="112" height="34" rx="11" fill="${day.memoColor}"/>
-    <text x="73" y="${memoY + 31}" class="memo-label">DAY ${day.day} 메모</text>
+    <rect x="${rowLayout.cardX + 22}" y="${memoY + 13}" width="112" height="34" rx="11" fill="${day.memoColor}"/>
+    <text x="${rowLayout.cardX + 36}" y="${memoY + 37}" class="memo-label">DAY ${day.day} 메모</text>
     ${memoLines}
   `);
 }
@@ -207,6 +210,13 @@ function gridCrop(grid, index) {
     height: grid.y[gridRow + 1] - grid.y[gridRow] - grid.inset * 2,
   };
 }
+
+const insetCrop = (crop, inset) => ({
+  left: crop.left + inset,
+  top: crop.top + inset,
+  width: crop.width - inset * 2,
+  height: crop.height - inset * 2,
+});
 
 async function artworkCrop(source, crop, targetWidth, targetHeight, background = "#ffffff") {
   const extracted = await source.clone().extract(crop).png().toBuffer();
@@ -224,6 +234,31 @@ async function artworkSource(sourcePath, targetWidth, targetHeight) {
     .resize({ width: px(targetWidth), height: px(targetHeight), fit: "contain", background: "#ffffff" })
     .sharpen(0.6)
     .png({ compressionLevel: 9, palette: false })
+    .toBuffer();
+}
+
+async function detailArtwork(
+  source,
+  crop,
+  background = "#fffdf8",
+  width = 720,
+  height = 400,
+) {
+  const extracted = await source.clone().extract(crop).png().toBuffer();
+  return sharp(extracted)
+    .trim({ background: "#ffffff", threshold: 14 })
+    .resize({ width, height, fit: "contain", background })
+    .sharpen(0.5)
+    .webp({ quality: 82, alphaQuality: 90, effort: 6 })
+    .toBuffer();
+}
+
+async function detailArtworkSource(sourcePath) {
+  return sharp(path.join(root, sourcePath))
+    .trim({ background: "#ffffff", threshold: 14 })
+    .resize({ width: 720, height: 400, fit: "contain", background: "#fffdf8" })
+    .sharpen(0.5)
+    .webp({ quality: 82, alphaQuality: 90, effort: 6 })
     .toBuffer();
 }
 
@@ -268,6 +303,16 @@ for (const day of days) {
       );
     layers.push({ input: art, top: px(item.y + rowLayout.artInsetY), left: px(artX), blend: "multiply" });
 
+    const detail = item.artSource
+      ? await detailArtworkSource(item.artSource)
+      : await detailArtwork(
+        scenes,
+        day.sceneGrid
+          ? sourceCrop(index + 1)
+          : insetCrop(sourceCrop(index + 1), 8),
+      );
+    await writeFile(path.join(detailDirectory, `${item.id}.webp`), detail);
+
     const iconSource = item.type === "숙소" ? day1Approved : day3Scenes;
     const iconCrop = item.type === "숙소" ? lodgingIconCrop : day3IconCrops[item.type];
     const iconBase = await iconSource.clone()
@@ -285,7 +330,12 @@ for (const day of days) {
   }
 
   const flowers = await artworkCrop(day3Scenes, day3FlowerCrop, 140, 105, "#fefaf4");
-  layers.push({ input: flowers, top: px(memoY + 13), left: px(515), blend: "multiply" });
+  layers.push({
+    input: flowers,
+    top: px(memoY + (rowLayout.height - 105) / 2),
+    left: px(rowLayout.cardX + rowLayout.cardWidth - 156),
+    blend: "multiply",
+  });
   layers.push({ input: textSvg(day, rows, logicalHeight, memoY), top: 0, left: 0 });
 
   const targetPath = path.join(root, day.target);
@@ -302,3 +352,12 @@ for (const day of days) {
     .toFile(targetPath);
   console.log(`DAY ${day.day}: ${info.width}x${info.height}, ${info.size} bytes`);
 }
+
+await writeFile(
+  path.join(detailDirectory, "botanical-branch.webp"),
+  await detailArtwork(day3Scenes, day3LeafCrop, "#fff7ee", 180, 240),
+);
+await writeFile(
+  path.join(detailDirectory, "botanical-flowers.webp"),
+  await detailArtwork(day3Scenes, day3FlowerCrop, "#fff7ee", 420, 190),
+);

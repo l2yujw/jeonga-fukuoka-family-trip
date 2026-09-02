@@ -15,6 +15,10 @@ export const getScheduleBodyLogicalHeight = (rowCount: number) =>
   scheduleLayout.memo.height +
   scheduleLayout.memo.bottomMargin;
 
+export const getScheduleRowLogicalY = (index: number) =>
+  scheduleLayout.row.firstY +
+  index * (scheduleLayout.row.height + scheduleLayout.row.gap);
+
 const dimensionsFor = (rowCount: number) => ({
   width: scheduleLayout.logicalWidth * scheduleLayout.pixelRatio,
   height: getScheduleBodyLogicalHeight(rowCount) * scheduleLayout.pixelRatio,

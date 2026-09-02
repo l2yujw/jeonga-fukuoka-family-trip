@@ -1,8 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { useCurrentTripSession } from "@/features/boarding/trip-access-guard";
+import {
+  createScheduleDetailHistoryState,
+  getScheduleDetailCloseMode,
+  removeScheduleDetailFromUrl,
+} from "./schedule-detail-history";
 import {
   getScheduleDetailHotspots,
   type ScheduleHotspotScope,
@@ -32,12 +44,15 @@ export function ScheduleView() {
   const [selectedDayNo, setSelectedDayNo] = useState<ScheduleDayNo>(1);
   const [selectedDetailId, setSelectedDetailId] =
     useState<ScheduleGuideItemId | null>(null);
+  const [restoreDetailFocus, setRestoreDetailFocus] = useState(false);
+  const [showHotspotDebug, setShowHotspotDebug] = useState(false);
+  const detailActivationRef = useRef<"keyboard" | "pointer" | null>(null);
+  const historyBackPendingRef = useRef(false);
 
   useEffect(() => {
     const syncFromLocation = () => {
-      const detail = getScheduleGuideItem(
-        new URLSearchParams(window.location.search).get("detail"),
-      );
+      const searchParams = new URLSearchParams(window.location.search);
+      const detail = getScheduleGuideItem(searchParams.get("detail"));
       let dayNo: ScheduleDayNo = detail?.day ?? 1;
       if (!detail) {
         try {
@@ -48,8 +63,14 @@ export function ScheduleView() {
         }
       }
 
+      historyBackPendingRef.current = false;
       setSelectedDayNo(dayNo);
       setSelectedDetailId(detail?.id ?? null);
+      if (!detail) setRestoreDetailFocus(false);
+      setShowHotspotDebug(
+        process.env.NODE_ENV !== "production" &&
+          searchParams.get("debugScheduleHotspots") === "1",
+      );
       if (detail) {
         try {
           localStorage.setItem(selectionKey(trip.id), String(dayNo));
@@ -68,12 +89,22 @@ export function ScheduleView() {
   }, [trip.id]);
 
   const closeDetail = useCallback(() => {
-    const url = new URL(window.location.href);
-    if (url.searchParams.has("detail")) {
-      url.searchParams.delete("detail");
-      window.history.replaceState(window.history.state, "", url);
+    const url = removeScheduleDetailFromUrl(window.location.href);
+    if (!new URLSearchParams(window.location.search).has("detail")) {
+      setSelectedDetailId(null);
+      return;
     }
+    if (getScheduleDetailCloseMode(window.history.state) === "back") {
+      if (!historyBackPendingRef.current) {
+        historyBackPendingRef.current = true;
+        window.history.back();
+      }
+      return;
+    }
+
+    window.history.replaceState(window.history.state, "", url);
     setSelectedDetailId(null);
+    setRestoreDetailFocus(false);
   }, []);
 
   const selectDay = (dayNo: ScheduleDayNo) => {
@@ -86,15 +117,23 @@ export function ScheduleView() {
     }
   };
 
-  const openDetail = (id: ScheduleGuideItemId) => {
+  const openDetail = (
+    id: ScheduleGuideItemId,
+    activation: "keyboard" | "pointer",
+  ) => {
     const item = getScheduleGuideItem(id);
     if (!item) return;
 
     const url = new URL(window.location.href);
     url.searchParams.set("detail", id);
-    window.history.pushState(window.history.state, "", url);
+    window.history.pushState(
+      createScheduleDetailHistoryState(window.history.state),
+      "",
+      url,
+    );
     setSelectedDayNo(item.day);
     setSelectedDetailId(id);
+    setRestoreDetailFocus(activation === "keyboard");
   };
 
   const selectedVisual = resolveScheduleVisual(scheduleVisualAssets[selectedDayNo]);
@@ -104,6 +143,22 @@ export function ScheduleView() {
     getScheduleDetailHotspots(selectedDayNo, scope).map((hotspot) => {
       const item = getScheduleGuideItem(hotspot.id);
       if (!item) return null;
+
+      const handleDetailKeyDown = (
+        event: ReactKeyboardEvent<HTMLButtonElement>,
+      ) => {
+        if (event.key === "Enter" || event.key === " ") {
+          detailActivationRef.current = "keyboard";
+        }
+      };
+      const handleDetailClick = (event: ReactMouseEvent<HTMLButtonElement>) => {
+        const activation =
+          detailActivationRef.current ??
+          (event.detail === 0 ? "keyboard" : "pointer");
+        detailActivationRef.current = null;
+        if (activation === "pointer") event.currentTarget.blur();
+        openDetail(hotspot.id, activation);
+      };
 
       return (
         <button
@@ -117,7 +172,14 @@ export function ScheduleView() {
             width: `${hotspot.rect.width}%`,
             height: `${hotspot.rect.height}%`,
           }}
-          onClick={() => openDetail(hotspot.id)}
+          onPointerDown={() => {
+            detailActivationRef.current = "pointer";
+          }}
+          onPointerCancel={() => {
+            detailActivationRef.current = null;
+          }}
+          onKeyDown={handleDetailKeyDown}
+          onClick={handleDetailClick}
         />
       );
     });
@@ -148,7 +210,11 @@ export function ScheduleView() {
   );
 
   return (
-    <section className="schedule-plate-shell" aria-labelledby="schedule-title">
+    <section
+      className="schedule-plate-shell"
+      aria-labelledby="schedule-title"
+      data-debug-hotspots={showHotspotDebug ? "true" : undefined}
+    >
       <h1 id="schedule-title" className="sr-only">
         여행 일정
       </h1>
@@ -200,7 +266,12 @@ export function ScheduleView() {
           {detailHotspots("fullPlate")}
         </div>
       )}
-      <ScheduleDetailSheet item={selectedDetail} onClose={closeDetail} />
+      <ScheduleDetailSheet
+        key={selectedDetail?.id ?? "closed"}
+        item={selectedDetail}
+        onClose={closeDetail}
+        restoreFocusOnClose={restoreDetailFocus}
+      />
     </section>
   );
 }

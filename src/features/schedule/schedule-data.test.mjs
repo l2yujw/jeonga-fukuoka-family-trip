@@ -98,7 +98,9 @@ test("canonical seed contains only the confirmed Day 1/2/3 itinerary", async () 
     rows.flatMap((line) => line.match(/^\(\d+,\s*\d+,\s*'(\d{2}:\d{2})'/)?.slice(1) ?? []),
     ["07:00", "09:30", "11:00", "17:45", "19:15"],
   );
+  assert.deepEqual(byDay(1).match(/'(\d{2}:\d{2})'/g), ["'07:00'", "'09:30'", "'11:00'"]);
   assert.doesNotMatch(byDay(2), /^\(2,\s*\d+,\s*'/m);
+  assert.deepEqual(byDay(3).match(/'(\d{2}:\d{2})'/g), ["'17:45'", "'19:15'"]);
 
   const canonical = rows.join("\n");
   for (const confirmed of [

@@ -4,6 +4,7 @@ import {
 } from "./schedule-guide-data";
 import {
   getScheduleBodyLogicalHeight,
+  getScheduleRowLogicalY,
   SCHEDULE_DAY_ROW_COUNTS,
   SCHEDULE_LAYOUT,
 } from "./schedule-layout";
@@ -38,11 +39,7 @@ export const SCHEDULE_DETAIL_HOTSPOTS: readonly ScheduleDetailHotspot[] =
       scope: "body",
       rect: {
         x: (SCHEDULE_LAYOUT.row.cardX / SCHEDULE_LAYOUT.logicalWidth) * 100,
-        y:
-          ((SCHEDULE_LAYOUT.row.firstY +
-            index * (SCHEDULE_LAYOUT.row.height + SCHEDULE_LAYOUT.row.gap)) /
-            bodyHeight) *
-          100,
+        y: (getScheduleRowLogicalY(index) / bodyHeight) * 100,
         width:
           (SCHEDULE_LAYOUT.row.cardWidth / SCHEDULE_LAYOUT.logicalWidth) * 100,
         height: (SCHEDULE_LAYOUT.row.height / bodyHeight) * 100,
