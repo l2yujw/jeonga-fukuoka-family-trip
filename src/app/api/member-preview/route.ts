@@ -1,13 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { readMemberNamePayload } from "@/features/boarding/boarding-logic";
+import {
+  classifyMembershipClaim,
+  readMemberNamePayload,
+  type MembershipClaimRow,
+} from "@/features/boarding/boarding-logic";
 import {
   authenticateRequest,
   resolveInviteTrip,
 } from "@/features/boarding/server/request-context";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-const jsonError = (error: string, status: number) =>
-  NextResponse.json({ error }, { status });
+const jsonError = (error: string, status: number, code?: string) =>
+  NextResponse.json(code ? { error, code } : { error }, { status });
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +25,8 @@ export async function POST(request: NextRequest) {
     const trip = await resolveInviteTrip(request);
     if (!trip) return jsonError("초대 링크로 접속해주세요.", 403);
 
-    const { data: member, error } = await createSupabaseAdminClient()
+    const admin = createSupabaseAdminClient();
+    const { data: member, error } = await admin
       .from("family_members")
       .select("id,name,display_role")
       .eq("trip_id", trip.id)
@@ -30,6 +35,34 @@ export async function POST(request: NextRequest) {
 
     if (error) throw new Error("Supabase member preview failed.");
     if (!member) return jsonError("등록된 가족 이름을 확인해주세요.", 404);
+
+    const [currentAuthResult, targetMemberResult] = await Promise.all([
+      admin
+        .from("trip_memberships")
+        .select("auth_user_id,family_member_id")
+        .eq("trip_id", trip.id)
+        .eq("auth_user_id", user.id)
+        .maybeSingle(),
+      admin
+        .from("trip_memberships")
+        .select("auth_user_id,family_member_id")
+        .eq("trip_id", trip.id)
+        .eq("family_member_id", member.id)
+        .maybeSingle(),
+    ]);
+    if (currentAuthResult.error || targetMemberResult.error) {
+      throw new Error("Supabase membership preview lookup failed.");
+    }
+
+    const claimState = classifyMembershipClaim({
+      authUserId: user.id,
+      currentAuthMembership: currentAuthResult.data as MembershipClaimRow | null,
+      targetMemberId: member.id,
+      targetMemberMembership: targetMemberResult.data as MembershipClaimRow | null,
+    });
+    if (claimState.status === "conflict") {
+      return jsonError(claimState.error, 409, claimState.code);
+    }
 
     return NextResponse.json({
       memberId: member.id,

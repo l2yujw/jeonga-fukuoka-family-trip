@@ -33,14 +33,13 @@ create table if not exists public.trip_memberships (
   family_member_id uuid not null references public.family_members(id) on delete cascade,
   auth_user_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
-  unique (trip_id, auth_user_id)
+  unique (trip_id, auth_user_id),
+  constraint trip_memberships_trip_family_member_key
+    unique (trip_id, family_member_id)
 );
 
 create index if not exists idx_trip_memberships_auth
 on public.trip_memberships(auth_user_id);
-
-create index if not exists idx_trip_memberships_member
-on public.trip_memberships(trip_id, family_member_id);
 
 create table if not exists public.itinerary_items (
   id uuid primary key default gen_random_uuid(),
