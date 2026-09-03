@@ -25,6 +25,8 @@ export const MEMORY_CARD_EXPORT_SIZES = [
   { width: 1080, height: 1920 },
   { width: 720, height: 1280 },
 ] as const;
+export const MEMORY_CARD_REQUIRED_IMAGE_ERROR =
+  "memory-card-required-image-load-failed";
 
 type ExportSize = (typeof MEMORY_CARD_EXPORT_SIZES)[number];
 
@@ -45,6 +47,8 @@ function loadImage(url: string) {
     image.src = url;
   });
 }
+
+type MemoryCardImageLoader = (url: string) => Promise<HTMLImageElement>;
 
 function canvasToPngBlob(canvas: HTMLCanvasElement) {
   return new Promise<Blob>((resolve, reject) => {
@@ -245,11 +249,31 @@ export function getMemoryCardExportDimensions(
 export async function renderMemoryCardPng(
   input: MemoryCardRenderInput,
   size: ExportSize,
+  imageLoader: MemoryCardImageLoader = loadImage,
 ) {
   const template = getMemoryCardRenderTemplate(input.templateKey, input.renderModel);
   if (!template) throw new Error("memory-card-template-missing");
-  await document.fonts?.ready;
+  const photos = new Map(input.photos.map((photo) => [photo.id, photo]));
+  const loadedImages = new Map<string, HTMLImageElement>();
+  await Promise.all(
+    [...new Set(input.renderModel.layout.slots.map(({ photoId }) => photoId))].map(
+      async (photoId) => {
+        const url = photos.get(photoId)?.signedUrl;
+        if (!url) throw new Error(MEMORY_CARD_REQUIRED_IMAGE_ERROR);
+        try {
+          const image = await imageLoader(url);
+          if (!image.naturalWidth || !image.naturalHeight) {
+            throw new Error(MEMORY_CARD_REQUIRED_IMAGE_ERROR);
+          }
+          loadedImages.set(photoId, image);
+        } catch {
+          throw new Error(MEMORY_CARD_REQUIRED_IMAGE_ERROR);
+        }
+      },
+    ),
+  );
 
+  await document.fonts?.ready;
   const renderCanvas = document.createElement("canvas");
   renderCanvas.width = size.width;
   renderCanvas.height = size.height;
@@ -268,7 +292,6 @@ export async function renderMemoryCardPng(
     );
   }
 
-  const photos = new Map(input.photos.map((photo) => [photo.id, photo]));
   const resolvedSlots = resolveMemoryCardSlots(
     input.templateKey,
     input.renderModel,
@@ -277,20 +300,13 @@ export async function renderMemoryCardPng(
   const resolvedBySlot = new Map(
     resolvedSlots.map((slot) => [slot.slotId, slot]),
   );
-  const loadedImages = new Map<string, HTMLImageElement | null>();
-  await Promise.all(input.renderModel.layout.slots.map(async ({ photoId }) => {
-    const url = photos.get(photoId)?.signedUrl;
-    if (!url || loadedImages.has(photoId)) return;
-    loadedImages.set(photoId, await loadImage(url).catch(() => null));
-  }));
-
   for (const slot of [...template.slots].sort((a, b) => a.z - b.z)) {
     const resolved = resolvedBySlot.get(slot.id);
     const photoId = resolved?.photoId;
     drawPhotoSlot(
       context,
       slot,
-      photoId ? (loadedImages.get(photoId) ?? null) : null,
+      photoId ? loadedImages.get(photoId) ?? null : null,
       resolved?.placement ?? null,
       scale,
     );

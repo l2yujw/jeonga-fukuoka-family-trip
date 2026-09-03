@@ -12,6 +12,10 @@ import {
   SCHEDULE_DAY_NOS,
   scheduleVisualAssets,
 } from "./schedule-visual-assets.ts";
+import {
+  createScheduleGeneratorRows,
+  parseCanonicalScheduleRows,
+} from "../../../scripts/schedule-itinerary.mjs";
 
 const splitAssets = [
   ["top/day-3.png", 695, 565],
@@ -28,50 +32,50 @@ test("schedule asset config maps exactly DAY 1 through DAY 3", () => {
 
   assert.deepEqual(resolveScheduleVisual(scheduleVisualAssets[1]), {
     mode: "split",
-    topSrc: "/assets/schedule/plates/top/day-3.png",
-    bodySrc: "/assets/schedule/plates/body/day-1.png",
+    topSrc: "/api/schedule-asset/plates/top/day-3.png",
+    bodySrc: "/api/schedule-asset/plates/body/day-1.png",
     bodyWidth: 1390,
     bodyHeight: 4250,
   });
   assert.deepEqual(resolveScheduleVisual(scheduleVisualAssets[2]), {
     mode: "split",
-    topSrc: "/assets/schedule/plates/top/day-3.png",
-    bodySrc: "/assets/schedule/plates/body/day-2.png",
+    topSrc: "/api/schedule-asset/plates/top/day-3.png",
+    bodySrc: "/api/schedule-asset/plates/body/day-2.png",
     bodyWidth: 1390,
     bodyHeight: 3594,
   });
   assert.deepEqual(resolveScheduleVisual(scheduleVisualAssets[3]), {
     mode: "split",
-    topSrc: "/assets/schedule/plates/top/day-3.png",
-    bodySrc: "/assets/schedule/plates/body/day-3.png",
+    topSrc: "/api/schedule-asset/plates/top/day-3.png",
+    bodySrc: "/api/schedule-asset/plates/body/day-3.png",
     bodyWidth: 1390,
     bodyHeight: 2938,
   });
-  assert.equal(scheduleVisualAssets[1].fullPlateFallbackSrc, "/assets/schedule/approved/day-1.png");
-  assert.equal(scheduleVisualAssets[2].fullPlateFallbackSrc, "/assets/schedule/approved/day-2.png");
+  assert.equal(scheduleVisualAssets[1].fullPlateFallbackSrc, "/api/schedule-asset/approved/day-1.png");
+  assert.equal(scheduleVisualAssets[2].fullPlateFallbackSrc, "/api/schedule-asset/approved/day-2.png");
 });
 
 test("split assets take priority while full-plate fallback remains supported", () => {
   assert.deepEqual(
     resolveScheduleVisual({
       ...scheduleVisualAssets[1],
-      fullPlateFallbackSrc: "/assets/schedule/approved/day-1.png",
+      fullPlateFallbackSrc: "/api/schedule-asset/approved/day-1.png",
     }),
     {
       mode: "split",
-      topSrc: "/assets/schedule/plates/top/day-3.png",
-      bodySrc: "/assets/schedule/plates/body/day-1.png",
+      topSrc: "/api/schedule-asset/plates/top/day-3.png",
+      bodySrc: "/api/schedule-asset/plates/body/day-1.png",
       bodyWidth: 1390,
       bodyHeight: 4250,
     },
   );
   assert.deepEqual(
     resolveScheduleVisual({
-      fullPlateFallbackSrc: "/assets/schedule/approved/day-1.png",
+      fullPlateFallbackSrc: "/api/schedule-asset/approved/day-1.png",
     }),
     {
       mode: "fallback",
-      src: "/assets/schedule/approved/day-1.png",
+      src: "/api/schedule-asset/approved/day-1.png",
     },
   );
   assert.equal(resolveScheduleVisual({}), null);
@@ -140,7 +144,7 @@ test("ScheduleView uses split segments without the legacy visual data path", asy
 test("split asset metadata matches runtime intrinsic dimensions", async () => {
   for (const [name, expectedWidth, expectedHeight] of splitAssets) {
     const image = await readFile(
-      new URL(`../../../public/assets/schedule/plates/${name}`, import.meta.url),
+      new URL(`../../../private-assets/schedule/plates/${name}`, import.meta.url),
     );
 
     assert.equal(image.readUInt32BE(16), expectedWidth);
@@ -156,7 +160,7 @@ test("split asset metadata matches runtime intrinsic dimensions", async () => {
   assert.ok(SCHEDULE_BODY_DIMENSIONS[2].height > SCHEDULE_BODY_DIMENSIONS[3].height);
 
   const scheduleAssetNames = await readdir(
-    new URL("../../../public/assets/schedule/", import.meta.url),
+    new URL("../../../private-assets/schedule/", import.meta.url),
     { recursive: true },
   );
   assert.equal(scheduleAssetNames.some((name) => /bottom.?nav/i.test(name)), false);
@@ -183,6 +187,30 @@ test("generator uses one logical contract for native 2x composition", async () =
   assert.match(generator, /width: physicalWidth/);
   assert.match(generator, /day-3-scenes-v25\.png/);
   assert.doesNotMatch(generator, /sharp\([^\n]*plates\/body\/day-3\.png/);
+});
+
+test("generator-visible itinerary fields equal every canonical seed row", async () => {
+  const canonicalRows = parseCanonicalScheduleRows(
+    await readFile(
+      new URL("../../../docs/data/04_SEED_DRAFT.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  const generatorRows = createScheduleGeneratorRows(canonicalRows);
+  const displayedRows = [1, 2, 3].flatMap((dayNo) =>
+    generatorRows[dayNo].map((row) => ({
+      dayNo,
+      sequence: row.sequence,
+      timeLabel: row.time ?? null,
+      locationName: row.location || null,
+      title: row.title,
+      description: row.description.join("\n") || null,
+      itemType: row.itemType,
+    })),
+  );
+
+  assert.equal(displayedRows.length, 27);
+  assert.deepEqual(displayedRows, canonicalRows);
 });
 
 test("v29-E memo uses itinerary-card geometry while timed rows stay unchanged", async () => {
@@ -218,21 +246,18 @@ test("v29-E memo uses itinerary-card geometry while timed rows stay unchanged", 
   assert.match(generator, /memoLines: \["푸른 하늘 아래,", "나가사키에서의 추억을 마음에 담아요\."\]/);
   assert.match(generator, /rowLayout\.cardX \+ rowLayout\.cardWidth - 156/);
 
-  const day1 = generator.slice(
-    generator.indexOf("day: 1,"),
-    generator.indexOf("day: 2,"),
+  const canonicalRows = parseCanonicalScheduleRows(
+    await readFile(
+      new URL("../../../docs/data/04_SEED_DRAFT.sql", import.meta.url),
+      "utf8",
+    ),
   );
-  const day2 = generator.slice(
-    generator.indexOf("day: 2,"),
-    generator.indexOf("day: 3,"),
-  );
-  const day3 = generator.slice(generator.indexOf("day: 3,"));
-  const times = (source) =>
-    [...source.matchAll(/time: "(\d{2}:\d{2})"/g)].map((match) => match[1]);
+  const rows = createScheduleGeneratorRows(canonicalRows);
+  const times = (day) => rows[day].flatMap(({ time }) => time ? [time] : []);
 
-  assert.deepEqual(times(day1), ["07:00", "09:30", "11:00"]);
-  assert.deepEqual(times(day2), []);
-  assert.deepEqual(times(day3), ["17:45", "19:15"]);
+  assert.deepEqual(times(1), ["07:00", "09:30", "11:00"]);
+  assert.deepEqual(times(2), []);
+  assert.deepEqual(times(3), ["17:45", "19:15"]);
   assert.doesNotMatch(generator, /Math\.random|Date\.now|new Date/);
   assert.deepEqual(
     SCHEDULE_DAY_NOS.map((day) => [
@@ -244,13 +269,21 @@ test("v29-E memo uses itinerary-card geometry while timed rows stay unchanged", 
 });
 
 test("generator keeps the approved v27 content corrections declarative", async () => {
-  const generator = await readFile(
-    new URL("../../../scripts/generate-schedule-bodies.mjs", import.meta.url),
-    "utf8",
-  );
+  const generator = (
+    await Promise.all([
+      readFile(
+        new URL("../../../scripts/generate-schedule-bodies.mjs", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../../../scripts/schedule-itinerary.mjs", import.meta.url),
+        "utf8",
+      ),
+    ])
+  ).join("\n");
 
   assert.match(generator, /routeArtIndex: 8/);
-  assert.match(generator, /titleLines: \["오에도 온센 모노가타리", "우레시노칸"\], titleSize: 21/);
+  assert.match(generator, /titleLines: \["오에도 온센 모노가타리", "우레시노칸"\],[\s\S]*?titleSize: 21/);
   assert.match(generator, /설레는 시작,[\s\S]*함께하는 여정의 첫걸음\./);
   assert.match(generator, /day-2-hotel-composite-v27\.png/);
   assert.match(generator, /푸른 하늘 아래,[\s\S]*나가사키에서의 추억을 마음에 담아요\./);

@@ -1962,7 +1962,7 @@ a {
 .schedule-detail-official {
   padding-right: 82px;
   background:
-    url("/assets/schedule/detail/botanical-branch.webp") right 8px bottom -23px / 72px 96px no-repeat,
+    url("/api/schedule-asset/detail/botanical-branch.webp") right 8px bottom -23px / 72px 96px no-repeat,
     var(--schedule-card);
 }
 

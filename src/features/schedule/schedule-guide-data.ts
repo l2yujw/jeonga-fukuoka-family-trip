@@ -52,7 +52,7 @@ export type ScheduleNearbyCategory =
   | "shopping";
 
 export type ScheduleDetailArtworkSrc =
-  `/assets/schedule/detail/${string}.webp`;
+  `/api/schedule-asset/detail/${string}.webp`;
 
 export type ScheduleNearbyPlace = {
   readonly name: string;
@@ -277,7 +277,7 @@ export const SCHEDULE_GUIDE_ITEMS = [
         ...GOOGLE_PLACE_RATING_SOURCE,
         "mapUrl": "https://www.google.com/maps/search/?api=1&query=Takeo%20City%20Library%20Saga",
         "note": "높은 서가와 카페가 있는 복합문화 공간",
-        "artworkSrc": "/assets/schedule/detail/d1-takeo-library.webp"
+        "artworkSrc": "/api/schedule-asset/detail/d1-takeo-library.webp"
       }
     ]
   },
@@ -470,7 +470,7 @@ export const SCHEDULE_GUIDE_ITEMS = [
         ...GOOGLE_PLACE_RATING_SOURCE,
         "mapUrl": "https://www.google.com/maps/search/?api=1&query=Glover%20Garden%20Nagasaki",
         "note": "오우라 성당과 함께 보기 좋은 역사 정원",
-        "artworkSrc": "/assets/schedule/detail/d2-glover-garden.webp"
+        "artworkSrc": "/api/schedule-asset/detail/d2-glover-garden.webp"
       },
       {
         "name": "Nagasaki Confucius Shrine",
@@ -1062,7 +1062,7 @@ export const buildGoogleMapsSearchUrl = (query: string) =>
 
 export const getScheduleDetailArtworkSrc = (
   id: ScheduleGuideItemId,
-): ScheduleDetailArtworkSrc => `/assets/schedule/detail/${id}.webp`;
+): ScheduleDetailArtworkSrc => `/api/schedule-asset/detail/${id}.webp`;
 
 export const getScheduleNearbyFood = (item: ScheduleGuideItem) =>
   (item.nearbyFood ?? []).slice(0, 3);

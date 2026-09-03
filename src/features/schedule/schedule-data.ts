@@ -77,8 +77,8 @@ export function getInitialScheduleDayIndex(
   return upcomingIndex === -1 ? days.length - 1 : upcomingIndex;
 }
 
-export function resolveScheduleDayNo(
-  days: Pick<ScheduleDay, "dayNo" | "date">[],
+export function resolveScheduleDayNo<DayNo extends number>(
+  days: (Pick<ScheduleDay, "date"> & { dayNo: DayNo })[],
   persistedDayNo: number | null,
   now = new Date(),
 ) {
@@ -86,6 +86,24 @@ export function resolveScheduleDayNo(
     days.find(({ dayNo }) => dayNo === persistedDayNo)?.dayNo ??
     days[getInitialScheduleDayIndex(days, now)]?.dayNo ??
     null
+  );
+}
+
+export function resolveScheduleViewDayNo<DayNo extends number>(
+  dayNos: readonly DayNo[],
+  startDate: string,
+  detailDayNo: DayNo | null,
+  persistedDayNo: number | null,
+  now = new Date(),
+) {
+  if (detailDayNo !== null && dayNos.includes(detailDayNo)) return detailDayNo;
+  return resolveScheduleDayNo(
+    dayNos.map((dayNo) => ({
+      dayNo,
+      date: readDate(startDate, dayNo).toISOString().slice(0, 10),
+    })),
+    persistedDayNo,
+    now,
   );
 }
 

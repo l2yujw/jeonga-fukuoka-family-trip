@@ -106,6 +106,7 @@ function PlaceRows({
                   width={96}
                   height={96}
                   sizes="96px"
+                  unoptimized
                 />
               </div>
             ) : null}
@@ -437,12 +438,13 @@ export function ScheduleDetailSheet({
               {item.summary}
             </p>
             <Image
-              src="/assets/schedule/detail/botanical-branch.webp"
+              src="/api/schedule-asset/detail/botanical-branch.webp"
               alt=""
               width={180}
               height={240}
               className="schedule-detail-botanical"
               aria-hidden="true"
+              unoptimized
             />
           </div>
 
@@ -456,6 +458,7 @@ export function ScheduleDetailSheet({
               width={720}
               height={400}
               sizes="(max-width: 430px) 100vw, 430px"
+              unoptimized
             />
           </div>
 

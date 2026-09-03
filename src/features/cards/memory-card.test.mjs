@@ -5,6 +5,8 @@ import {
   exportMemoryCardPng,
   getMemoryCardExportDimensions,
   MEMORY_CARD_EXPORT_SIZES,
+  MEMORY_CARD_REQUIRED_IMAGE_ERROR,
+  renderMemoryCardPng,
   shareOrDownloadMemoryCardPng,
   wrapMemoryCardText,
 } from "./memory-card-export.ts";
@@ -1177,6 +1179,13 @@ test("export retries at lower scale and unsupported Web Share downloads", async 
   });
   assert.deepEqual(attempted, MEMORY_CARD_EXPORT_SIZES);
 
+  await assert.rejects(
+    exportMemoryCardPng(exportInput(), async () => {
+      throw new Error("decode-failed");
+    }),
+    /decode-failed/,
+  );
+
   let downloads = 0;
   const result = await shareOrDownloadMemoryCardPng(new Blob(["png"]), "card.png", {
     navigator: null,
@@ -1184,6 +1193,46 @@ test("export retries at lower scale and unsupported Web Share downloads", async 
   });
   assert.equal(result, "downloaded");
   assert.equal(downloads, 1);
+});
+
+test("required image decode failure rejects render instead of exporting a blank slot", async () => {
+  const renderModel = createMemoryCardRenderModel(
+    buildMemoryCardLayoutV2("four_cut", ["a", "b", "c", "d"]),
+  );
+  const photos = ["a", "b", "c", "d"].map((id) => ({
+    id,
+    storagePath: `${id}.jpg`,
+    originalFilename: null,
+    mimeType: "image/jpeg",
+    signedUrl: `https://private.invalid/${id}`,
+    mediaState: "ready",
+    uploaderMemberId: memberId,
+    uploaderName: null,
+    caption: null,
+    width: 100,
+    height: 100,
+    createdAt: "2026-09-11T00:00:00Z",
+    isOwner: true,
+  }));
+
+  await assert.rejects(
+    renderMemoryCardPng(
+      { ...exportInput(renderModel), photos },
+      MEMORY_CARD_EXPORT_SIZES[0],
+      async () => {
+        throw new Error("browser-decode-failed");
+      },
+    ),
+    { message: MEMORY_CARD_REQUIRED_IMAGE_ERROR },
+  );
+  await assert.rejects(
+    renderMemoryCardPng(
+      { ...exportInput(renderModel), photos: photos.slice(1) },
+      MEMORY_CARD_EXPORT_SIZES[0],
+      async () => ({ naturalWidth: 100, naturalHeight: 100 }),
+    ),
+    { message: MEMORY_CARD_REQUIRED_IMAGE_ERROR },
+  );
 });
 
 test("export and repositories exclude app wrappers, public URLs, and result uploads", async () => {

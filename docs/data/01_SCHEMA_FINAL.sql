@@ -90,7 +90,7 @@ create table if not exists public.memory_cards (
       'instant_memory'
     )
   ),
-  layout_version integer not null default 1,
+  layout_version integer not null default 3,
   layout_json jsonb not null,
   result_storage_path text,
   created_at timestamptz not null default now(),

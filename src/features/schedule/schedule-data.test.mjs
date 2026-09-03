@@ -5,6 +5,7 @@ import {
   createScheduleDays,
   getInitialScheduleDayIndex,
   resolveScheduleDayNo,
+  resolveScheduleViewDayNo,
 } from "./schedule-data.ts";
 
 const row = (overrides) => ({
@@ -169,5 +170,32 @@ test("schedule opens on the Korea-local trip day and trims empty times", () => {
     resolveScheduleDayNo(days, 99, new Date("2026-09-11T15:00:00Z")),
     2,
     "an invalid persisted selection falls back to the Korea-local day",
+  );
+});
+
+test("ScheduleView wiring prioritizes detail, persisted day, then Korea-local current day", async () => {
+  const dayNos = [1, 2, 3];
+  assert.equal(
+    resolveScheduleViewDayNo(dayNos, "2026-09-11", null, null, new Date("2026-09-12T03:00:00Z")),
+    2,
+  );
+  assert.equal(
+    resolveScheduleViewDayNo(dayNos, "2026-09-11", null, null, new Date("2026-09-13T03:00:00Z")),
+    3,
+  );
+  assert.equal(
+    resolveScheduleViewDayNo(dayNos, "2026-09-11", null, 1, new Date("2026-09-13T03:00:00Z")),
+    1,
+  );
+  assert.equal(
+    resolveScheduleViewDayNo(dayNos, "2026-09-11", 2, 1, new Date("2026-09-13T03:00:00Z")),
+    2,
+  );
+
+  const view = await readFile(new URL("./schedule-view.tsx", import.meta.url), "utf8");
+  assert.match(view, /resolveScheduleViewDayNo\([\s\S]*trip\.startDate/);
+  assert.ok(
+    view.indexOf("detail?.day ?? null") < view.indexOf("persistedDayNo,"),
+    "detail must be passed before persisted selection",
   );
 });
