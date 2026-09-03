@@ -119,7 +119,7 @@ test("home restores the approved v5 composition with live previews", async () =>
   assert.ok(scenicAsset.byteLength > 40_000);
   assert.ok(homeCssStart >= 0 && homeCssEnd > homeCssStart);
   assert.match(page, /<TripAccessGuard>/);
-  assert.match(page, /const \{ trip \} = useCurrentTripSession\(\)/);
+  assert.match(page, /const \{ trip, member \} = useCurrentTripSession\(\)/);
   assert.match(page, /FUKUOKA FAMILY TRIP/);
   assert.match(page, /<span>전가네<\/span>[\s\S]*<span>후쿠오카<\/span>[\s\S]*<span>가족여행<\/span>/);
   assert.match(page, /함께하는 2박 3일/);

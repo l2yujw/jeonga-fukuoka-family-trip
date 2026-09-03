@@ -519,6 +519,34 @@ a {
   user-select: none;
 }
 
+.home-v5-member-switch {
+  position: absolute;
+  top: 17px;
+  right: 16px;
+  z-index: 2;
+  min-width: 44px;
+  max-width: min(46%, 172px);
+  min-height: 44px;
+  padding: 0 13px;
+  overflow: hidden;
+  border: 1px solid rgb(202 166 141 / 82%);
+  border-radius: 999px;
+  background: rgb(255 250 242 / 90%);
+  color: #695c52;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgb(91 66 42 / 5%);
+}
+
+.home-v5-member-switch:focus-visible {
+  outline: 3px solid rgb(230 103 97 / 52%);
+  outline-offset: 2px;
+}
+
 .home-v5-summary {
   position: relative;
   z-index: 2;
@@ -958,6 +986,76 @@ a {
 .home-v5-preview-card:focus-visible {
   outline: 3px solid rgb(230 103 97 / 52%);
   outline-offset: 3px;
+}
+
+.home-v5-switch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  background: rgb(43 34 28 / 48%);
+}
+
+.home-v5-switch-dialog {
+  width: min(100%, 398px);
+  padding: 24px 20px 20px;
+  border: 1px solid var(--home-v5-line);
+  border-radius: 24px;
+  background: var(--home-v5-surface);
+  box-shadow: 0 18px 48px rgb(43 34 28 / 24%);
+}
+
+.home-v5-switch-dialog h2 {
+  margin: 0;
+  color: var(--home-v5-ink);
+  font-family: var(--font-editorial);
+  font-size: 24px;
+  line-height: 1.35;
+}
+
+.home-v5-switch-dialog > p {
+  margin: 12px 0 0;
+  color: var(--home-v5-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.home-v5-switch-dialog > .home-v5-switch-error {
+  color: var(--app-color-danger);
+  font-weight: 700;
+}
+
+.home-v5-switch-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.home-v5-switch-actions button {
+  min-height: 48px;
+  border: 1px solid var(--home-v5-line);
+  border-radius: 14px;
+  background: var(--home-v5-paper);
+  color: var(--home-v5-ink);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.home-v5-switch-actions .home-v5-switch-confirm {
+  border-color: var(--home-v5-coral);
+  background: var(--home-v5-coral);
+  color: white;
+}
+
+.home-v5-switch-actions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 @media (max-width: 374px) {

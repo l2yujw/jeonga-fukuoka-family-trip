@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "test": "node --experimental-loader=./scripts/typescript-test-loader.mjs --test docs/data/rls-privileges.test.mjs src/features/album/album-utils.test.mjs src/features/album/album-view-state.test.mjs src/features/boarding/boarding-logic.test.mjs src/features/boarding/identity-hardening.test.mjs src/features/boarding/landing-layout.test.mjs src/features/boarding/protected-routes.test.mjs src/features/boarding/server/invite.test.mjs src/features/boarding/server/landing-visual.test.mjs src/features/cards/memory-card.test.mjs src/features/home/home-date-state.test.mjs src/features/schedule/schedule-data.test.mjs src/features/schedule/schedule-detail-guide.test.mjs src/features/schedule/schedule-visual-plate.test.mjs src/features/schedule/server/schedule-asset.test.mjs",
+    "test": "node --experimental-loader=./scripts/typescript-test-loader.mjs --test docs/data/rls-privileges.test.mjs src/features/album/album-utils.test.mjs src/features/album/album-view-state.test.mjs src/features/boarding/boarding-logic.test.mjs src/features/boarding/identity-hardening.test.mjs src/features/boarding/landing-layout.test.mjs src/features/boarding/member-switch.test.mjs src/features/boarding/protected-routes.test.mjs src/features/boarding/server/invite.test.mjs src/features/boarding/server/landing-visual.test.mjs src/features/cards/memory-card.test.mjs src/features/home/home-date-state.test.mjs src/features/schedule/schedule-data.test.mjs src/features/schedule/schedule-detail-guide.test.mjs src/features/schedule/schedule-visual-plate.test.mjs src/features/schedule/server/schedule-asset.test.mjs",
     "invite:generate": "node scripts/generate-invite-token.mjs"
   },
   "dependencies": {
