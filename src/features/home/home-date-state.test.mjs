@@ -98,6 +98,7 @@ test("home restores the approved v5 composition with live previews", async () =>
     albumRepository,
     cardRepository,
     scenicAsset,
+    nextConfig,
   ] = await Promise.all([
     readFile(new URL("../../app/home/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../../app/api/home-visual/route.ts", import.meta.url), "utf8"),
@@ -108,7 +109,8 @@ test("home restores the approved v5 composition with live previews", async () =>
     readFile(new URL("../../app/cards/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../album/album-repository.ts", import.meta.url), "utf8"),
     readFile(new URL("../cards/memory-card-repository.ts", import.meta.url), "utf8"),
-    readFile("local-references/home-v5/Jeonga_Fukuoka_Home_v5_Hero_Scenery_445x490.png"),
+    readFile("private-assets/home/Jeonga_Fukuoka_Home_v5_Hero_Scenery_445x490.png"),
+    readFile("next.config.ts", "utf8"),
   ]);
   const homeCssStart = css.indexOf("/* Home approved base restore + light development v5. */");
   const homeCssEnd = css.indexOf(".bottom-nav {", homeCssStart);
@@ -164,11 +166,14 @@ test("home restores the approved v5 composition with live previews", async () =>
   );
 
   assert.match(route, /Jeonga_Fukuoka_Home_v5_Hero_Scenery_445x490\.png/);
-  assert.match(route, /"home-v5"/);
+  assert.match(route, /"private-assets",\s*"home"/);
+  assert.doesNotMatch(route, /local-references\/home-v5/);
   assert.match(route, /resolveInviteTrip\(request\)/);
   assert.match(route, /serveLandingVisual/);
   assert.match(route, /'"home-visual-v5"'/);
   assert.match(route, /private, max-age=0, must-revalidate/);
+  assert.match(nextConfig, /"\/api\/home-visual": \["\.\/private-assets\/home\/\*\*\/\*"\]/);
+  assert.match(nextConfig, /"\/api\/schedule-asset\/\[\.\.\.path\]": \["\.\/private-assets\/schedule\/\*\*\/\*"\]/);
 
   assert.match(homeCss, /\.home-v5-hero\s*\{[^}]*height: clamp\(270px, 73vw, 314px\)/s);
   assert.match(homeCss, /\.home-v5-summary dl\s*\{[^}]*grid-template-columns: 0\.9fr 0\.9fr 0\.95fr 1\.35fr/s);

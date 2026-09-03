@@ -19,13 +19,13 @@ export async function GET(request: NextRequest) {
     inviteToken,
     async () => Boolean(await resolveInviteTrip(request)),
     async () => {
-      const localImagePath = join(
+      const imagePath = join(
         process.cwd(),
-        "local-references",
-        "home-v5",
+        "private-assets",
+        "home",
         HOME_RUNTIME_BASE_FILE,
       );
-      return new Uint8Array(await readFile(localImagePath)).buffer;
+      return new Uint8Array(await readFile(imagePath)).buffer;
     },
     {
       cacheControl: HOME_VISUAL_CACHE_CONTROL,
