@@ -10,6 +10,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useCurrentTripSession } from "@/features/boarding/trip-access-guard";
+import { resolveScheduleViewDayNo } from "./schedule-data";
 import {
   createScheduleDetailHistoryState,
   getScheduleDetailCloseMode,
@@ -41,7 +42,14 @@ const dayDates: Record<ScheduleDayNo, string> = {
 
 export function ScheduleView() {
   const { trip } = useCurrentTripSession();
-  const [selectedDayNo, setSelectedDayNo] = useState<ScheduleDayNo>(1);
+  const [selectedDayNo, setSelectedDayNo] = useState<ScheduleDayNo>(() =>
+    resolveScheduleViewDayNo(
+      SCHEDULE_DAY_NOS,
+      trip.startDate,
+      null,
+      null,
+    ) ?? 1,
+  );
   const [selectedDetailId, setSelectedDetailId] =
     useState<ScheduleGuideItemId | null>(null);
   const [restoreDetailFocus, setRestoreDetailFocus] = useState(false);
@@ -53,15 +61,21 @@ export function ScheduleView() {
     const syncFromLocation = () => {
       const searchParams = new URLSearchParams(window.location.search);
       const detail = getScheduleGuideItem(searchParams.get("detail"));
-      let dayNo: ScheduleDayNo = detail?.day ?? 1;
+      let persistedDayNo: ScheduleDayNo | null = null;
       if (!detail) {
         try {
           const storedDayNo = Number(localStorage.getItem(selectionKey(trip.id)));
-          dayNo = isScheduleDayNo(storedDayNo) ? storedDayNo : 1;
+          persistedDayNo = isScheduleDayNo(storedDayNo) ? storedDayNo : null;
         } catch {
-          // DAY 1 remains the safe default when storage is unavailable.
+          // The Korea-local trip day remains available when storage is unavailable.
         }
       }
+      const dayNo = resolveScheduleViewDayNo(
+        SCHEDULE_DAY_NOS,
+        trip.startDate,
+        detail?.day ?? null,
+        persistedDayNo,
+      ) ?? 1;
 
       historyBackPendingRef.current = false;
       setSelectedDayNo(dayNo);
@@ -86,7 +100,7 @@ export function ScheduleView() {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("popstate", syncFromLocation);
     };
-  }, [trip.id]);
+  }, [trip.id, trip.startDate]);
 
   const closeDetail = useCallback(() => {
     const url = removeScheduleDetailFromUrl(window.location.href);

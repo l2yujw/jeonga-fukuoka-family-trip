@@ -2,9 +2,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
+import {
+  createScheduleGeneratorRows,
+  loadCanonicalScheduleRows,
+} from "./schedule-itinerary.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const detailDirectory = path.join(root, "public/assets/schedule/detail");
+const detailDirectory = path.join(root, "private-assets/schedule/detail");
 await mkdir(detailDirectory, { recursive: true });
 const layout = JSON.parse(
   await readFile(path.join(root, "src/features/schedule/schedule-layout.json"), "utf8"),
@@ -19,53 +23,34 @@ const bodyHeight = (rowCount) =>
   memo.gap +
   memo.height +
   memo.bottomMargin;
+const generatorRows = createScheduleGeneratorRows(
+  await loadCanonicalScheduleRows(root),
+);
 
-const day3ScenesPath = "public/assets/schedule/plates/source/day-3-scenes-v25.png";
+const day3ScenesPath = "private-assets/schedule/plates/source/day-3-scenes-v25.png";
 const days = [
   {
     day: 1,
-    scenes: "public/assets/schedule/plates/source/day-1-scenes-v2.png",
+    scenes: "private-assets/schedule/plates/source/day-1-scenes-v2.png",
     sceneGrid: { x: [0, 362, 724, 1086, 1448], y: [0, 350, 680, 1086], inset: 8 },
     routeArtIndex: 8,
-    target: "public/assets/schedule/plates/body/day-1.png",
+    target: "private-assets/schedule/plates/body/day-1.png",
     routeTitle: "첫째 날, 설레는 출발",
     routePath: "인천 → 후쿠오카 → 야나가와 → 다케오 → 우레시노",
     memoColor: "#db3e60",
     memoLines: ["설레는 시작,", "함께하는 여정의 첫걸음."],
-    rows: [
-      { id: "d1-incheon-meeting", time: "07:00", type: "항공", location: "인천", title: "인천국제공항 1터미널 집결", description: ["탑승수속 및 출발 준비"], narrowArt: true },
-      { id: "d1-incheon-departure", time: "09:30", type: "항공", location: "인천", title: "인천국제공항 출발", description: ["제주항공 7C1403"], narrowArt: true },
-      { id: "d1-fukuoka-arrival", time: "11:00", type: "항공", location: "후쿠오카", title: "후쿠오카공항 도착", description: ["후쿠오카 도착 후 일정 시작"], narrowArt: true },
-      { id: "d1-move-yanagawa", type: "이동", location: "야나가와", title: "야나가와 이동", description: ["약 1시간 20분 소요"] },
-      { id: "d1-lunch-yanagawa", type: "식사", location: "야나가와", title: "중식 · 현지식", description: ["야나가와 도착 후 점심 식사"] },
-      { id: "d1-yanagawa-boat", type: "관광", location: "야나가와", title: "야나가와 뱃놀이", description: ["운하를 따라 즐기는 여름 뱃놀이"] },
-      { id: "d1-move-takeo", type: "이동", location: "다케오", title: "다케오 이동", description: ["약 1시간 10분 소요"] },
-      { id: "d1-takeo-shrine", type: "관광", location: "다케오", title: "다케오 신사", description: ["3,000여 년의 역사가 있는 신사"] },
-      { id: "d1-takeo-library", type: "관광", location: "다케오", title: "다케오 도서관", description: ["감각적인 공간의 복합문화 요소"] },
-      { id: "d1-move-ureshino", type: "이동", location: "우레시노", title: "우레시노 이동", description: ["약 30분 소요"] },
-      { id: "d1-ureshino-hotel", type: "숙소", location: "우레시노", title: "오에도 온센 모노가타리 우레시노칸", titleLines: ["오에도 온센 모노가타리", "우레시노칸"], titleSize: 21, description: ["체크인 · 석식(호텔 뷔페)", "· 온천욕으로 하루 마무리"], narrowArt: true },
-    ],
+    rows: generatorRows[1],
   },
   {
     day: 2,
-    scenes: "public/assets/schedule/plates/source/day-2-scenes-v2.png",
+    scenes: "private-assets/schedule/plates/source/day-2-scenes-v2.png",
     sceneGrid: { x: [0, 425, 800, 1200, 1570, 1983], y: [0, 385, 793], inset: 8 },
-    target: "public/assets/schedule/plates/body/day-2.png",
+    target: "private-assets/schedule/plates/body/day-2.png",
     routeTitle: "둘째 날, 나가사키의 여름 산책",
     routePath: "우레시노 → 나가사키 → 후쿠오카",
     memoColor: "#3f9548",
     memoLines: ["푸른 하늘 아래,", "나가사키에서의 추억을 마음에 담아요."],
-    rows: [
-      { id: "d2-hotel-breakfast", type: "식사", location: "우레시노", title: "호텔 조식", description: ["호텔식으로 여유로운 아침"] },
-      { id: "d2-move-nagasaki", type: "이동", location: "나가사키", title: "나가사키 이동", description: ["약 50분 소요"] },
-      { id: "d2-nagasaki-chinatown", type: "관광", location: "나가사키", title: "나가사키 차이나타운", description: ["일본의 오래된 차이나타운 산책"] },
-      { id: "d2-oura-cathedral", type: "관광", location: "나가사키", title: "오우라 천주당", description: ["일본 국보 서양식 목조 성당"] },
-      { id: "d2-glover-garden", type: "관광", location: "나가사키", title: "그라바엔", description: ["이국적인 분위기의 역사 정원"] },
-      { id: "d2-lunch-nagasaki", type: "식사", location: "나가사키", title: "중식 · 현지식", description: ["현지식으로 점심 식사"] },
-      { id: "d2-move-fukuoka", type: "이동", location: "후쿠오카", title: "후쿠오카 이동", description: ["약 2시간 소요"] },
-      { id: "d2-tenjin-free", type: "관광", location: "텐진", title: "텐진거리 자유시간", description: ["쇼핑과 도심 산책을 여유롭게"] },
-      { id: "d2-fukuoka-hotel", type: "숙소", location: "후쿠오카", title: "호텔 이동 및 휴식", description: ["베스트 웨스턴 플러스 후쿠오카", "텐진 미나미 · 석식은 불포함"], artSource: "public/assets/schedule/plates/source/day-2-hotel-composite-v27.png", narrowArt: true },
-    ],
+    rows: generatorRows[2],
   },
   {
     day: 3,
@@ -80,7 +65,7 @@ const days = [
       { left: 500, top: 1248, width: 370, height: 164 },
       { left: 495, top: 1418, width: 375, height: 170 },
     ],
-    target: "public/assets/schedule/plates/body/day-3.png",
+    target: "private-assets/schedule/plates/body/day-3.png",
     routeTitle: "셋째 날, 아쉬운 귀국의 날",
     routeTitleSize: 25,
     routePath: "후쿠오카 → 다자이후 → 라라포트 → 공항 → 인천",
@@ -90,15 +75,7 @@ const days = [
       "17:45 후쿠오카 출발 · 19:15 인천 도착",
       "가족들과 함께한 여름의 기억을 오래 간직해요.",
     ],
-    rows: [
-      { id: "d3-hotel-breakfast", type: "식사", location: "후쿠오카", title: "호텔 조식", description: ["호텔식 후 마지막 일정 준비"] },
-      { id: "d3-dazaifu", type: "관광", location: "다자이후", title: "다자이후 텐만구", description: ["학문의 신을 모신 대표 신사"] },
-      { id: "d3-lalaport", type: "관광", location: "후쿠오카", title: "라라포트 후쿠오카", description: ["복합 문화공간에서 마지막 자유시간"] },
-      { id: "d3-lunch", type: "식사", location: "현지식", title: "중식 · 현지식", description: ["현지식으로 점심 식사"] },
-      { id: "d3-move-airport", type: "이동", location: "공항", title: "후쿠오카공항 이동", description: ["약 30분 소요"] },
-      { id: "d3-fukuoka-departure", time: "17:45", type: "항공", location: "후쿠오카", title: "후쿠오카공항 출발", description: ["제주항공 7C1406"], narrowArt: true },
-      { id: "d3-incheon-arrival", time: "19:15", type: "항공", location: "인천", title: "인천국제공항 도착", description: ["가족여행의 마무리"], narrowArt: true },
-    ],
+    rows: generatorRows[3],
   },
 ];
 
@@ -170,13 +147,16 @@ function textSvg(day, rows, height, memoY) {
     const descriptionLineHeight = item.description.length > 1 ? 19 : 22;
     const titles = titleLines.map((line, index) => `<text x="${contentX}" y="${titleStartY + index * titleLineHeight}" class="title" font-size="${titleSize}">${escapeXml(line)}</text>`).join("");
     const descriptions = item.description.map((line, index) => `<text x="${contentX}" y="${descriptionStartY + index * descriptionLineHeight}" class="desc" font-size="${descSize}">${escapeXml(line)}</text>`).join("");
+    const locationChip = item.location
+      ? `<rect x="${contentX + typeWidth + 8}" y="${item.y + rowLayout.chipYOffset}" width="${locationWidth}" height="${rowLayout.chipHeight}" rx="10" fill="#e8ecd0"/>
+      <text x="${contentX + typeWidth + 19}" y="${item.y + 41}" class="chip" fill="#47743e">${escapeXml(item.location)}</text>`
+      : "";
 
     return `
       ${item.time ? `<text x="${rowLayout.timeX}" y="${item.y + 48}" class="time">${item.time}</text>` : ""}
       <rect x="${contentX}" y="${item.y + rowLayout.chipYOffset}" width="${typeWidth}" height="${rowLayout.chipHeight}" rx="10" fill="${typeFill}"/>
       <text x="${contentX + 11}" y="${item.y + 41}" class="chip" fill="${typeColor}">${item.type}</text>
-      <rect x="${contentX + typeWidth + 8}" y="${item.y + rowLayout.chipYOffset}" width="${locationWidth}" height="${rowLayout.chipHeight}" rx="10" fill="#e8ecd0"/>
-      <text x="${contentX + typeWidth + 19}" y="${item.y + 41}" class="chip" fill="#47743e">${escapeXml(item.location)}</text>
+      ${locationChip}
       ${titles}
       ${descriptions}
     `;
@@ -270,7 +250,7 @@ async function circleIcon(image) {
 }
 
 const day3Scenes = sharp(path.join(root, day3ScenesPath));
-const day1Approved = sharp(path.join(root, "public/assets/schedule/approved/day-1.png"));
+const day1Approved = sharp(path.join(root, "private-assets/schedule/approved/day-1.png"));
 for (const day of days) {
   const expectedRows = layout.dayRowCounts[String(day.day)];
   if (day.rows.length !== expectedRows) {

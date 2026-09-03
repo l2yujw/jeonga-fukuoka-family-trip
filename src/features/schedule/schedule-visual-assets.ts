@@ -17,22 +17,22 @@ export const scheduleVisualAssets: Record<
   ScheduleVisualAssetConfig
 > = {
   1: {
-    topSrc: "/assets/schedule/plates/top/day-3.png",
-    bodySrc: "/assets/schedule/plates/body/day-1.png",
+    topSrc: "/api/schedule-asset/plates/top/day-3.png",
+    bodySrc: "/api/schedule-asset/plates/body/day-1.png",
     bodyWidth: SCHEDULE_BODY_DIMENSIONS[1].width,
     bodyHeight: SCHEDULE_BODY_DIMENSIONS[1].height,
-    fullPlateFallbackSrc: "/assets/schedule/approved/day-1.png",
+    fullPlateFallbackSrc: "/api/schedule-asset/approved/day-1.png",
   },
   2: {
-    topSrc: "/assets/schedule/plates/top/day-3.png",
-    bodySrc: "/assets/schedule/plates/body/day-2.png",
+    topSrc: "/api/schedule-asset/plates/top/day-3.png",
+    bodySrc: "/api/schedule-asset/plates/body/day-2.png",
     bodyWidth: SCHEDULE_BODY_DIMENSIONS[2].width,
     bodyHeight: SCHEDULE_BODY_DIMENSIONS[2].height,
-    fullPlateFallbackSrc: "/assets/schedule/approved/day-2.png",
+    fullPlateFallbackSrc: "/api/schedule-asset/approved/day-2.png",
   },
   3: {
-    topSrc: "/assets/schedule/plates/top/day-3.png",
-    bodySrc: "/assets/schedule/plates/body/day-3.png",
+    topSrc: "/api/schedule-asset/plates/top/day-3.png",
+    bodySrc: "/api/schedule-asset/plates/body/day-3.png",
     bodyWidth: SCHEDULE_BODY_DIMENSIONS[3].width,
     bodyHeight: SCHEDULE_BODY_DIMENSIONS[3].height,
   },

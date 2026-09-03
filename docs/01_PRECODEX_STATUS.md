@@ -1,4 +1,6 @@
-# 00. Pre-Codex Status
+# 00. Pre-Codex Status (Historical)
+
+> Historical planning snapshot only. Repository implementation has started; do not use this file as the active status or execution gate. Follow `AGENTS.md`. Function / Architecture Lock re-audit is pending.
 
 ## Gate Summary
 

@@ -56,7 +56,7 @@ test("guide data contains the 27 stable IDs in 11/9/7 day order", () => {
 
 test("detail artwork is generated only from Schedule-local source scenes", async () => {
   const detailDirectory = new URL(
-    "../../../public/assets/schedule/detail/",
+    "../../../private-assets/schedule/detail/",
     import.meta.url,
   );
   const generatedFiles = (await readdir(detailDirectory)).filter((file) =>
@@ -66,9 +66,11 @@ test("detail artwork is generated only from Schedule-local source scenes", async
   assert.equal(generatedFiles.length, 29);
   for (const item of SCHEDULE_GUIDE_ITEMS) {
     const artworkSrc = getScheduleDetailArtworkSrc(item.id);
-    assert.match(artworkSrc, /^\/assets\/schedule\/detail\/[a-z0-9-]+\.webp$/);
+    assert.match(artworkSrc, /^\/api\/schedule-asset\/detail\/[a-z0-9-]+\.webp$/);
     assert.doesNotMatch(artworkSrc, /^https?:|APPROVED_DesignGuide|00_references/);
-    const asset = await readFile(new URL(`../../../public${artworkSrc}`, import.meta.url));
+    const asset = await readFile(
+      new URL(`../../../private-assets/schedule/detail/${item.id}.webp`, import.meta.url),
+    );
     assert.ok(asset.byteLength > 0 && asset.byteLength < 100_000, item.id);
   }
 
@@ -236,7 +238,7 @@ test("manifest nearby groups are static, complete, and capped at three", () => {
     for (const place of [...nearbyFood, ...walkablePlaces]) {
       assert.match(place.mapUrl, /^https:\/\/www\.google\.com\/maps\/search\//);
       if (place.artworkSrc) {
-        assert.match(place.artworkSrc, /^\/assets\/schedule\/detail\/[a-z0-9-]+\.webp$/);
+        assert.match(place.artworkSrc, /^\/api\/schedule-asset\/detail\/[a-z0-9-]+\.webp$/);
       }
     }
   }

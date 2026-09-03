@@ -1,6 +1,8 @@
-# 전가네 후쿠오카 가족여행 — Pre-Codex Complete v3
+# 전가네 후쿠오카 가족여행 — Pre-Codex Complete v3 (Historical)
 
-## 현재 상태
+> Historical planning snapshot only. Do not use this document as the active execution gate. Current work is governed by `AGENTS.md`, with Function / Architecture Lock re-audit pending.
+
+## 당시 상태
 **Codex 호출 전 할 수 있는 설계 작업을 최대한 완료한 상태다.**
 
 현재 Codex가 없어도 확정 가능한 항목:
@@ -22,11 +24,11 @@
 - QA release gate
 - 배포/운영 runbook
 
-## Codex를 아직 실행하지 않는 이유
+## 당시 Codex를 아직 실행하지 않은 이유
 지금 Codex를 호출하면 설계 결정과 구현 결정을 동시에 하게 된다.
 이 패키지는 그 판단을 선행해서 잠그고, 나중에 Codex가 **구현만 하도록** 만드는 것이 목적이다.
 
-## Codex가 처음 필요한 시점
+## 당시 Codex가 처음 필요하다고 정한 시점
 `10_precodex_final/12_CODEX_ENTRY_GATE.md`의 조건을 모두 확인한 뒤:
 - 실제 Next.js repository scaffold
 - component/code 작성
