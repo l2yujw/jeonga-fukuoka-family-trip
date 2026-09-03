@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { MobileShell } from "@/components/ui";
+import { LoadingState, MobileShell } from "@/components/ui";
 import {
   isSafeMemberPreview,
   normalizeMemberName,
 } from "./boarding-logic";
-import { ensureAnonymousAuthSession } from "./current-trip-session";
+import {
+  ensureAnonymousAuthSession,
+  getCurrentTripSession,
+} from "./current-trip-session";
 import { savePendingMember } from "./pending-member";
 
 export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolean }) {
@@ -16,6 +19,36 @@ export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolea
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingMembership, setCheckingMembership] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    getCurrentTripSession()
+      .then((session) => {
+        if (!active) return;
+        if (session) {
+          router.replace("/home");
+          return;
+        }
+        setCheckingMembership(false);
+      })
+      .catch(() => {
+        if (active) setCheckingMembership(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [router]);
+
+  if (checkingMembership) {
+    return (
+      <MobileShell className="safe-top safe-x">
+        <LoadingState className="min-h-svh" label="여행 정보를 확인하고 있어요" />
+      </MobileShell>
+    );
+  }
 
   if (invalidInvite) {
     return (

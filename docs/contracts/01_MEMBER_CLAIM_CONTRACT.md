@@ -26,8 +26,16 @@ normalize하고, DB에는 SHA-256 lowercase hex hash만 저장한다.
 
 서버는 auth와 invite를 다시 검증하고 member가 해당 trip 소속인지 확인한다.
 같은 `(trip_id, auth_user_id)` membership 재요청은 동일 member일 때 idempotent success,
-다른 member일 때 `409`다. 여러 auth user가 같은 `family_member_id`를 claim할 수 있다.
+다른 member일 때 `409`다. `(trip_id, family_member_id)`도 unique이므로 다른 auth user가
+이미 claim한 member는 `409`이며, insert race는 DB unique constraint가 최종 판정한다.
 `family_members.boarded_at`은 null일 때만 설정하므로 device 수가 boarded count를 늘리지 않는다.
 
 성공 응답은 trip의 id/slug/title/destination/start/end와 claimed member의
 id/name/displayRole/boardedAt만 반환한다.
+
+## Anonymous session persistence
+
+- 같은 브라우저에서 Supabase session을 유지하면 같은 family member로 복원되고 `/`에서 `/home`으로 이동한다.
+- 브라우저 auth storage를 지우면 anonymous identity도 사라진다.
+- 새 identity는 이미 claim된 member를 자동으로 인계받을 수 없다.
+- recovery/reassignment/takeover는 관리자 수동 절차이며 현재 범위 밖이다.

@@ -45,6 +45,26 @@ export type FamilySlot = {
   current: boolean;
 };
 
+export type MembershipClaimRow = {
+  auth_user_id: string;
+  family_member_id: string;
+};
+
+export const MEMBERSHIP_CLAIM_CONFLICTS = {
+  AUTH_ALREADY_CLAIMED_OTHER_MEMBER:
+    "이 브라우저에서는 이미 다른 가족으로 탑승이 완료되었어요.",
+  MEMBER_ALREADY_CLAIMED:
+    "이미 다른 브라우저에서 탑승이 완료된 가족이에요.",
+} as const;
+
+export type MembershipClaimState =
+  | { status: "fresh" | "owned" }
+  | {
+      status: "conflict";
+      code: keyof typeof MEMBERSHIP_CLAIM_CONFLICTS;
+      error: (typeof MEMBERSHIP_CLAIM_CONFLICTS)[keyof typeof MEMBERSHIP_CLAIM_CONFLICTS];
+    };
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -105,6 +125,38 @@ export function isCurrentTripSession(value: unknown): value is CurrentTripSessio
     typeof value.member.displayRole === "string" &&
     typeof value.member.boardedAt === "string"
   );
+}
+
+export function classifyMembershipClaim({
+  authUserId,
+  currentAuthMembership,
+  targetMemberId,
+  targetMemberMembership,
+}: {
+  authUserId: string;
+  currentAuthMembership: MembershipClaimRow | null;
+  targetMemberId: string;
+  targetMemberMembership: MembershipClaimRow | null;
+}): MembershipClaimState {
+  if (
+    currentAuthMembership &&
+    currentAuthMembership.family_member_id !== targetMemberId
+  ) {
+    const code = "AUTH_ALREADY_CLAIMED_OTHER_MEMBER";
+    return { status: "conflict", code, error: MEMBERSHIP_CLAIM_CONFLICTS[code] };
+  }
+
+  if (
+    targetMemberMembership &&
+    targetMemberMembership.auth_user_id !== authUserId
+  ) {
+    const code = "MEMBER_ALREADY_CLAIMED";
+    return { status: "conflict", code, error: MEMBERSHIP_CLAIM_CONFLICTS[code] };
+  }
+
+  return currentAuthMembership || targetMemberMembership
+    ? { status: "owned" }
+    : { status: "fresh" };
 }
 
 export async function resolveBoardingInitialization(

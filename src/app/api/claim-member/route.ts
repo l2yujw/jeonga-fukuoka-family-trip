@@ -1,7 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
+  classifyMembershipClaim,
   readMemberIdPayload,
   type CurrentTripSession,
+  type MembershipClaimRow,
+  type MembershipClaimState,
 } from "@/features/boarding/boarding-logic";
 import {
   authenticateRequest,
@@ -9,12 +12,8 @@ import {
 } from "@/features/boarding/server/request-context";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-type MembershipRow = {
-  family_member_id: string;
-};
-
-const jsonError = (error: string, status: number) =>
-  NextResponse.json({ error }, { status });
+const jsonError = (error: string, status: number, code?: string) =>
+  NextResponse.json(code ? { error, code } : { error }, { status });
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,23 +38,40 @@ export async function POST(request: NextRequest) {
     if (memberError) throw new Error("Supabase member lookup failed.");
     if (!member) return jsonError("등록된 가족 이름을 확인해주세요.", 404);
 
-    const readMembership = async () => {
-      const { data, error } = await admin
-        .from("trip_memberships")
-        .select("family_member_id")
-        .eq("trip_id", trip.id)
-        .eq("auth_user_id", user.id)
-        .maybeSingle();
-      if (error) throw new Error("Supabase membership lookup failed.");
-      return data as MembershipRow | null;
+    const readClaimState = async (): Promise<MembershipClaimState> => {
+      const [currentAuthResult, targetMemberResult] = await Promise.all([
+        admin
+          .from("trip_memberships")
+          .select("auth_user_id,family_member_id")
+          .eq("trip_id", trip.id)
+          .eq("auth_user_id", user.id)
+          .maybeSingle(),
+        admin
+          .from("trip_memberships")
+          .select("auth_user_id,family_member_id")
+          .eq("trip_id", trip.id)
+          .eq("family_member_id", member.id)
+          .maybeSingle(),
+      ]);
+      if (currentAuthResult.error || targetMemberResult.error) {
+        throw new Error("Supabase membership lookup failed.");
+      }
+      return classifyMembershipClaim({
+        authUserId: user.id,
+        currentAuthMembership:
+          currentAuthResult.data as MembershipClaimRow | null,
+        targetMemberId: member.id,
+        targetMemberMembership:
+          targetMemberResult.data as MembershipClaimRow | null,
+      });
     };
 
-    let membership = await readMembership();
-    if (membership && membership.family_member_id !== member.id) {
-      return jsonError("이미 다른 가족으로 탑승이 완료되었어요.", 409);
+    let claimState = await readClaimState();
+    if (claimState.status === "conflict") {
+      return jsonError(claimState.error, 409, claimState.code);
     }
 
-    if (!membership) {
+    if (claimState.status === "fresh") {
       const { error: insertError } = await admin.from("trip_memberships").insert({
         trip_id: trip.id,
         family_member_id: member.id,
@@ -66,9 +82,12 @@ export async function POST(request: NextRequest) {
         if (insertError.code !== "23505") {
           throw new Error("Supabase membership creation failed.");
         }
-        membership = await readMembership();
-        if (!membership || membership.family_member_id !== member.id) {
-          return jsonError("이미 다른 가족으로 탑승이 완료되었어요.", 409);
+        claimState = await readClaimState();
+        if (claimState.status === "conflict") {
+          return jsonError(claimState.error, 409, claimState.code);
+        }
+        if (claimState.status === "fresh") {
+          return jsonError("탑승 정보를 확인할 수 없어요. 다시 시도해주세요.", 409);
         }
       }
     }
