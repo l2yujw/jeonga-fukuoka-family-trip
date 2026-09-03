@@ -2,13 +2,22 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { BottomNav, MobileShell } from "@/components/ui";
 import {
   loadHomeAlbumPhoto,
   loadHomeAlbumPreview,
 } from "@/features/album/album-repository";
 import type { AlbumPhoto } from "@/features/album/album-types";
+import { getCurrentAuthSession } from "@/features/boarding/current-trip-session";
+import { clearPendingMember } from "@/features/boarding/pending-member";
 import {
   TripAccessGuard,
   useCurrentTripSession,
@@ -202,8 +211,15 @@ function HomePreviewImage({
 }
 
 function HomeScreen() {
-  const { trip } = useCurrentTripSession();
+  const router = useRouter();
+  const { trip, member } = useCurrentTripSession();
   const schedule = getHomeSchedulePreview();
+  const memberSwitchDialogRef = useRef<HTMLElement>(null);
+  const memberSwitchCancelRef = useRef<HTMLButtonElement>(null);
+  const memberSwitchPendingRef = useRef(false);
+  const [memberSwitchOpen, setMemberSwitchOpen] = useState(false);
+  const [memberSwitchPending, setMemberSwitchPending] = useState(false);
+  const [memberSwitchError, setMemberSwitchError] = useState<string | null>(null);
   const [scheduleState, setScheduleState] = useState<{
     tripId: string;
     dayNo: number;
@@ -276,6 +292,108 @@ function HomeScreen() {
         : latestCardTemplate ?? "아직 만든 카드가 없어요";
   const tripDateRange = `${trip.startDate.replaceAll("-", ".")} — ${trip.endDate.slice(5).replace("-", ".")}`;
 
+  const closeMemberSwitchDialog = useCallback(() => {
+    setMemberSwitchOpen(false);
+    setMemberSwitchError(null);
+  }, [setMemberSwitchError, setMemberSwitchOpen]);
+
+  useEffect(() => {
+    if (!memberSwitchOpen) return;
+
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusFrame = requestAnimationFrame(() => {
+      memberSwitchCancelRef.current?.focus({ preventScroll: true });
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (!memberSwitchPendingRef.current) closeMemberSwitchDialog();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = Array.from(
+        memberSwitchDialogRef.current?.querySelectorAll<HTMLButtonElement>(
+          "button:not([disabled])",
+        ) ?? [],
+      );
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, [closeMemberSwitchDialog, memberSwitchOpen]);
+
+  async function confirmMemberSwitch() {
+    if (memberSwitchPendingRef.current) return;
+
+    memberSwitchPendingRef.current = true;
+    setMemberSwitchPending(true);
+    setMemberSwitchError(null);
+
+    try {
+      const authSession = await getCurrentAuthSession();
+      if (!authSession) {
+        throw new Error("인증 정보를 확인할 수 없어요. 초대 링크로 다시 접속해주세요.");
+      }
+
+      const response = await fetch("/api/member-switch", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          Authorization: `Bearer ${authSession.access_token}`,
+        },
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      const status =
+        payload && typeof payload === "object" && "status" in payload
+          ? payload.status
+          : null;
+      const responseError =
+        payload &&
+        typeof payload === "object" &&
+        "error" in payload &&
+        typeof payload.error === "string"
+          ? payload.error
+          : "사용자 변경을 완료할 수 없어요. 잠시 후 다시 시도해주세요.";
+
+      if (!response.ok) throw new Error(responseError);
+      if (status !== "released" && status !== "already_released") {
+        throw new Error("사용자 변경 결과를 확인할 수 없어요. 다시 시도해주세요.");
+      }
+
+      clearPendingMember();
+      setMemberSwitchOpen(false);
+      router.replace("/");
+    } catch (error) {
+      setMemberSwitchError(
+        error instanceof Error
+          ? error.message
+          : "사용자 변경을 완료할 수 없어요. 잠시 후 다시 시도해주세요.",
+      );
+    } finally {
+      memberSwitchPendingRef.current = false;
+      setMemberSwitchPending(false);
+    }
+  }
+
   useEffect(() => {
     let active = true;
 
@@ -344,6 +462,17 @@ function HomeScreen() {
         aria-describedby="home-trip-period"
       >
         <header className="home-v5-hero">
+          <button
+            type="button"
+            className="home-v5-member-switch"
+            aria-label={`현재 사용자 ${member.name}, 사용자 변경`}
+            onClick={() => {
+              setMemberSwitchError(null);
+              setMemberSwitchOpen(true);
+            }}
+          >
+            {member.name} · 변경
+          </button>
           <div className="home-v5-hero-copy">
             <p className="home-v5-eyebrow">FUKUOKA FAMILY TRIP</p>
             <h1 id="home-title">
@@ -506,6 +635,59 @@ function HomeScreen() {
           </div>
         </section>
       </main>
+      {memberSwitchOpen ? (
+        <div
+          className="home-v5-switch-overlay"
+          onClick={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              !memberSwitchPendingRef.current
+            ) {
+              closeMemberSwitchDialog();
+            }
+          }}
+        >
+          <section
+            ref={memberSwitchDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="home-member-switch-title"
+            aria-describedby="home-member-switch-description"
+            tabIndex={-1}
+            className="home-v5-switch-dialog"
+          >
+            <h2 id="home-member-switch-title">사용자를 변경할까요?</h2>
+            <p id="home-member-switch-description">
+              현재 {member.name}(으)로 입장되어 있어요. 사용자 변경을 하면 이
+              기기의 탑승 연결을 해제하고 이름 선택 화면으로 돌아갑니다.
+            </p>
+            {memberSwitchError ? (
+              <p className="home-v5-switch-error" role="alert">
+                {memberSwitchError}
+              </p>
+            ) : null}
+            <div className="home-v5-switch-actions">
+              <button
+                ref={memberSwitchCancelRef}
+                type="button"
+                disabled={memberSwitchPending}
+                onClick={closeMemberSwitchDialog}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="home-v5-switch-confirm"
+                disabled={memberSwitchPending}
+                aria-busy={memberSwitchPending}
+                onClick={confirmMemberSwitch}
+              >
+                {memberSwitchPending ? "변경하고 있어요" : "사용자 변경"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       <BottomNav activeHref="/home" />
     </MobileShell>
   );
