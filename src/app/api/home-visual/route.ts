@@ -8,8 +8,8 @@ import { INVITE_COOKIE_NAME } from "@/features/boarding/server/invite";
 export const runtime = "nodejs";
 
 const HOME_RUNTIME_BASE_FILE =
-  "Jeonga_Fukuoka_Feedback05_B_ORIGINAL_Runtime_Base_895x1756_v16.png";
-const HOME_VISUAL_ETAG = '"home-visual-v16"';
+  "Jeonga_Fukuoka_Home_v5_Hero_Scenery_445x490.png";
+const HOME_VISUAL_ETAG = '"home-visual-v5"';
 const HOME_VISUAL_CACHE_CONTROL = "private, max-age=0, must-revalidate";
 
 export async function GET(request: NextRequest) {
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       const localImagePath = join(
         process.cwd(),
         "local-references",
-        "feedback05",
+        "home-v5",
         HOME_RUNTIME_BASE_FILE,
       );
       return new Uint8Array(await readFile(localImagePath)).buffer;
