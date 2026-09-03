@@ -22,6 +22,8 @@ export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolea
   const [checkingMembership, setCheckingMembership] = useState(true);
 
   useEffect(() => {
+    if (invalidInvite) return;
+
     let active = true;
 
     getCurrentTripSession()
@@ -40,9 +42,9 @@ export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolea
     return () => {
       active = false;
     };
-  }, [router]);
+  }, [invalidInvite, router]);
 
-  if (checkingMembership) {
+  if (checkingMembership && !invalidInvite) {
     return (
       <MobileShell className="safe-top safe-x">
         <LoadingState className="min-h-svh" label="여행 정보를 확인하고 있어요" />

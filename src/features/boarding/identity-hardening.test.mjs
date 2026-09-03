@@ -133,19 +133,34 @@ test("member preview rejects either conflict without returning auth identifiers"
   assert.doesNotMatch(source, /NextResponse\.json\([^)]*auth_user_id/s);
 });
 
-test("root checks retained membership before invite UI without anonymous sign-in", async () => {
+test("valid invite with retained membership redirects home", async () => {
   const source = await readFile(new URL("./landing-entry.tsx", import.meta.url), "utf8");
-  const checkPosition = source.indexOf("if (checkingMembership)");
-  const invitePosition = source.indexOf("if (invalidInvite)");
+
+  assert.match(
+    source,
+    /if \(invalidInvite\) return;[\s\S]*getCurrentTripSession\(\)[\s\S]*if \(session\)[\s\S]*router\.replace\("\/home"\)/,
+  );
+  assert.match(source, /\}, \[invalidInvite, router\]\);/);
+});
+
+test("invalid or missing invite never redirects a retained membership", async () => {
+  const source = await readFile(new URL("./landing-entry.tsx", import.meta.url), "utf8");
+
+  assert.ok(
+    source.indexOf("if (invalidInvite) return;") <
+      source.indexOf("getCurrentTripSession()"),
+  );
+  assert.match(source, /if \(checkingMembership && !invalidInvite\)/);
+  assert.match(source, /if \(invalidInvite\)[\s\S]*초대 링크를 확인해주세요/);
+});
+
+test("passive landing initialization never creates anonymous auth", async () => {
+  const source = await readFile(new URL("./landing-entry.tsx", import.meta.url), "utf8");
   const submitPosition = source.indexOf("async function handleSubmit");
   const anonymousSignInPosition = source.indexOf("ensureAnonymousAuthSession()");
 
-  assert.match(source, /getCurrentTripSession\(\)[\s\S]*router\.replace\("\/home"\)/);
-  assert.ok(checkPosition > 0 && checkPosition < invitePosition);
   assert.ok(anonymousSignInPosition > submitPosition);
   assert.equal(source.match(/ensureAnonymousAuthSession\(\)/g)?.length, 1);
-  assert.match(source, /초대 링크를 확인해주세요/);
-  assert.match(source, /<form onSubmit=\{handleSubmit\}/);
 });
 
 test("canonical schema and migration add the member uniqueness preflight safely", async () => {
