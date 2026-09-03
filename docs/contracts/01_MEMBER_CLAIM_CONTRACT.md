@@ -47,10 +47,12 @@ cookie의 trip을 서버에서 결정한다. client member ID는 받지 않는�
 
 service-role 전용 `release_trip_membership_for_switch` 함수가 현재 membership row와
 family member row를 lock하고 한 transaction 안에서 membership 삭제와 기존 member의
-`boarded_at = null`을 함께 처리한다. 같은 trip에서 현재 auth user가 올린 Photo 또는
-Memory Card가 하나라도 있으면 `409 blocked_owned_content`로 중단하며 ownership은
-이전하거나 다시 쓰지 않는다.
-release는 owned-content 확인 동안 Photo/Memory Card write를 직렬화해 concurrent write가 membership release와 race하지 못하게 한다.
+`boarded_at = null`을 함께 처리한다. 기존 Photo나 Memory Card가 있어도 변경할 수 있으며,
+과거 content의 family-member attribution은 이전하거나 다시 쓰지 않는다.
 
 성공 후에도 anonymous auth session과 invite cookie는 유지된다. 기존 landing/claim
-흐름으로 돌아가 새 member를 claim하며, 양쪽 unique conflict 보호는 그대로 적용된다.
+흐름으로 돌아가 새 member를 claim하며, 이후 새 content는 새 membership의 member로
+attribution된다. 양쪽 unique conflict 보호는 그대로 적용된다.
+
+같은 auth owner는 현재 해당 trip membership을 유지하는 동안 변경 전 Photo의
+`caption`과 `taken_at`을 계속 수정할 수 있다. Memory Card는 수정할 수 없다.

@@ -5,9 +5,6 @@ import {
 } from "@/features/boarding/server/request-context";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-const BLOCKED_OWNED_CONTENT_ERROR =
-  "이미 이 사용자로 만든 사진이나 추억 카드가 있어 자동 변경할 수 없어요.";
-
 const jsonError = (error: string, status: number) =>
   NextResponse.json({ error }, { status });
 
@@ -25,12 +22,6 @@ export async function POST(request: NextRequest) {
     );
     if (error) throw new Error("Supabase member switch failed.");
 
-    if (status === "blocked_owned_content") {
-      return NextResponse.json(
-        { status, error: BLOCKED_OWNED_CONTENT_ERROR },
-        { status: 409 },
-      );
-    }
     if (status === "released" || status === "already_released") {
       return NextResponse.json({ status });
     }
