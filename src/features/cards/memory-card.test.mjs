@@ -14,11 +14,13 @@ import {
   buildMemoryCardInsertPayload,
   buildMemoryCardLayoutV2,
   buildMemoryCardLayoutV3,
+  buildMemoryCardResultStoragePath,
   createMemoryCardRenderModel,
   getMinimumMemoryCardPhotoCount,
   getRandomPhotoCount,
   getMemoryCardReferencedPhotoIds,
   getMemoryCardRenderPhotoIds,
+  isMemoryCardResultStoragePath,
   mapPersistedMemoryCardRows,
   normalizeMemoryCardCaption,
   parseCanonicalExperimentalMemoryCardLayoutV1,
@@ -65,6 +67,8 @@ import {
 const tripId = "11111111-1111-4111-8111-111111111111";
 const memberId = "22222222-2222-4222-8222-222222222222";
 const authUserId = "33333333-3333-4333-8333-333333333333";
+const resultId = "55555555-5555-4555-8555-555555555555";
+const resultStoragePath = `${tripId}/${authUserId}/${resultId}.png`;
 const newTemplateCases = [
   ["postcard_duo", 2, ["pd1", "pd2"]],
   ["scrapbook_trio", 3, ["st1", "st2", "st3"]],
@@ -681,19 +685,39 @@ test("saved-card photo IDs support v1/v2/v3, dedupe, and ignore unreadable layou
   const v3 = parseMemoryCardRenderModel(
     "one_moment",
     3,
-    buildMemoryCardLayoutV3("one_moment", ["a"]),
+    buildMemoryCardLayoutV3("one_moment", ["final-only"]),
   );
   assert.ok(legacy && v2 && v3);
-  assert.deepEqual(getMemoryCardRenderPhotoIds(v3), ["a"]);
+  assert.deepEqual(getMemoryCardRenderPhotoIds(v3), ["final-only"]);
   assert.deepEqual(
     getMemoryCardReferencedPhotoIds([
-      { renderModel: legacy },
-      { renderModel: v2 },
-      { renderModel: v3 },
-      { renderModel: null },
+      { renderModel: legacy, isFinalized: false },
+      { renderModel: v2, isFinalized: false },
+      { renderModel: v3, isFinalized: true },
+      { renderModel: null, isFinalized: false },
     ]),
     ["a", "b", "c", "d"],
   );
+});
+
+test("immutable result paths are code-derived and reject cross-trip or unsafe names", () => {
+  assert.equal(
+    buildMemoryCardResultStoragePath(tripId, authUserId, () => resultId),
+    resultStoragePath,
+  );
+  assert.equal(
+    isMemoryCardResultStoragePath(resultStoragePath, tripId, authUserId),
+    true,
+  );
+  for (const unsafe of [
+    `${tripId}/other/${resultId}.png`,
+    `${tripId}/${authUserId}/../${resultId}.png`,
+    `${tripId}/${authUserId}/${resultId}.jpg`,
+    `${tripId}/${authUserId}/card.png`,
+    `${tripId}/${authUserId}/55555555-5555-5555-8555-555555555555.png`,
+  ]) {
+    assert.equal(isMemoryCardResultStoragePath(unsafe, tripId, authUserId), false);
+  }
 });
 
 test("Cards startup is referenced-only and composer/export hydration is deferred", async () => {
@@ -772,6 +796,7 @@ test("new insert payload always writes validated DB and JSON version 3", () => {
       })),
     },
     memberId,
+    resultStoragePath,
     templateKey: "four_cut",
     tripId,
   });
@@ -779,13 +804,14 @@ test("new insert payload always writes validated DB and JSON version 3", () => {
   assert.equal(payload.layout_version, 3);
   assert.deepEqual(payload.layout_json, layout);
   assert.equal(payload.layout_json.version, 3);
-  assert.equal(payload.result_storage_path, null);
+  assert.equal(payload.result_storage_path, resultStoragePath);
   assert.doesNotMatch(JSON.stringify(payload.layout_json), /signedUrl|storagePath|decorations|gradient|https?:\/\//i);
   assert.throws(() => buildMemoryCardInsertPayload({
     authUserId,
     availablePhotoIds: new Set(["a", "b", "c"]),
     layout,
     memberId,
+    resultStoragePath,
     templateKey: "four_cut",
     tripId,
   }), /invalid-memory-card-photos/);
@@ -969,8 +995,28 @@ test("persisted rows preserve ownership and all supported v1/v2/v3 read versions
 
   assert.deepEqual(cards.map(({ renderModel }) => renderModel?.kind), ["legacy-simple-v1", "canonical", "canonical", "canonical"]);
   assert.deepEqual(cards.map(({ renderModel }) => renderModel?.layoutVersion), [1, 1, 2, 3]);
+  assert.ok(cards.every(({ isFinalized, resultStoragePath, resultSignedUrl }) =>
+    !isFinalized && resultStoragePath === null && resultSignedUrl === null
+  ));
   assert.equal(cards[0].creatorName, "류정원");
   assert.equal(cards[0].isOwner, true);
+});
+
+test("persisted result state is explicit and keeps the stored asset primary", () => {
+  const row = memoryCardRow({
+    layout_version: 3,
+    layout_json: buildMemoryCardLayoutV3("four_cut", ["a", "b", "c", "d"]),
+    result_storage_path: resultStoragePath,
+  });
+  const [card] = mapPersistedMemoryCardRows(
+    [row],
+    new Map([[memberId, "류정원"]]),
+    authUserId,
+    new Map([[resultStoragePath, "https://signed.example/final.png"]]),
+  );
+  assert.equal(card.isFinalized, true);
+  assert.equal(card.resultStoragePath, resultStoragePath);
+  assert.equal(card.resultSignedUrl, "https://signed.example/final.png");
 });
 
 test("persisted rows map every new template key", () => {
@@ -1235,18 +1281,48 @@ test("required image decode failure rejects render instead of exporting a blank 
   );
 });
 
-test("export and repositories exclude app wrappers, public URLs, and result uploads", async () => {
+test("finalized repository uses the existing private result bucket without mutable updates", async () => {
   const sources = await Promise.all([
     readFile(new URL("../album/album-repository.ts", import.meta.url), "utf8"),
     readFile(new URL("./memory-card-repository.ts", import.meta.url), "utf8"),
     readFile(new URL("./memory-card-export.ts", import.meta.url), "utf8"),
+    readFile(new URL("./memory-cards-view.tsx", import.meta.url), "utf8"),
   ]);
   const source = sources.join("\n");
   assert.match(sources[0], /createSignedUrl/);
-  assert.doesNotMatch(source, /getPublicUrl|memory-card-results|app page background|mobile navigation/);
-  assert.doesNotMatch(sources[1], /storage\.from\([^)]*\)\.upload/);
+  assert.match(sources[1], /MEMORY_CARD_RESULT_BUCKET = "memory-card-results"/);
+  assert.match(sources[1], /createSignedUrls/);
+  assert.match(sources[1], /\.upload\(resultStoragePath, resultPng/);
+  assert.match(sources[1], /if \(error\) \{[\s\S]*removeResultStorageObject\(resultStoragePath\)/);
+  assert.match(sources[1], /\.download\(card\.resultStoragePath\)/);
+  assert.match(sources[1], /if \(!card\.resultStoragePath\) return \{ storageCleanupFailed: false \}/);
+  assert.match(sources[3], /card\.isFinalized[\s\S]*downloadMemoryCardResult\(card\)/);
+  assert.match(sources[3], /card\.isFinalized \? \([\s\S]*<FinalizedMemoryCardImage/);
+  assert.doesNotMatch(source, /getPublicUrl/);
+  assert.doesNotMatch(sources[1], /\.from\("memory_cards"\)[\s\S]*\.update\(/);
   assert.match(sources[1], /layout: MemoryCardLayoutV3/);
   assert.doesNotMatch(sources[1], /buildMemoryCardLayoutV2/);
+});
+
+test("Cards first screen and composer use the approved live visual hierarchy", async () => {
+  const [page, view, css] = await Promise.all([
+    readFile(new URL("../../app/cards/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("./memory-cards-view.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(page, /<TripAccessGuard>/);
+  assert.match(page, /<BottomNav activeHref="\/cards"/);
+  assert.match(page, /FUKUOKA · MEMORY CARDS/);
+  assert.match(page, /가족여행의 장면을 감성 카드로 남겨요/);
+  assert.match(page, /<CardsBotanical \/>/);
+  assert.match(view, /cards-first-actions/);
+  assert.match(view, /FAMILY KEEPSAKES/);
+  assert.match(view, /cards-studio/);
+  assert.match(view, /카드 만들기/);
+  assert.ok((view.match(/MEMORY_CARD_TEMPLATES\.map/g) ?? []).length >= 2);
+  assert.match(view, /카드 팁/);
+  assert.match(css, /\.cards-template-strip[\s\S]*overflow-x: auto/);
+  assert.doesNotMatch(`${page}\n${view}`, /VisualGuide|OriginalAuthority|\/tmp\/jeonga-cards/);
 });
 
 function exportInput(renderModel = createMemoryCardRenderModel(

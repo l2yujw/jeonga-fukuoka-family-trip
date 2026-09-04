@@ -57,7 +57,9 @@ import {
 import {
   createMemoryCard,
   deleteMemoryCard,
+  downloadMemoryCardResult,
   loadMemoryCards,
+  refreshMemoryCardResultSignedUrl,
 } from "./memory-card-repository";
 import { MemoryCardPreview } from "./memory-card-preview";
 import type { MemoryCardPhotoSlot } from "./memory-card-template-spec";
@@ -73,6 +75,67 @@ const createdAtFormatter = new Intl.DateTimeFormat("ko-KR", {
 
 function templatePhotoCountLabel(min: number, max: number) {
   return min === max ? `사진 ${min}장` : `사진 ${min}–${max}장`;
+}
+
+function TemplateGlyph({ templateKey }: { templateKey: MemoryCardTemplateKey }) {
+  const count = getMemoryCardTemplate(templateKey)?.acceptedMin ?? 1;
+  return (
+    <svg aria-hidden="true" viewBox="0 0 36 30" className="cards-template-glyph">
+      <rect x="3" y="3" width="30" height="24" rx="2" />
+      {Array.from({ length: Math.min(count, 6) }, (_, index) => (
+        <rect
+          key={index}
+          x={7 + index % 3 * 8}
+          y={7 + Math.floor(index / 3) * 8}
+          width="6"
+          height="6"
+          rx="0.8"
+        />
+      ))}
+    </svg>
+  );
+}
+
+function FinalizedMemoryCardImage({
+  card,
+  className = "",
+}: {
+  card: MemoryCard;
+  className?: string;
+}) {
+  const [rejectedUrl, setRejectedUrl] = useState<string | null>(null);
+  const [refreshedUrl, setRefreshedUrl] = useState<string | null>(null);
+  const [refreshedPath, setRefreshedPath] = useState<string | null>(null);
+  const signedUrl = refreshedUrl ?? (
+    card.resultSignedUrl !== rejectedUrl ? card.resultSignedUrl : null
+  );
+
+  const handleError = () => {
+    setRejectedUrl(signedUrl);
+    setRefreshedUrl(null);
+    if (!card.resultStoragePath || refreshedPath === card.resultStoragePath) return;
+    setRefreshedPath(card.resultStoragePath);
+    void refreshMemoryCardResultSignedUrl(card.resultStoragePath).then(setRefreshedUrl);
+  };
+
+  if (!signedUrl) {
+    return (
+      <div className={`cards-final-image-fallback ${className}`} role="img" aria-label="완성 카드 이미지를 표시할 수 없음">
+        완성 카드를 불러오지 못했어요.
+      </div>
+    );
+  }
+
+  return (
+    /* Private Storage signed URL; never persisted into card layout metadata. */
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src={signedUrl}
+      alt={`${card.creatorName ?? "가족 구성원"}님의 완성된 추억 카드`}
+      className={`cards-final-image ${className}`}
+      onError={handleError}
+    />
+  );
 }
 
 const minimumPhotoCount = getMinimumMemoryCardPhotoCount();
@@ -155,6 +218,7 @@ export function MemoryCardsView() {
   const [isSaving, setIsSaving] = useState(false);
   const [exportingKey, setExportingKey] = useState<string | null>(null);
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [reloadVersion, setReloadVersion] = useState(0);
@@ -249,6 +313,7 @@ export function MemoryCardsView() {
     (template?.acceptedMin ?? 0) - selectedPhotoIds.length,
   );
   const dateLabel = `${tripSession.trip.startDate.replaceAll("-", ".")} – ${tripSession.trip.endDate.replaceAll("-", ".")}`;
+  const selectedSavedCard = cards.find(({ id }) => id === selectedCardId) ?? null;
 
   const handlePhotoMediaChange = useCallback<AlbumPhotoMediaChange>((
     photoId,
@@ -455,15 +520,48 @@ export function MemoryCardsView() {
     });
   };
 
+  const renderCardBlob = async (
+    renderTemplateKey: MemoryCardTemplateKey,
+    renderModel: MemoryCardRenderModel,
+  ) => {
+    const requiredPhotoIds = getMemoryCardRenderPhotoIds(renderModel);
+    const requiredPhotoIdSet = new Set(requiredPhotoIds);
+    const requiredPhotos = photos.filter(({ id }) => requiredPhotoIdSet.has(id));
+    const signedUrls = await loadAlbumPhotoSignedUrls(
+      requiredPhotos.map(({ storagePath }) => storagePath),
+    );
+    const hydratedRequiredPhotos = applyAlbumPhotoSignedUrls(
+      requiredPhotos,
+      signedUrls,
+    );
+    const hydratedPhotos = applyAlbumPhotoSignedUrls(photos, signedUrls);
+    setPhotos((current) => mergeAlbumPhotos(current, hydratedRequiredPhotos));
+    if (
+      requiredPhotoIds.some(
+        (photoId) => !hydratedPhotos.find(({ id }) => id === photoId)?.signedUrl,
+      )
+    ) {
+      throw new Error("memory-card-export-photo-unavailable");
+    }
+    return exportMemoryCardPng({
+      templateKey: renderTemplateKey,
+      renderModel,
+      photos: hydratedPhotos,
+      dateLabel,
+    });
+  };
+
   const saveCard = async () => {
-    if (!templateKey || !canPreview || isSaving) return;
+    if (!templateKey || !draftRenderModel || !canPreview || isSaving) return;
     setIsSaving(true);
     setError(null);
 
     try {
+      const resultPng = await renderCardBlob(templateKey, draftRenderModel);
       const saved = await createMemoryCard({
         availablePhotoIds: photos.map(({ id }) => id),
         layout: draftLayout!,
+        resultPng,
         templateKey,
         tripSession,
       });
@@ -486,31 +584,7 @@ export function MemoryCardsView() {
     setExportingKey(`${key}-${action}`);
     setError(null);
     try {
-      const requiredPhotoIds = getMemoryCardRenderPhotoIds(renderModel);
-      const requiredPhotoIdSet = new Set(requiredPhotoIds);
-      const requiredPhotos = photos.filter(({ id }) => requiredPhotoIdSet.has(id));
-      const signedUrls = await loadAlbumPhotoSignedUrls(
-        requiredPhotos.map(({ storagePath }) => storagePath),
-      );
-      const hydratedRequiredPhotos = applyAlbumPhotoSignedUrls(
-        requiredPhotos,
-        signedUrls,
-      );
-      const hydratedPhotos = applyAlbumPhotoSignedUrls(photos, signedUrls);
-      setPhotos((current) => mergeAlbumPhotos(current, hydratedRequiredPhotos));
-      if (
-        requiredPhotoIds.some(
-          (photoId) => !hydratedPhotos.find(({ id }) => id === photoId)?.signedUrl,
-        )
-      ) {
-        throw new Error("memory-card-export-photo-unavailable");
-      }
-      const blob = await exportMemoryCardPng({
-        templateKey: exportTemplateKey,
-        renderModel,
-        photos: hydratedPhotos,
-        dateLabel,
-      });
+      const blob = await renderCardBlob(exportTemplateKey, renderModel);
       const filename = `fukuoka-memory-card-${exportTemplateKey}.png`;
       if (action === "share") {
         await shareOrDownloadMemoryCardPng(blob, filename);
@@ -519,6 +593,30 @@ export function MemoryCardsView() {
       }
     } catch {
       setError("PNG를 만들지 못했어요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setExportingKey(null);
+    }
+  };
+
+  const exportSavedCard = async (card: MemoryCard, action: ExportAction) => {
+    if (exportingKey) return;
+    setExportingKey(`${card.id}-${action}`);
+    setError(null);
+    try {
+      const blob = card.isFinalized
+        ? await downloadMemoryCardResult(card)
+        : card.renderModel
+          ? await renderCardBlob(card.templateKey, card.renderModel)
+          : null;
+      if (!blob) throw new Error("memory-card-render-unavailable");
+      const filename = `fukuoka-memory-card-${card.templateKey}.png`;
+      if (action === "share") {
+        await shareOrDownloadMemoryCardPng(blob, filename);
+      } else {
+        downloadMemoryCardPng(blob, filename);
+      }
+    } catch {
+      setError("완성 카드를 내려받지 못했어요. 잠시 후 다시 시도해주세요.");
     } finally {
       setExportingKey(null);
     }
@@ -536,8 +634,12 @@ export function MemoryCardsView() {
     setDeletingCardId(card.id);
     setError(null);
     try {
-      await deleteMemoryCard(card);
+      const { storageCleanupFailed } = await deleteMemoryCard(card);
       setCards((current) => current.filter(({ id }) => id !== card.id));
+      if (selectedCardId === card.id) setSelectedCardId(null);
+      if (storageCleanupFailed) {
+        setError("카드는 삭제했지만 저장 이미지를 정리하지 못했어요.");
+      }
     } catch {
       setError("추억 카드를 삭제하지 못했어요. 다시 시도해주세요.");
     } finally {
@@ -546,13 +648,13 @@ export function MemoryCardsView() {
   };
 
   if (isLoading) {
-    return <LoadingState className="min-h-[60svh]" label="추억 카드를 불러오고 있어요" />;
+    return <LoadingState className="cards-empty min-h-[60svh]" label="추억 카드를 불러오고 있어요" />;
   }
 
   if (loadError) {
     return (
       <EmptyState
-        className="bg-surface/60"
+        className="cards-empty"
         title="추억 카드를 불러오지 못했어요."
         description="네트워크 연결을 확인하고 다시 시도해주세요."
         action={
@@ -570,23 +672,18 @@ export function MemoryCardsView() {
 
   if (composerStep === "template") {
     return (
-      <section aria-labelledby="template-title">
-        <div className="flex items-start justify-between gap-3">
+      <section className="cards-studio" aria-labelledby="template-title">
+        <header className="cards-studio-heading">
+          <span className="cards-sparkle" aria-hidden="true">✦</span>
           <div>
-            <p className="text-caption font-bold tracking-[0.16em] text-accent-primary">STEP 1</p>
-            <h2 id="template-title" className="font-editorial mt-1 text-section font-semibold">템플릿을 골라주세요</h2>
+            <p className="cards-step">STEP 1 · TEMPLATE</p>
+            <h2 id="template-title" className="cards-studio-title">카드 만들기</h2>
+            <p>템플릿을 선택하고 우리만의 추억 카드를 만들어 보세요.</p>
           </div>
-          <Button variant="ghost" onClick={closeComposer}>닫기</Button>
-        </div>
-        {albumPhotoCount < minimumPhotoCount && (
-          <EmptyState
-            className="mt-5 bg-surface/60"
-            title="카드를 만들 사진이 부족해요."
-            description={`템플릿에는 앨범 사진이 최소 ${minimumPhotoCount}장 필요해요.`}
-            action={<a href="/album" className="tap-target inline-flex items-center font-semibold text-accent-primary">앨범으로 이동</a>}
-          />
-        )}
-        <div className="mt-5 space-y-4">
+          <button type="button" className="cards-close" onClick={closeComposer}>닫기</button>
+        </header>
+
+        <div className="cards-template-strip" aria-label="빠른 템플릿 선택">
           {MEMORY_CARD_TEMPLATES.map((item) => {
             const available = albumPhotoCount >= item.acceptedMin;
             return (
@@ -595,18 +692,54 @@ export function MemoryCardsView() {
                 type="button"
                 disabled={!available}
                 onClick={() => selectTemplate(item.key)}
-                className="tap-target grid w-full grid-cols-[7rem_minmax(0,1fr)] items-center gap-4 rounded-lg border border-line bg-surface p-3 text-left shadow-card disabled:opacity-45"
+                className="cards-template-tile"
               >
-                <MemoryCardPreview templateKey={item.key} photos={[]} dateLabel={dateLabel} />
-                <span className="min-w-0">
-                  <span className="font-editorial block text-lg font-semibold">{item.displayName}</span>
-                  <span className="mt-1 block text-sm text-text-secondary">
-                    {templatePhotoCountLabel(item.acceptedMin, item.acceptedMax)} · {available ? "고정 배치" : `앨범 ${item.acceptedMin}장부터`}
-                  </span>
-                </span>
+                <TemplateGlyph templateKey={item.key} />
+                <span>{item.displayName}</span>
               </button>
             );
           })}
+        </div>
+
+        {albumPhotoCount < minimumPhotoCount && (
+          <EmptyState
+            className="cards-empty mt-5"
+            title="카드를 만들 사진이 부족해요."
+            description={`템플릿에는 앨범 사진이 최소 ${minimumPhotoCount}장 필요해요.`}
+            action={<a href="/album" className="tap-target inline-flex items-center font-semibold text-accent-primary">앨범으로 이동</a>}
+          />
+        )}
+
+        <div className="cards-studio-divider" />
+        <div className="cards-gallery-heading">
+          <h3><span aria-hidden="true">❧</span> 템플릿 선택</h3>
+          <span>8가지 디자인</span>
+        </div>
+        <div className="cards-template-gallery">
+          {MEMORY_CARD_TEMPLATES.map((item) => {
+            const available = albumPhotoCount >= item.acceptedMin;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                disabled={!available}
+                onClick={() => selectTemplate(item.key)}
+                className="cards-template-card"
+              >
+                <span className="cards-template-preview">
+                  <MemoryCardPreview templateKey={item.key} photos={[]} dateLabel={dateLabel} />
+                </span>
+                <strong>{item.displayName}</strong>
+                <small>{available ? templatePhotoCountLabel(item.acceptedMin, item.acceptedMax) : `앨범 ${item.acceptedMin}장부터`}</small>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="cards-tip">
+          <span aria-hidden="true">❧</span>
+          <p><strong>카드 팁</strong>사진은 앨범에서 선택해 카드에 담을 수 있어요.</p>
+          <a href="/album">사진 보기</a>
         </div>
       </section>
     );
@@ -614,19 +747,26 @@ export function MemoryCardsView() {
 
   if (composerStep === "photos" && template && draftLayout) {
     return (
-      <section aria-labelledby="photo-selection-title">
-        <div className="flex items-start justify-between gap-3">
+      <section className="cards-studio" aria-labelledby="photo-selection-title">
+        <header className="cards-studio-heading">
+          <span className="cards-sparkle" aria-hidden="true">✦</span>
           <div>
-            <p className="text-caption font-bold tracking-[0.16em] text-accent-primary">STEP 2</p>
-            <h2 id="photo-selection-title" className="font-editorial mt-1 text-section font-semibold">사진을 채워주세요</h2>
-            <p className="mt-1 text-sm text-text-secondary">
+            <p className="cards-step">STEP 2 · PHOTOS</p>
+            <h2 id="photo-selection-title" className="cards-studio-title">사진을 채워주세요</h2>
+            <p>
               {template.displayName} · {selectedPhotoIds.length}/{template.acceptedMax}장
             </p>
           </div>
-          <Button variant="ghost" onClick={closeComposer}>닫기</Button>
-        </div>
+          <button type="button" className="cards-close" onClick={closeComposer}>닫기</button>
+        </header>
 
-        <Card className="mt-5 p-3">
+        <button type="button" className="cards-selected-template" onClick={() => setComposerStep("template")}>
+          <TemplateGlyph templateKey={template.key} />
+          <span><strong>{template.displayName}</strong>{templatePhotoCountLabel(template.acceptedMin, template.acceptedMax)}</span>
+          <span>템플릿 변경</span>
+        </button>
+
+        <Card className="cards-preview-frame mt-5 p-3">
           <MemoryCardPreview
             templateKey={template.key}
             renderModel={draftRenderModel}
@@ -636,8 +776,8 @@ export function MemoryCardsView() {
           />
         </Card>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button variant="secondary" onClick={() => setComposerStep("template")}>템플릿 변경</Button>
+        <div className="cards-action-row mt-4">
+          <Button variant="secondary" onClick={() => setComposerStep("template")}>다른 템플릿</Button>
           <Button variant="secondary" onClick={fillRandomly}>랜덤 채우기</Button>
         </div>
 
@@ -647,7 +787,7 @@ export function MemoryCardsView() {
           </p>
         )}
 
-        <div className="mt-5 grid grid-cols-3 gap-2" aria-label="카드에 넣을 사진 선택">
+        <div className="cards-photo-grid mt-5" aria-label="카드에 넣을 사진 선택">
           {photos.map((photo, index) => {
             const selectionIndex = selectedPhotoIds.indexOf(photo.id);
             const selected = selectionIndex >= 0;
@@ -677,7 +817,7 @@ export function MemoryCardsView() {
 
         <Button
           fullWidth
-          className="mt-5"
+          className="cards-primary-action mt-5"
           disabled={!canPreview}
           onClick={() => {
             selectSlotForCrop(draftLayout.slots[0]?.slotId ?? null);
@@ -686,6 +826,11 @@ export function MemoryCardsView() {
         >
           카드 미리보기
         </Button>
+        <div className="cards-tip mt-5">
+          <span aria-hidden="true">❧</span>
+          <p><strong>카드 팁</strong>선택한 순서대로 카드의 사진 칸이 채워져요.</p>
+          <button type="button" onClick={fillRandomly}>랜덤 선택</button>
+        </div>
       </section>
     );
   }
@@ -693,11 +838,17 @@ export function MemoryCardsView() {
   if (composerStep === "preview" && template && draftLayout && canPreview) {
     const draftBusy = exportingKey?.startsWith("draft-");
     return (
-      <section aria-labelledby="preview-title">
-        <p className="text-caption font-bold tracking-[0.16em] text-accent-primary">STEP 3</p>
-        <h2 id="preview-title" className="font-editorial mt-1 text-section font-semibold">카드 미리보기</h2>
-        <p className="mt-1 text-sm text-text-secondary">{template.displayName}</p>
-        <Card className="mt-5 p-3">
+      <section className="cards-studio" aria-labelledby="preview-title">
+        <header className="cards-studio-heading">
+          <span className="cards-sparkle" aria-hidden="true">✦</span>
+          <div>
+            <p className="cards-step">STEP 3 · PREVIEW</p>
+            <h2 id="preview-title" className="cards-studio-title">카드 미리보기</h2>
+            <p>{template.displayName} · 사진을 눌러 위치를 조정하세요.</p>
+          </div>
+          <button type="button" className="cards-close" onClick={closeComposer}>닫기</button>
+        </header>
+        <Card className="cards-preview-frame mt-5 p-3">
           <MemoryCardPreview
             templateKey={template.key}
             renderModel={draftRenderModel}
@@ -709,10 +860,10 @@ export function MemoryCardsView() {
           />
         </Card>
 
-        <div className="mt-5 rounded-lg border border-line bg-surface p-4">
+        <div className="cards-editor-panel mt-5">
           <h3 className="font-semibold">조정할 사진</h3>
           <p className="mt-1 text-sm text-text-secondary">미리보기의 사진을 눌러도 열 수 있어요.</p>
-          <div className="mt-3 grid grid-cols-3 gap-2" aria-label="조정할 사진 선택">
+          <div className="cards-slot-grid mt-3" aria-label="조정할 사진 선택">
             {draftLayout.slots.map((slot, index) => (
               <button
                 key={slot.slotId}
@@ -806,13 +957,14 @@ export function MemoryCardsView() {
         <p className="mt-1 text-caption text-text-secondary">앨범 사진의 문구와 별도로 저장돼요.</p>
 
         {error && <p role="alert" className="mt-4 rounded-md bg-danger/8 px-4 py-3 text-sm text-danger">{error}</p>}
-        <div className="mt-5 grid grid-cols-2 gap-2">
+        <div className="cards-action-row mt-5">
           <Button variant="secondary" disabled={isSaving || Boolean(draftBusy)} onClick={() => setComposerStep("photos")}>사진 다시 고르기</Button>
           <Button variant="secondary" disabled={isSaving || Boolean(draftBusy)} onClick={reshuffle}>다시 섞기</Button>
           <Button variant="secondary" loading={exportingKey === "draft-download"} disabled={isSaving || Boolean(draftBusy)} onClick={() => draftRenderModel && exportCard("draft", "download", template.key, draftRenderModel)}>PNG 저장</Button>
           <Button variant="secondary" loading={exportingKey === "draft-share"} disabled={isSaving || Boolean(draftBusy)} onClick={() => draftRenderModel && exportCard("draft", "share", template.key, draftRenderModel)}>공유</Button>
         </div>
-        <Button fullWidth className="mt-2" loading={isSaving} disabled={Boolean(draftBusy)} onClick={saveCard}>
+        <p className="cards-finalize-note">최초 저장하면 이 모습으로 확정되며 이후에는 보기·다운로드·삭제만 할 수 있어요.</p>
+        <Button fullWidth className="cards-primary-action mt-2" loading={isSaving} disabled={Boolean(draftBusy)} onClick={saveCard}>
           {isSaving ? "저장 중" : "카드 저장"}
         </Button>
       </section>
@@ -821,86 +973,107 @@ export function MemoryCardsView() {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3">
-        <Badge tone="neutral">{cards.length}장</Badge>
+      <section className="cards-first-actions" aria-label="추억 카드 만들기">
+        <div className="cards-count">
+          <Badge tone="neutral">{cards.length}장</Badge>
+          <p>가족이 함께 간직한 카드</p>
+        </div>
         <Button
+          className="cards-create-button"
           loading={isLoadingComposerPhotos}
           disabled={albumPhotoCount < minimumPhotoCount}
           onClick={openComposer}
         >
-          추억 카드 만들기
+          <span aria-hidden="true">✦</span> 추억 카드 만들기
         </Button>
-      </div>
+      </section>
 
       {error && <p role="alert" className="mt-4 rounded-md bg-danger/8 px-4 py-3 text-sm text-danger">{error}</p>}
 
       {albumPhotoCount < minimumPhotoCount && (
-        <Card className="mt-5 p-4">
+        <Card className="cards-album-needed mt-5 p-4">
           <p className="font-semibold">카드를 만들려면 사진이 최소 {minimumPhotoCount}장 필요해요.</p>
           <p className="mt-1 text-sm text-text-secondary">현재 앨범 사진 {albumPhotoCount}장 · 사진을 더 추가해주세요.</p>
           <a href="/album" className="tap-target mt-2 inline-flex items-center text-sm font-semibold text-accent-primary">앨범으로 이동 →</a>
         </Card>
       )}
 
-      <section className="mt-8" aria-labelledby="saved-cards-title">
-        <div className="flex items-end justify-between gap-3 border-b border-line pb-3">
+      <section className="cards-keepsakes" aria-labelledby="saved-cards-title">
+        <div className="cards-keepsakes-heading">
           <div>
-            <p className="text-caption font-bold tracking-[0.14em] text-accent-secondary">FAMILY KEEPSAKES</p>
-            <h2 id="saved-cards-title" className="font-editorial mt-1 text-section font-semibold">가족의 추억 카드</h2>
+            <p>FAMILY KEEPSAKES</p>
+            <h2 id="saved-cards-title">가족의 추억 카드</h2>
           </div>
-          {cards.length > 0 && <span className="text-caption text-text-secondary">최신순</span>}
+          {cards.length > 0 && <span className="cards-sort">최신순⌄</span>}
         </div>
 
         {cards.length === 0 ? (
           <EmptyState
-            className="mt-4 bg-surface/55"
+            className="cards-empty mt-4"
             title="아직 저장된 추억 카드가 없어요."
             description="앨범 사진으로 첫 카드를 만들어보세요."
+            action={<button type="button" onClick={openComposer} className="cards-empty-action">첫 카드 만들기</button>}
           />
         ) : (
-          <div className="mt-5 space-y-6">
+          <div className="cards-saved-list">
             {cards.map((card) => {
               const savedTemplate = getMemoryCardTemplate(card.templateKey)!;
               const cardBusy = exportingKey?.startsWith(`${card.id}-`);
               return (
-                <article key={card.id} className="overflow-hidden rounded-lg border border-line/70 bg-surface p-3 shadow-card">
-                  <MemoryCardPreview
-                    templateKey={card.templateKey}
-                    renderModel={card.renderModel}
-                    photos={photos}
-                    dateLabel={dateLabel}
-                    onPhotoMediaChange={handlePhotoMediaChange}
-                  />
-                  <div className="flex items-start justify-between gap-3 px-1 pt-3">
+                <article key={card.id} className="cards-saved-card">
+                  <div className="cards-saved-art">
+                    {card.isFinalized ? (
+                      <FinalizedMemoryCardImage card={card} />
+                    ) : (
+                      <MemoryCardPreview
+                        templateKey={card.templateKey}
+                        renderModel={card.renderModel}
+                        photos={photos}
+                        dateLabel={dateLabel}
+                        onPhotoMediaChange={handlePhotoMediaChange}
+                      />
+                    )}
+                    <span className={card.isFinalized ? "cards-final-badge" : "cards-legacy-badge"}>
+                      {card.isFinalized ? "최종 카드" : "이전 카드"}
+                    </span>
+                  </div>
+                  <div className="cards-saved-meta">
                     <div>
-                      <h3 className="font-editorial font-semibold">{savedTemplate.displayName}</h3>
-                      <p className="mt-0.5 text-caption text-text-secondary">{card.creatorName ?? "가족 구성원"} · {createdAtFormatter.format(new Date(card.createdAt))}</p>
+                      <h3>{savedTemplate.displayName}</h3>
+                      <p>{card.creatorName ?? "가족 구성원"} · {createdAtFormatter.format(new Date(card.createdAt))}</p>
                     </div>
                     {card.isOwner && (
                       <button
                         type="button"
                         disabled={Boolean(deletingCardId)}
                         onClick={() => removeCard(card)}
-                        className="tap-target px-2 text-caption font-semibold text-danger disabled:opacity-50"
+                        className="cards-delete"
                       >
                         {deletingCardId === card.id ? "삭제 중" : "삭제"}
                       </button>
                     )}
                   </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="cards-saved-actions">
                     <Button
                       variant="secondary"
-                      disabled={!card.renderModel || Boolean(cardBusy)}
-                      loading={exportingKey === `${card.id}-download`}
-                      onClick={() => card.renderModel && exportCard(card.id, "download", card.templateKey, card.renderModel)}
+                      disabled={Boolean(cardBusy)}
+                      onClick={() => setSelectedCardId(card.id)}
                     >
-                      PNG 저장
+                      보기
                     </Button>
                     <Button
                       variant="secondary"
-                      disabled={!card.renderModel || Boolean(cardBusy)}
+                      disabled={(!card.isFinalized && !card.renderModel) || Boolean(cardBusy)}
+                      loading={exportingKey === `${card.id}-download`}
+                      onClick={() => exportSavedCard(card, "download")}
+                    >
+                      다운로드
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={(!card.isFinalized && !card.renderModel) || Boolean(cardBusy)}
                       loading={exportingKey === `${card.id}-share`}
-                      onClick={() => card.renderModel && exportCard(card.id, "share", card.templateKey, card.renderModel)}
+                      onClick={() => exportSavedCard(card, "share")}
                     >
                       공유
                     </Button>
@@ -911,6 +1084,59 @@ export function MemoryCardsView() {
           </div>
         )}
       </section>
+
+      {selectedSavedCard && (
+        <div className="cards-viewer-backdrop" role="presentation" onClick={() => setSelectedCardId(null)}>
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="saved-card-dialog-title"
+            className="cards-viewer"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header>
+              <div>
+                <p>IMMUTABLE KEEPSAKE</p>
+                <h2 id="saved-card-dialog-title">완성된 추억 카드</h2>
+              </div>
+              <button type="button" onClick={() => setSelectedCardId(null)} aria-label="카드 보기 닫기">닫기</button>
+            </header>
+            <div className="cards-viewer-art">
+              {selectedSavedCard.isFinalized ? (
+                <FinalizedMemoryCardImage card={selectedSavedCard} />
+              ) : (
+                <MemoryCardPreview
+                  templateKey={selectedSavedCard.templateKey}
+                  renderModel={selectedSavedCard.renderModel}
+                  photos={photos}
+                  dateLabel={dateLabel}
+                  onPhotoMediaChange={handlePhotoMediaChange}
+                />
+              )}
+            </div>
+            <p className="cards-viewer-meta">
+              {selectedSavedCard.creatorName ?? "가족 구성원"} · {createdAtFormatter.format(new Date(selectedSavedCard.createdAt))}
+            </p>
+            <div className="cards-action-row">
+              <Button
+                variant="secondary"
+                loading={exportingKey === `${selectedSavedCard.id}-download`}
+                disabled={!selectedSavedCard.isFinalized && !selectedSavedCard.renderModel}
+                onClick={() => exportSavedCard(selectedSavedCard, "download")}
+              >
+                다운로드
+              </Button>
+              <Button
+                loading={exportingKey === `${selectedSavedCard.id}-share`}
+                disabled={!selectedSavedCard.isFinalized && !selectedSavedCard.renderModel}
+                onClick={() => exportSavedCard(selectedSavedCard, "share")}
+              >
+                공유
+              </Button>
+            </div>
+          </section>
+        </div>
+      )}
     </>
   );
 }

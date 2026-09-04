@@ -84,6 +84,9 @@ export type MemoryCard = {
   id: string;
   templateKey: MemoryCardTemplateKey;
   renderModel: MemoryCardRenderModel | null;
+  resultStoragePath: string | null;
+  resultSignedUrl: string | null;
+  isFinalized: boolean;
   creatorName: string | null;
   createdAt: string;
   isOwner: boolean;
@@ -96,12 +99,12 @@ export function getMemoryCardRenderPhotoIds(
 }
 
 export function getMemoryCardReferencedPhotoIds(
-  cards: readonly Pick<MemoryCard, "renderModel">[],
+  cards: readonly Pick<MemoryCard, "renderModel" | "isFinalized">[],
 ) {
   return [
     ...new Set(
-      cards.flatMap(({ renderModel }) =>
-        renderModel ? getMemoryCardRenderPhotoIds(renderModel) : [],
+      cards.flatMap(({ isFinalized, renderModel }) =>
+        !isFinalized && renderModel ? getMemoryCardRenderPhotoIds(renderModel) : [],
       ),
     ),
   ];
@@ -527,6 +530,7 @@ export function mapPersistedMemoryCardRows(
   rows: readonly PersistedMemoryCardRow[],
   creatorNames: ReadonlyMap<string, string>,
   authUserId: string,
+  resultSignedUrls: ReadonlyMap<string, string | null> = new Map(),
 ): MemoryCard[] {
   return rows.flatMap((row) => {
     const template = getMemoryCardTemplateSpec(row.template_key);
@@ -541,6 +545,11 @@ export function mapPersistedMemoryCardRows(
           row.layout_version,
           row.layout_json,
         ),
+        resultStoragePath: row.result_storage_path,
+        resultSignedUrl: row.result_storage_path
+          ? resultSignedUrls.get(row.result_storage_path) ?? null
+          : null,
+        isFinalized: Boolean(row.result_storage_path),
         creatorName: creatorNames.get(row.creator_member_id) ?? null,
         createdAt: row.created_at,
         isOwner: row.creator_auth_user_id === authUserId,
@@ -549,11 +558,48 @@ export function mapPersistedMemoryCardRows(
   });
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_V4_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function buildMemoryCardResultStoragePath(
+  tripId: string,
+  authUserId: string,
+  createUuid: () => string = () => crypto.randomUUID(),
+) {
+  const resultId = createUuid();
+  if (
+    !UUID_PATTERN.test(tripId) ||
+    !UUID_PATTERN.test(authUserId) ||
+    !UUID_V4_PATTERN.test(resultId)
+  ) {
+    throw new Error("invalid-memory-card-result-path");
+  }
+  return `${tripId}/${authUserId}/${resultId}.png`;
+}
+
+export function isMemoryCardResultStoragePath(
+  storagePath: string,
+  tripId: string,
+  authUserId: string,
+) {
+  const [pathTripId, pathAuthUserId, filename, ...rest] = storagePath.split("/");
+  return (
+    rest.length === 0 &&
+    pathTripId === tripId &&
+    pathAuthUserId === authUserId &&
+    UUID_V4_PATTERN.test(filename?.slice(0, -4) ?? "") &&
+    filename?.endsWith(".png") === true
+  );
+}
+
 export function buildMemoryCardInsertPayload({
   authUserId,
   availablePhotoIds,
   layout,
   memberId,
+  resultStoragePath,
   templateKey,
   tripId,
 }: {
@@ -561,6 +607,7 @@ export function buildMemoryCardInsertPayload({
   availablePhotoIds: ReadonlySet<string>;
   layout: unknown;
   memberId: string;
+  resultStoragePath: string;
   templateKey: MemoryCardTemplateKey;
   tripId: string;
 }) {
@@ -573,6 +620,9 @@ export function buildMemoryCardInsertPayload({
   ) {
     throw new Error("invalid-memory-card-photos");
   }
+  if (!isMemoryCardResultStoragePath(resultStoragePath, tripId, authUserId)) {
+    throw new Error("invalid-memory-card-result-path");
+  }
 
   return {
     trip_id: tripId,
@@ -581,6 +631,6 @@ export function buildMemoryCardInsertPayload({
     template_key: templateKey,
     layout_version: 3,
     layout_json: validatedLayout,
-    result_storage_path: null,
+    result_storage_path: resultStoragePath,
   };
 }

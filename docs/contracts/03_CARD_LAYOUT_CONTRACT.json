@@ -123,8 +123,9 @@
     "caption": "Card-specific text; empty or whitespace normalizes to null and never updates photos.caption.",
     "signedUrlsInLayoutJson": false,
     "storagePathsInLayoutJson": false,
-    "resultStoragePath": null,
-    "renderedResultStorage": "deferred",
+    "resultStoragePath": "Required for new writes as {tripId}/{authUserId}/{randomUuid}.png in the existing private memory-card-results bucket.",
+    "renderedResultStorage": "Render once before INSERT; the stored PNG is the primary list/detail/download artifact and is immutable after save.",
+    "legacyResultFallback": "Rows with null result_storage_path remain readable through layout/photo reconstruction.",
     "decorations": "Template metadata only; never persisted in layout_json."
   }
 }
