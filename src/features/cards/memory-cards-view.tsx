@@ -948,8 +948,9 @@ export function MemoryCardsView() {
               className="cards-sheet cards-preview-dialog"
               onClick={(event) => event.stopPropagation()}
             >
-              <header className="cards-sheet-heading">
+              <header className="cards-sheet-heading cards-preview-heading">
                 <div>
+                  <span>FINAL REVIEW</span>
                   <h3 id="cards-preview-dialog-title">카드 미리보기</h3>
                   <p>{template.displayName} · 사진을 눌러 위치를 조정하세요.</p>
                 </div>
@@ -969,21 +970,20 @@ export function MemoryCardsView() {
                 </div>
 
                 <div className="cards-editor-panel">
-                  <h3 className="font-semibold">조정할 사진</h3>
-                  <p className="mt-1 text-sm text-text-secondary">미리보기의 사진을 눌러도 열 수 있어요.</p>
-                  <div className="cards-slot-grid mt-3" aria-label="조정할 사진 선택">
+                  <div className="cards-editor-heading">
+                    <h3>사진 위치 조정</h3>
+                    <p>조정할 사진을 선택하면 위치와 크기를 바꿀 수 있어요.</p>
+                  </div>
+                  <div className="cards-slot-grid" aria-label="조정할 사진 선택">
                     {draftLayout.slots.map((slot, index) => (
                       <button
                         key={slot.slotId}
                         type="button"
                         aria-pressed={slot.slotId === selectedSlotId}
                         onClick={() => selectSlotForCrop(slot.slotId)}
-                        className={`min-h-11 rounded-md border px-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary ${
-                          slot.slotId === selectedSlotId
-                            ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
-                            : "border-line bg-background"
-                        }`}
+                        className="cards-slot-button"
                       >
+                        <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
                         사진 {index + 1}
                       </button>
                     ))}
