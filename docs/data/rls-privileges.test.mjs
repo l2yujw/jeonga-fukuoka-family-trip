@@ -109,29 +109,31 @@ test("historical migration 10 remains row-preserving and removes authenticated U
   assert.match(normalizedMigration10, /^begin;[\s\S]*commit;$/);
 });
 
-test("canonical RLS and migration 11 enforce canonical-v3 reader parity", async () => {
-  const [rls, migration11] = await Promise.all([
+test("canonical RLS and migration 14 require an owned immutable PNG path", async () => {
+  const [rls, migration14] = await Promise.all([
     readFile(new URL("./02_RLS_FINAL.sql", import.meta.url), "utf8"),
     readFile(
       new URL(
-        "./11_FUNCTION_ARCHITECTURE_LOCK_CARD_LAYOUT_POLICY_TIGHTENING.sql",
+        "./14_MEMORY_CARD_IMMUTABLE_RENDER_MIGRATION.sql",
         import.meta.url,
       ),
       "utf8",
     ),
   ]);
   const canonicalPolicy = extractMemoryCardInsertPolicy(rls);
-  const migrationPolicy = extractMemoryCardInsertPolicy(migration11);
-  const normalizedMigration11 = normalizeSql(migration11);
+  const migrationPolicy = extractMemoryCardInsertPolicy(migration14);
+  const normalizedMigration14 = normalizeSql(migration14);
 
   assert.equal(migrationPolicy, canonicalPolicy);
-  assert.equal(
-    normalizedMigration11,
-    `begin; drop policy if exists "members can create own memory cards" on public.memory_cards; ${migrationPolicy} commit;`,
+  assert.match(normalizedMigration14, /^begin;[\s\S]*commit;$/);
+  assert.match(normalizedMigration14, /drop policy if exists "members can create own memory cards" on public\.memory_cards/);
+  assert.doesNotMatch(
+    normalizedMigration14,
+    /grant update(?: \([^)]*\))? on table public\.memory_cards to [^;]*\bauthenticated\b/,
   );
   assert.doesNotMatch(
-    normalizedMigration11,
-    /grant update(?: \([^)]*\))? on table public\.memory_cards to [^;]*\bauthenticated\b/,
+    normalizedMigration14,
+    /update public\.memory_cards set|delete from public\.memory_cards|create policy .* for update/,
   );
 
   for (const policy of [canonicalPolicy, migrationPolicy]) {
@@ -141,7 +143,12 @@ test("canonical RLS and migration 11 enforce canonical-v3 reader parity", async 
     assert.match(policy, /tm\.auth_user_id = \(select auth\.uid\(\)\)/);
     assert.match(policy, /layout_version = 3/);
     assert.match(policy, /layout_json -> 'version' = to_jsonb\(layout_version\)/);
-    assert.match(policy, /result_storage_path is null/);
+    assert.match(policy, /result_storage_path is not null/);
+    assert.match(policy, /\(storage\.foldername\(result_storage_path\)\)\[1\] = memory_cards\.trip_id::text/);
+    assert.match(policy, /\(storage\.foldername\(result_storage_path\)\)\[2\] = \(select auth\.uid\(\)::text\)/);
+    assert.match(policy, /cardinality\(storage\.foldername\(result_storage_path\)\) = 2/);
+    assert.match(policy, /storage\.filename\(result_storage_path\) ~ '\^\[0-9a-f\]/);
+    assert.match(policy, /\\\.png\$/);
     assert.match(policy, /layout_json \? 'caption'/);
     assert.match(policy, /layout_json -> 'caption' = 'null'::jsonb/);
     assert.match(policy, /jsonb_typeof\(layout_json -> 'caption'\) = 'string'/);
@@ -173,12 +180,21 @@ test("canonical RLS and migration 11 enforce canonical-v3 reader parity", async 
   }
 });
 
+test("historical migration 11 remains immutable and row-preserving", async () => {
+  const migration11 = normalizeSql(await readFile(
+    new URL("./11_FUNCTION_ARCHITECTURE_LOCK_CARD_LAYOUT_POLICY_TIGHTENING.sql", import.meta.url),
+    "utf8",
+  ));
+  assert.match(migration11, /result_storage_path is null/);
+  assert.doesNotMatch(migration11, /grant update|update public\.memory_cards set|delete from public\.memory_cards/);
+});
+
 test("canonical policies reject malformed slot shapes and allow both editorial shapes", async () => {
-  const [rls, migration11] = await Promise.all([
+  const [rls, migration14] = await Promise.all([
     readFile(new URL("./02_RLS_FINAL.sql", import.meta.url), "utf8"),
     readFile(
       new URL(
-        "./11_FUNCTION_ARCHITECTURE_LOCK_CARD_LAYOUT_POLICY_TIGHTENING.sql",
+        "./14_MEMORY_CARD_IMMUTABLE_RENDER_MIGRATION.sql",
         import.meta.url,
       ),
       "utf8",
@@ -198,7 +214,7 @@ test("canonical policies reject malformed slot shapes and allow both editorial s
     instant_memory: [["im1"]],
   };
 
-  for (const sql of [rls, migration11]) {
+  for (const sql of [rls, migration14]) {
     const policy = extractMemoryCardInsertPolicy(sql);
     assert.match(
       extractTemplateBranch(policy, "editorial_collage"),
