@@ -115,7 +115,7 @@ function MemoryCardPhoto({
   return (
     <span
       ref={observe}
-      className="flex size-full items-center justify-center bg-line/45 px-1 text-center text-[clamp(6px,2vw,10px)] font-semibold text-text-secondary"
+      className="cards-photo-unavailable flex size-full items-center justify-center bg-line/45 px-1 text-center text-[clamp(6px,2vw,10px)] font-semibold text-text-secondary"
     >
       {mediaState === "ready" && signedUrl ? (
         /* Signed URLs are short-lived runtime values from private Storage. */
@@ -144,7 +144,7 @@ function MemoryCardPhoto({
           draggable={false}
         />
       ) : mediaState === "error" ? (
-        "사진을 표시할 수 없어요"
+        "사진 없음"
       ) : (
         <span className="sr-only">사진 불러오는 중</span>
       )}
@@ -263,9 +263,9 @@ export function MemoryCardPreview({
                 }}
               />
             ) : resolved?.optionalEmpty ? null : (
-              <span className="flex size-full items-center justify-center bg-line/45 px-1 text-center text-[clamp(6px,2vw,10px)] font-semibold text-text-secondary">
+              <span className={`flex size-full items-center justify-center bg-line/45 px-1 text-center text-[clamp(6px,2vw,10px)] font-semibold text-text-secondary ${resolved?.photoId ? "cards-photo-unavailable" : ""}`}>
                 {resolved?.photoId
-                  ? "사진을 표시할 수 없어요"
+                  ? "사진 없음"
                   : "사진 선택"}
               </span>
             )}

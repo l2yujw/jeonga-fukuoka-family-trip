@@ -67,6 +67,18 @@ import type { MemoryCardPhotoSlot } from "./memory-card-template-spec";
 type ComposerStep = "template" | "photos" | "preview";
 type ExportAction = "download" | "share";
 
+const FEATURED_TEMPLATE_KEYS = [
+  "one_moment",
+  "instant_memory",
+  "postcard_duo",
+  "scrapbook_trio",
+  "film_contact_sheet",
+] as const satisfies readonly MemoryCardTemplateKey[];
+
+const FEATURED_MEMORY_CARD_TEMPLATES = FEATURED_TEMPLATE_KEYS.map(
+  (key) => MEMORY_CARD_TEMPLATES.find((template) => template.key === key)!,
+);
+
 const createdAtFormatter = new Intl.DateTimeFormat("ko-KR", {
   year: "numeric",
   month: "short",
@@ -94,6 +106,29 @@ function TemplateGlyph({ templateKey }: { templateKey: MemoryCardTemplateKey }) 
       ))}
     </svg>
   );
+}
+
+function EyeIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="cards-action-icon">
+      <path d="M2.5 12s3.5-5.5 9.5-5.5 9.5 5.5 9.5 5.5-3.5 5.5-9.5 5.5S2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="2.5" />
+    </svg>
+  );
+}
+
+function SaveIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="cards-action-icon">
+      <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v2h14v-2" />
+    </svg>
+  );
+}
+
+function getSavedCardCaption(card: MemoryCard) {
+  return card.renderModel?.kind === "canonical"
+    ? card.renderModel.layout.caption
+    : null;
 }
 
 function FinalizedMemoryCardImage({
@@ -139,6 +174,14 @@ function FinalizedMemoryCardImage({
 }
 
 const minimumPhotoCount = getMinimumMemoryCardPhotoCount();
+
+function getDefaultComposerTemplateKey(photoCount: number) {
+  return (
+    MEMORY_CARD_TEMPLATES.find(
+      ({ acceptedMin, key }) => key === "one_moment" && photoCount >= acceptedMin,
+    ) ?? MEMORY_CARD_TEMPLATES.find(({ acceptedMin }) => photoCount >= acceptedMin)
+  )?.key ?? null;
+}
 
 type PhotoDraft = {
   photoIds: string[];
@@ -191,7 +234,7 @@ const ComposerPhotoThumbnail = memo(function ComposerPhotoThumbnail({
           className="size-full object-cover object-center"
         />
       ) : mediaState === "error" ? (
-        "표시할 수 없는 사진"
+        <span className="cards-photo-unavailable">사진을 불러올 수 없어요</span>
       ) : (
         <span className="sr-only">사진 불러오는 중</span>
       )}
@@ -207,6 +250,7 @@ export function MemoryCardsView() {
   const [composerPhotosLoaded, setComposerPhotosLoaded] = useState(false);
   const [isLoadingComposerPhotos, setIsLoadingComposerPhotos] = useState(false);
   const [composerStep, setComposerStep] = useState<ComposerStep | null>(null);
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
   const [templateKey, setTemplateKey] = useState<MemoryCardTemplateKey | null>(null);
   const [photoDraft, setPhotoDraft] = useState<PhotoDraft>({
     photoIds: [],
@@ -373,6 +417,7 @@ export function MemoryCardsView() {
   const openComposer = async () => {
     if (isLoadingComposerPhotos) return;
     if (composerPhotosLoaded) {
+      setTemplateKey(getDefaultComposerTemplateKey(albumPhotoCount));
       setComposerStep("template");
       return;
     }
@@ -388,6 +433,7 @@ export function MemoryCardsView() {
       setPhotos((current) => mergeAlbumPhotos(albumPhotos, current));
       setAlbumPhotoCount(albumPhotos.length);
       setComposerPhotosLoaded(true);
+      setTemplateKey(getDefaultComposerTemplateKey(albumPhotos.length));
       setComposerStep("template");
       void loadAlbumPhotoSignedUrls(
         firstViewPhotos.map(({ storagePath }) => storagePath),
@@ -408,6 +454,7 @@ export function MemoryCardsView() {
 
   const closeComposer = () => {
     setComposerStep(null);
+    setShowAllTemplates(false);
     setTemplateKey(null);
     setPhotoDraft({ photoIds: [], placementBySlotId: {} });
     setSelectedSlotId(null);
@@ -427,11 +474,14 @@ export function MemoryCardsView() {
 
   const selectTemplate = (nextTemplateKey: MemoryCardTemplateKey) => {
     const nextTemplate = getMemoryCardTemplate(nextTemplateKey);
-    if (!nextTemplate || photos.length < nextTemplate.acceptedMin) return;
+    if (
+      !nextTemplate ||
+      albumPhotoCount < nextTemplate.acceptedMin ||
+      templateKey === nextTemplateKey
+    ) return;
     setTemplateKey(nextTemplateKey);
     setPhotoDraft({ photoIds: [], placementBySlotId: {} });
     setSelectedSlotId(null);
-    setComposerStep("photos");
     setError(null);
   };
 
@@ -670,304 +720,364 @@ export function MemoryCardsView() {
     );
   }
 
-  if (composerStep === "template") {
-    return (
-      <section className="cards-studio" aria-labelledby="template-title">
-        <header className="cards-studio-heading">
-          <span className="cards-sparkle" aria-hidden="true">✦</span>
-          <div>
-            <p className="cards-step">STEP 1 · TEMPLATE</p>
-            <h2 id="template-title" className="cards-studio-title">카드 만들기</h2>
-            <p>템플릿을 선택하고 우리만의 추억 카드를 만들어 보세요.</p>
-          </div>
-          <button type="button" className="cards-close" onClick={closeComposer}>닫기</button>
-        </header>
+  if (composerStep && template && draftLayout) {
+    const draftBusy = exportingKey?.startsWith("draft-");
 
-        <div className="cards-template-strip" aria-label="빠른 템플릿 선택">
-          {MEMORY_CARD_TEMPLATES.map((item) => {
+    return (
+      <>
+        <section className="cards-studio" aria-labelledby="cards-studio-title">
+          <header className="cards-studio-heading">
+            <span className="cards-sparkle" aria-hidden="true">✦</span>
+            <div>
+              <h2 id="cards-studio-title" className="cards-studio-title">카드 만들기</h2>
+              <p>템플릿을 선택하고 우리만의 추억 카드를 만들어 보세요.</p>
+            </div>
+            <button type="button" className="cards-close" onClick={closeComposer} aria-label="카드 만들기 닫기">×</button>
+          </header>
+
+          <div className="cards-template-strip" aria-label="빠른 템플릿 선택">
+          {FEATURED_MEMORY_CARD_TEMPLATES.map((item) => {
             const available = albumPhotoCount >= item.acceptedMin;
+            const selected = template.key === item.key;
             return (
               <button
                 key={item.key}
                 type="button"
+                aria-pressed={selected}
                 disabled={!available}
                 onClick={() => selectTemplate(item.key)}
-                className="cards-template-tile"
+                className={`cards-template-tile ${selected ? "is-selected" : ""}`}
               >
                 <TemplateGlyph templateKey={item.key} />
                 <span>{item.displayName}</span>
               </button>
             );
           })}
-        </div>
-
-        {albumPhotoCount < minimumPhotoCount && (
-          <EmptyState
-            className="cards-empty mt-5"
-            title="카드를 만들 사진이 부족해요."
-            description={`템플릿에는 앨범 사진이 최소 ${minimumPhotoCount}장 필요해요.`}
-            action={<a href="/album" className="tap-target inline-flex items-center font-semibold text-accent-primary">앨범으로 이동</a>}
-          />
-        )}
-
-        <div className="cards-studio-divider" />
-        <div className="cards-gallery-heading">
-          <h3><span aria-hidden="true">❧</span> 템플릿 선택</h3>
-          <span>8가지 디자인</span>
-        </div>
-        <div className="cards-template-gallery">
-          {MEMORY_CARD_TEMPLATES.map((item) => {
-            const available = albumPhotoCount >= item.acceptedMin;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                disabled={!available}
-                onClick={() => selectTemplate(item.key)}
-                className="cards-template-card"
-              >
-                <span className="cards-template-preview">
-                  <MemoryCardPreview templateKey={item.key} photos={[]} dateLabel={dateLabel} />
-                </span>
-                <strong>{item.displayName}</strong>
-                <small>{available ? templatePhotoCountLabel(item.acceptedMin, item.acceptedMax) : `앨범 ${item.acceptedMin}장부터`}</small>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="cards-tip">
-          <span aria-hidden="true">❧</span>
-          <p><strong>카드 팁</strong>사진은 앨범에서 선택해 카드에 담을 수 있어요.</p>
-          <a href="/album">사진 보기</a>
-        </div>
-      </section>
-    );
-  }
-
-  if (composerStep === "photos" && template && draftLayout) {
-    return (
-      <section className="cards-studio" aria-labelledby="photo-selection-title">
-        <header className="cards-studio-heading">
-          <span className="cards-sparkle" aria-hidden="true">✦</span>
-          <div>
-            <p className="cards-step">STEP 2 · PHOTOS</p>
-            <h2 id="photo-selection-title" className="cards-studio-title">사진을 채워주세요</h2>
-            <p>
-              {template.displayName} · {selectedPhotoIds.length}/{template.acceptedMax}장
-            </p>
           </div>
-          <button type="button" className="cards-close" onClick={closeComposer}>닫기</button>
-        </header>
 
-        <button type="button" className="cards-selected-template" onClick={() => setComposerStep("template")}>
-          <TemplateGlyph templateKey={template.key} />
-          <span><strong>{template.displayName}</strong>{templatePhotoCountLabel(template.acceptedMin, template.acceptedMax)}</span>
-          <span>템플릿 변경</span>
-        </button>
-
-        <Card className="cards-preview-frame mt-5 p-3">
-          <MemoryCardPreview
-            templateKey={template.key}
-            renderModel={draftRenderModel}
-            photos={photos}
-            dateLabel={dateLabel}
-            onPhotoMediaChange={handlePhotoMediaChange}
-          />
-        </Card>
-
-        <div className="cards-action-row mt-4">
-          <Button variant="secondary" onClick={() => setComposerStep("template")}>다른 템플릿</Button>
-          <Button variant="secondary" onClick={fillRandomly}>랜덤 채우기</Button>
-        </div>
-
-        {remainingCount > 0 && (
-          <p role="status" className="mt-3 rounded-md bg-accent-primary/8 px-4 py-3 text-sm text-accent-primary">
-            {remainingCount}칸이 비어 있어요. 사진을 더 선택해주세요.
+        <Card className="cards-preview-frame">
+          <div className="cards-preview-stage">
+            <MemoryCardPreview
+              templateKey={template.key}
+              renderModel={draftRenderModel}
+              photos={photos}
+              dateLabel={dateLabel}
+              onPhotoMediaChange={handlePhotoMediaChange}
+            />
+          </div>
+          <p className="cards-preview-caption">
+            <strong>{template.displayName}</strong>
+            {templatePhotoCountLabel(template.acceptedMin, template.acceptedMax)}
           </p>
-        )}
-
-        <div className="cards-photo-grid mt-5" aria-label="카드에 넣을 사진 선택">
-          {photos.map((photo, index) => {
-            const selectionIndex = selectedPhotoIds.indexOf(photo.id);
-            const selected = selectionIndex >= 0;
-            const selectionFull = !selected && selectedPhotoIds.length >= template.acceptedMax;
-            return (
-              <button
-                key={photo.id}
-                type="button"
-                aria-pressed={selected}
-                disabled={selectionFull}
-                onClick={() => togglePhoto(photo.id)}
-                className={`relative aspect-square overflow-hidden rounded-md border-2 bg-line/40 disabled:opacity-45 ${selected ? "border-accent-primary" : "border-transparent"}`}
-              >
-                <ComposerPhotoThumbnail
-                  photo={photo}
-                  onMediaChange={handlePhotoMediaChange}
-                  fetchPriority={getFirstViewFetchPriority(
-                    index,
-                    CARDS_HIGH_PRIORITY_MEDIA_COUNT,
-                  )}
-                />
-                {selected && <span className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-accent-primary text-caption font-bold text-white">{selectionIndex + 1}</span>}
-              </button>
-            );
-          })}
-        </div>
-
-        <Button
-          fullWidth
-          className="cards-primary-action mt-5"
-          disabled={!canPreview}
-          onClick={() => {
-            selectSlotForCrop(draftLayout.slots[0]?.slotId ?? null);
-            setComposerStep("preview");
-          }}
-        >
-          카드 미리보기
-        </Button>
-        <div className="cards-tip mt-5">
-          <span aria-hidden="true">❧</span>
-          <p><strong>카드 팁</strong>선택한 순서대로 카드의 사진 칸이 채워져요.</p>
-          <button type="button" onClick={fillRandomly}>랜덤 선택</button>
-        </div>
-      </section>
-    );
-  }
-
-  if (composerStep === "preview" && template && draftLayout && canPreview) {
-    const draftBusy = exportingKey?.startsWith("draft-");
-    return (
-      <section className="cards-studio" aria-labelledby="preview-title">
-        <header className="cards-studio-heading">
-          <span className="cards-sparkle" aria-hidden="true">✦</span>
-          <div>
-            <p className="cards-step">STEP 3 · PREVIEW</p>
-            <h2 id="preview-title" className="cards-studio-title">카드 미리보기</h2>
-            <p>{template.displayName} · 사진을 눌러 위치를 조정하세요.</p>
-          </div>
-          <button type="button" className="cards-close" onClick={closeComposer}>닫기</button>
-        </header>
-        <Card className="cards-preview-frame mt-5 p-3">
-          <MemoryCardPreview
-            templateKey={template.key}
-            renderModel={draftRenderModel}
-            photos={photos}
-            dateLabel={dateLabel}
-            selectedSlotId={selectedSlotId}
-            onSelectSlot={selectSlotForCrop}
-            onPhotoMediaChange={handlePhotoMediaChange}
-          />
         </Card>
-
-        <div className="cards-editor-panel mt-5">
-          <h3 className="font-semibold">조정할 사진</h3>
-          <p className="mt-1 text-sm text-text-secondary">미리보기의 사진을 눌러도 열 수 있어요.</p>
-          <div className="cards-slot-grid mt-3" aria-label="조정할 사진 선택">
-            {draftLayout.slots.map((slot, index) => (
-              <button
-                key={slot.slotId}
-                type="button"
-                aria-pressed={slot.slotId === selectedSlotId}
-                onClick={() => selectSlotForCrop(slot.slotId)}
-                className={`min-h-11 rounded-md border px-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary ${
-                  slot.slotId === selectedSlotId
-                    ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
-                    : "border-line bg-background"
-                }`}
-              >
-                사진 {index + 1}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {selectedSlot && selectedTemplateSlot && selectedPhoto &&
-          cropPhotoReadyKey === selectedCropKey && selectedPhoto.signedUrl && (
-          <MemoryCardCropEditor
-            key={`${selectedSlot.slotId}:${selectedSlot.photoId}`}
-            initialPlacement={selectedSlot.placement}
-            photo={selectedPhoto}
-            slot={selectedTemplateSlot}
-            slotNumber={selectedSlotIndex + 1}
-            onCancel={() => selectSlotForCrop(null)}
-            onPhotoError={() => {
-              setCropPhotoReadyKey(null);
-              if (cropRefreshVersion === 0) {
-                setCropPhotoFailedKey(null);
-                setCropRefreshVersion(1);
-              } else {
-                handlePhotoMediaChange(selectedPhoto.id, "error");
-                setCropPhotoFailedKey(selectedCropKey);
-              }
-            }}
-            onApply={(placement) => {
-              updateSelectedPlacement(placement);
-              selectSlotForCrop(null);
-            }}
-          />
-        )}
-
-        {selectedSlot && selectedTemplateSlot && selectedPhoto &&
-          cropPhotoReadyKey !== selectedCropKey &&
-          cropPhotoFailedKey !== selectedCropKey && (
-          <LoadingState className="mt-5" label="편집할 사진을 불러오고 있어요" />
-        )}
-
-        {selectedSlot && selectedTemplateSlot && selectedPhoto &&
-          cropPhotoFailedKey === selectedCropKey && (
-          <div className="mt-5 rounded-lg border border-line bg-surface p-4">
-            <p className="text-sm text-text-secondary">이 사진을 불러오지 못했어요.</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => selectSlotForCrop(null)} className="min-h-11 rounded-md border border-line px-4 text-sm font-semibold">
-                닫기
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setCropPhotoFailedKey(null);
-                  setCropRefreshVersion((version) => version + 1);
-                }}
-                className="min-h-11 rounded-md bg-accent-primary px-4 text-sm font-semibold text-white"
-              >
-                다시 시도
-              </button>
-            </div>
-          </div>
-        )}
-
-        {selectedSlot && (!selectedTemplateSlot || !selectedPhoto) && (
-          <div className="mt-5 rounded-lg border border-line bg-surface p-4">
-            <p className="text-sm text-text-secondary">이 사진의 편집 정보를 불러올 수 없어요.</p>
-            <button type="button" onClick={() => selectSlotForCrop(null)} className="mt-3 min-h-11 w-full rounded-md border border-line px-4 text-sm font-semibold">
-              닫기
-            </button>
-          </div>
-        )}
-
-        <label className="mt-5 block text-sm font-semibold" htmlFor="memory-card-caption">카드 문구</label>
-        <textarea
-          id="memory-card-caption"
-          value={cardCaption}
-          onChange={(event) => setCardCaption(event.target.value)}
-          placeholder="이 카드에만 남길 문구를 입력하세요"
-          rows={3}
-          className="mt-2 w-full resize-none rounded-md border border-line bg-surface px-4 py-3 text-sm outline-none focus:border-accent-primary"
-        />
-        <p className="mt-1 text-caption text-text-secondary">앨범 사진의 문구와 별도로 저장돼요.</p>
 
         {error && <p role="alert" className="mt-4 rounded-md bg-danger/8 px-4 py-3 text-sm text-danger">{error}</p>}
-        <div className="cards-action-row mt-5">
-          <Button variant="secondary" disabled={isSaving || Boolean(draftBusy)} onClick={() => setComposerStep("photos")}>사진 다시 고르기</Button>
-          <Button variant="secondary" disabled={isSaving || Boolean(draftBusy)} onClick={reshuffle}>다시 섞기</Button>
-          <Button variant="secondary" loading={exportingKey === "draft-download"} disabled={isSaving || Boolean(draftBusy)} onClick={() => draftRenderModel && exportCard("draft", "download", template.key, draftRenderModel)}>PNG 저장</Button>
-          <Button variant="secondary" loading={exportingKey === "draft-share"} disabled={isSaving || Boolean(draftBusy)} onClick={() => draftRenderModel && exportCard("draft", "share", template.key, draftRenderModel)}>공유</Button>
-        </div>
-        <p className="cards-finalize-note">최초 저장하면 이 모습으로 확정되며 이후에는 보기·다운로드·삭제만 할 수 있어요.</p>
-        <Button fullWidth className="cards-primary-action mt-2" loading={isSaving} disabled={Boolean(draftBusy)} onClick={saveCard}>
-          {isSaving ? "저장 중" : "카드 저장"}
-        </Button>
+
+          <div className="cards-action-row cards-main-actions">
+            <Button
+              variant="secondary"
+              disabled={!canPreview || isSaving || Boolean(draftBusy)}
+              onClick={() => {
+                selectSlotForCrop(null);
+                setComposerStep("preview");
+              }}
+            >
+              <EyeIcon /> 미리보기
+            </Button>
+            <Button
+              className="cards-primary-action"
+              disabled={isSaving || Boolean(draftBusy)}
+              onClick={() => setComposerStep("photos")}
+            >
+              사진 선택하기
+            </Button>
+          </div>
+
+            <div className="cards-studio-divider" />
+            <div className="cards-gallery-heading">
+              <h3><span aria-hidden="true">❧</span> 템플릿 선택</h3>
+              <button type="button" onClick={() => setShowAllTemplates(true)}>더보기 <span aria-hidden="true">›</span></button>
+            </div>
+            <div id="cards-template-gallery" className="cards-template-gallery">
+              {FEATURED_MEMORY_CARD_TEMPLATES.map((item) => {
+                const available = albumPhotoCount >= item.acceptedMin;
+                const selected = template.key === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    aria-pressed={selected}
+                    disabled={!available}
+                    onClick={() => selectTemplate(item.key)}
+                    className={`cards-template-card ${selected ? "is-selected" : ""}`}
+                  >
+                    {selected && <span className="cards-template-check" aria-hidden="true">✓</span>}
+                    <span className="cards-template-preview">
+                      <MemoryCardPreview templateKey={item.key} photos={[]} dateLabel={dateLabel} />
+                    </span>
+                    <strong>{item.displayName}</strong>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="cards-tip">
+              <span aria-hidden="true">❧</span>
+              <p><strong>카드 팁</strong>사진은 앨범에서 선택해 카드에 담을 수 있어요.</p>
+              <button type="button" onClick={() => setComposerStep("photos")}>사진 선택하기</button>
+            </div>
+
+        {showAllTemplates && (
+          <div className="cards-dialog-backdrop" role="presentation" onClick={() => setShowAllTemplates(false)}>
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cards-template-sheet-title"
+              className="cards-sheet cards-template-sheet"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="cards-sheet-heading">
+                <div>
+                  <h3 id="cards-template-sheet-title">모든 템플릿</h3>
+                  <p>8가지 실제 카드 디자인</p>
+                </div>
+                <button type="button" onClick={() => setShowAllTemplates(false)} aria-label="모든 템플릿 닫기">×</button>
+              </header>
+              <div className="cards-sheet-body">
+                <div className="cards-all-template-grid">
+                  {MEMORY_CARD_TEMPLATES.map((item) => {
+                    const available = albumPhotoCount >= item.acceptedMin;
+                    const selected = template.key === item.key;
+                    return (
+                      <button
+                        key={item.key}
+                        type="button"
+                        aria-pressed={selected}
+                        disabled={!available}
+                        onClick={() => {
+                          selectTemplate(item.key);
+                          setShowAllTemplates(false);
+                        }}
+                        className={`cards-all-template-item ${selected ? "is-selected" : ""}`}
+                      >
+                        <TemplateGlyph templateKey={item.key} />
+                        <span><strong>{item.displayName}</strong><small>{templatePhotoCountLabel(item.acceptedMin, item.acceptedMax)}</small></span>
+                        {selected && <span className="cards-all-template-check" aria-hidden="true">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {composerStep === "photos" && (
+          <div className="cards-dialog-backdrop" role="presentation" onClick={() => setComposerStep("template")}>
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cards-photo-sheet-title"
+              className="cards-sheet cards-photo-sheet"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="cards-sheet-heading">
+                <div>
+                  <h3 id="cards-photo-sheet-title">사진 선택</h3>
+                  <p>{selectedPhotoIds.length}/{template.acceptedMax}장 선택 · {template.displayName}</p>
+                </div>
+                <button type="button" onClick={() => setComposerStep("template")} aria-label="사진 선택 닫기">×</button>
+              </header>
+
+              <div className="cards-sheet-body">
+                <div className="cards-photo-toolbar">
+                  <p>{remainingCount > 0 ? `${remainingCount}장을 더 선택해주세요.` : "선택이 완료됐어요."}</p>
+                  <Button variant="secondary" onClick={fillRandomly}>랜덤 채우기</Button>
+                </div>
+
+                <div className="cards-photo-grid" aria-label="카드에 넣을 사진 선택">
+                  {photos.map((photo, index) => {
+                    const selectionIndex = selectedPhotoIds.indexOf(photo.id);
+                    const selected = selectionIndex >= 0;
+                    const selectionFull = !selected && selectedPhotoIds.length >= template.acceptedMax;
+                    return (
+                      <button
+                        key={photo.id}
+                        type="button"
+                        aria-pressed={selected}
+                        disabled={selectionFull}
+                        onClick={() => togglePhoto(photo.id)}
+                        className={`relative aspect-square overflow-hidden rounded-md border-2 bg-line/40 disabled:opacity-45 ${selected ? "border-accent-primary" : "border-transparent"}`}
+                      >
+                        <ComposerPhotoThumbnail
+                          photo={photo}
+                          onMediaChange={handlePhotoMediaChange}
+                          fetchPriority={getFirstViewFetchPriority(index, CARDS_HIGH_PRIORITY_MEDIA_COUNT)}
+                        />
+                        {selected && <span className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-accent-primary text-caption font-bold text-white">{selectionIndex + 1}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <label className="cards-caption-label" htmlFor="memory-card-caption">카드 문구</label>
+                <textarea
+                  id="memory-card-caption"
+                  value={cardCaption}
+                  onChange={(event) => setCardCaption(event.target.value)}
+                  placeholder="이 카드에만 남길 문구를 입력하세요"
+                  rows={2}
+                  className="cards-caption-input"
+                />
+              </div>
+
+              <div className="cards-action-row cards-sheet-actions">
+                <Button variant="secondary" disabled={!canPreview} onClick={reshuffle}>다시 섞기</Button>
+                <Button className="cards-primary-action" disabled={!canPreview} onClick={() => setComposerStep("template")}>선택 완료</Button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {composerStep === "preview" && canPreview && (
+          <div className="cards-dialog-backdrop" role="presentation" onClick={() => setComposerStep("template")}>
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cards-preview-dialog-title"
+              className="cards-sheet cards-preview-dialog"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <header className="cards-sheet-heading">
+                <div>
+                  <h3 id="cards-preview-dialog-title">카드 미리보기</h3>
+                  <p>{template.displayName} · 사진을 눌러 위치를 조정하세요.</p>
+                </div>
+                <button type="button" onClick={() => setComposerStep("template")} aria-label="카드 미리보기 닫기">×</button>
+              </header>
+              <div className="cards-sheet-body">
+                <div className="cards-dialog-preview">
+                  <MemoryCardPreview
+                    templateKey={template.key}
+                    renderModel={draftRenderModel}
+                    photos={photos}
+                    dateLabel={dateLabel}
+                    selectedSlotId={selectedSlotId}
+                    onSelectSlot={selectSlotForCrop}
+                    onPhotoMediaChange={handlePhotoMediaChange}
+                  />
+                </div>
+
+                <div className="cards-editor-panel">
+                  <h3 className="font-semibold">조정할 사진</h3>
+                  <p className="mt-1 text-sm text-text-secondary">미리보기의 사진을 눌러도 열 수 있어요.</p>
+                  <div className="cards-slot-grid mt-3" aria-label="조정할 사진 선택">
+                    {draftLayout.slots.map((slot, index) => (
+                      <button
+                        key={slot.slotId}
+                        type="button"
+                        aria-pressed={slot.slotId === selectedSlotId}
+                        onClick={() => selectSlotForCrop(slot.slotId)}
+                        className={`min-h-11 rounded-md border px-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary ${
+                          slot.slotId === selectedSlotId
+                            ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
+                            : "border-line bg-background"
+                        }`}
+                      >
+                        사진 {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+            {selectedSlot && (
+              <div className="cards-crop-backdrop" role="presentation" onClick={() => selectSlotForCrop(null)}>
+                <div className="cards-crop-sheet" onClick={(event) => event.stopPropagation()}>
+            {selectedSlot && selectedTemplateSlot && selectedPhoto &&
+              cropPhotoReadyKey === selectedCropKey && selectedPhoto.signedUrl && (
+              <MemoryCardCropEditor
+                key={`${selectedSlot.slotId}:${selectedSlot.photoId}`}
+                initialPlacement={selectedSlot.placement}
+                photo={selectedPhoto}
+                slot={selectedTemplateSlot}
+                slotNumber={selectedSlotIndex + 1}
+                onCancel={() => selectSlotForCrop(null)}
+                onPhotoError={() => {
+                  setCropPhotoReadyKey(null);
+                  if (cropRefreshVersion === 0) {
+                    setCropPhotoFailedKey(null);
+                    setCropRefreshVersion(1);
+                  } else {
+                    handlePhotoMediaChange(selectedPhoto.id, "error");
+                    setCropPhotoFailedKey(selectedCropKey);
+                  }
+                }}
+                onApply={(placement) => {
+                  updateSelectedPlacement(placement);
+                  selectSlotForCrop(null);
+                }}
+              />
+            )}
+
+            {selectedSlot && selectedTemplateSlot && selectedPhoto &&
+              cropPhotoReadyKey !== selectedCropKey &&
+              cropPhotoFailedKey !== selectedCropKey && (
+              <LoadingState className="mt-5" label="편집할 사진을 불러오고 있어요" />
+            )}
+
+            {selectedSlot && selectedTemplateSlot && selectedPhoto &&
+              cropPhotoFailedKey === selectedCropKey && (
+              <div className="mt-5 rounded-lg border border-line bg-surface p-4">
+                <p className="text-sm text-text-secondary">이 사진을 불러오지 못했어요.</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => selectSlotForCrop(null)} className="min-h-11 rounded-md border border-line px-4 text-sm font-semibold">
+                    닫기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCropPhotoFailedKey(null);
+                      setCropRefreshVersion((version) => version + 1);
+                    }}
+                    className="min-h-11 rounded-md bg-accent-primary px-4 text-sm font-semibold text-white"
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {selectedSlot && (!selectedTemplateSlot || !selectedPhoto) && (
+              <div className="mt-5 rounded-lg border border-line bg-surface p-4">
+                <p className="text-sm text-text-secondary">이 사진의 편집 정보를 불러올 수 없어요.</p>
+                <button type="button" onClick={() => selectSlotForCrop(null)} className="mt-3 min-h-11 w-full rounded-md border border-line px-4 text-sm font-semibold">
+                  닫기
+                </button>
+              </div>
+            )}
+                </div>
+              </div>
+            )}
+
+                <div className="cards-preview-tools">
+                  <Button variant="secondary" disabled={isSaving || Boolean(draftBusy)} onClick={reshuffle}>다시 섞기</Button>
+                  <Button variant="secondary" loading={exportingKey === "draft-download"} disabled={isSaving || Boolean(draftBusy)} onClick={() => draftRenderModel && exportCard("draft", "download", template.key, draftRenderModel)}>PNG 저장</Button>
+                  <Button variant="secondary" loading={exportingKey === "draft-share"} disabled={isSaving || Boolean(draftBusy)} onClick={() => draftRenderModel && exportCard("draft", "share", template.key, draftRenderModel)}>공유</Button>
+                </div>
+                <p className="cards-finalize-note">저장하면 이 모습으로 확정되며 이후에는 보기·다운로드·삭제만 할 수 있어요.</p>
+              </div>
+
+              <div className="cards-action-row cards-sheet-actions cards-preview-actions">
+                <Button variant="secondary" disabled={isSaving || Boolean(draftBusy)} onClick={() => setComposerStep("photos")}>사진 다시 선택</Button>
+                <Button className="cards-primary-action" loading={isSaving} disabled={Boolean(draftBusy)} onClick={saveCard}>
+                  <SaveIcon /> {isSaving ? "저장 중" : "카드 저장"}
+                </Button>
+              </div>
+            </section>
+          </div>
+        )}
       </section>
+      </>
     );
   }
 
@@ -976,7 +1086,6 @@ export function MemoryCardsView() {
       <section className="cards-first-actions" aria-label="추억 카드 만들기">
         <div className="cards-count">
           <Badge tone="neutral">{cards.length}장</Badge>
-          <p>가족이 함께 간직한 카드</p>
         </div>
         <Button
           className="cards-create-button"
@@ -1019,65 +1128,73 @@ export function MemoryCardsView() {
             {cards.map((card) => {
               const savedTemplate = getMemoryCardTemplate(card.templateKey)!;
               const cardBusy = exportingKey?.startsWith(`${card.id}-`);
+              const caption = getSavedCardCaption(card);
+              const photoCount = card.renderModel?.layout.slots.length ?? 0;
               return (
                 <article key={card.id} className="cards-saved-card">
-                  <div className="cards-saved-art">
-                    {card.isFinalized ? (
-                      <FinalizedMemoryCardImage card={card} />
-                    ) : (
-                      <MemoryCardPreview
-                        templateKey={card.templateKey}
-                        renderModel={card.renderModel}
-                        photos={photos}
-                        dateLabel={dateLabel}
-                        onPhotoMediaChange={handlePhotoMediaChange}
-                      />
-                    )}
-                    <span className={card.isFinalized ? "cards-final-badge" : "cards-legacy-badge"}>
-                      {card.isFinalized ? "최종 카드" : "이전 카드"}
+                  <span className="cards-binding" aria-hidden="true">
+                    {Array.from({ length: 6 }, (_, index) => <i key={index} />)}
+                  </span>
+                  <button
+                    type="button"
+                    className="cards-saved-open"
+                    aria-label={`${caption ?? savedTemplate.displayName} 카드 보기`}
+                    onClick={() => setSelectedCardId(card.id)}
+                  >
+                    <span className="cards-saved-rail" aria-hidden="true" />
+                    <span className="cards-saved-icon" aria-hidden="true"><TemplateGlyph templateKey={card.templateKey} /></span>
+                    <span className="cards-saved-copy">
+                      <span className="cards-saved-chips">
+                        <span>{savedTemplate.displayName}</span>
+                        <span>{card.creatorName ?? "가족 구성원"}</span>
+                      </span>
+                      <strong>{caption ?? savedTemplate.displayName}</strong>
+                      <small>{photoCount > 0 ? `사진 ${photoCount}장으로 만든 카드` : "이전 형식의 추억 카드"}</small>
+                      <time dateTime={card.createdAt}>{createdAtFormatter.format(new Date(card.createdAt))}</time>
                     </span>
-                  </div>
-                  <div className="cards-saved-meta">
-                    <div>
-                      <h3>{savedTemplate.displayName}</h3>
-                      <p>{card.creatorName ?? "가족 구성원"} · {createdAtFormatter.format(new Date(card.createdAt))}</p>
-                    </div>
-                    {card.isOwner && (
-                      <button
-                        type="button"
-                        disabled={Boolean(deletingCardId)}
-                        onClick={() => removeCard(card)}
-                        className="cards-delete"
-                      >
-                        {deletingCardId === card.id ? "삭제 중" : "삭제"}
-                      </button>
-                    )}
-                  </div>
-                  <div className="cards-saved-actions">
-                    <Button
-                      variant="secondary"
-                      disabled={Boolean(cardBusy)}
-                      onClick={() => setSelectedCardId(card.id)}
-                    >
-                      보기
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={(!card.isFinalized && !card.renderModel) || Boolean(cardBusy)}
-                      loading={exportingKey === `${card.id}-download`}
-                      onClick={() => exportSavedCard(card, "download")}
-                    >
-                      다운로드
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      disabled={(!card.isFinalized && !card.renderModel) || Boolean(cardBusy)}
-                      loading={exportingKey === `${card.id}-share`}
-                      onClick={() => exportSavedCard(card, "share")}
-                    >
-                      공유
-                    </Button>
-                  </div>
+                    <span className="cards-saved-thumb">
+                      {card.isFinalized ? (
+                        <FinalizedMemoryCardImage card={card} />
+                      ) : (
+                        <MemoryCardPreview
+                          templateKey={card.templateKey}
+                          renderModel={card.renderModel}
+                          photos={photos}
+                          dateLabel={dateLabel}
+                          onPhotoMediaChange={handlePhotoMediaChange}
+                        />
+                      )}
+                    </span>
+                  </button>
+                    <details className="cards-saved-menu">
+                      <summary aria-label="카드 작업 더보기">•••</summary>
+                      <div>
+                        <button
+                          type="button"
+                          disabled={(!card.isFinalized && !card.renderModel) || Boolean(cardBusy)}
+                          onClick={() => exportSavedCard(card, "download")}
+                        >
+                          {exportingKey === `${card.id}-download` ? "저장 중" : "다운로드"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={(!card.isFinalized && !card.renderModel) || Boolean(cardBusy)}
+                          onClick={() => exportSavedCard(card, "share")}
+                        >
+                          {exportingKey === `${card.id}-share` ? "공유 중" : "공유"}
+                        </button>
+                        {card.isOwner && (
+                          <button
+                            type="button"
+                            disabled={Boolean(deletingCardId)}
+                            onClick={() => removeCard(card)}
+                            className="cards-delete"
+                          >
+                            {deletingCardId === card.id ? "삭제 중" : "삭제"}
+                          </button>
+                        )}
+                      </div>
+                    </details>
                 </article>
               );
             })}
