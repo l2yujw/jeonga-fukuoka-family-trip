@@ -209,6 +209,20 @@ export function MemoryCardCropEditor({
         draft,
       )
     : null;
+  const centeredCover = dimensions
+    ? getMemoryCardCenteredCoverPlacement(
+        dimensions.width,
+        dimensions.height,
+        viewport.width,
+        viewport.height,
+      )
+    : null;
+  const centered = draft.rotation === 0 && draft.offsetX === 0 && draft.offsetY === 0;
+  const fitMode = centered && Math.abs(draft.zoom - 1) < 0.001
+    ? "contain"
+    : centeredCover && centered && Math.abs(draft.zoom - centeredCover.zoom) < 0.001
+      ? "cover"
+      : null;
   const showEntirePhoto = () => {
     setValidDraft(getMemoryCardCenteredContainPlacement());
   };
@@ -223,172 +237,186 @@ export function MemoryCardCropEditor({
       : getMemoryCardCenteredContainPlacement());
   };
   return (
-    <section className="mt-5 rounded-lg border border-line bg-surface p-4" aria-labelledby="crop-editor-title">
-      <div className="flex items-center justify-between gap-3">
-        <h3 id="crop-editor-title" className="font-semibold">사진 위치 조정</h3>
-        <span className="text-caption text-text-secondary">사진 {slotNumber}</span>
-      </div>
-      <p className="mt-1 text-sm text-text-secondary">한 손가락으로 이동 · 두 손가락으로 확대/회전</p>
+    <section className="cards-crop-workbench" aria-labelledby="crop-editor-title">
+      <header className="cards-crop-heading">
+        <div>
+          <span>PHOTO WORKBENCH</span>
+          <h3 id="crop-editor-title">사진 {slotNumber} 조정</h3>
+        </div>
+        <p>한 손가락으로 이동 · 두 손가락으로 확대/회전</p>
+      </header>
 
-      <div
-        ref={surfaceRef}
-        role="img"
-        aria-label={`사진 ${slotNumber} 자르기 영역`}
-        className="relative mt-3 w-full cursor-grab overflow-hidden rounded-md border border-line active:cursor-grabbing"
-        style={{
-          aspectRatio: `${viewport.width} / ${viewport.height}`,
-          backgroundColor: MEMORY_CARD_PHOTO_BACKGROUND_COLOR,
-          touchAction: "none",
-          userSelect: "none",
-        }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={finishPointer}
-        onPointerCancel={finishPointer}
-        onLostPointerCapture={finishPointer}
-      >
-        {photo.signedUrl ? (
-          /* Signed URLs are short-lived runtime values from private Storage. */
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={photo.signedUrl}
-            alt=""
-            draggable={false}
-            onError={onPhotoError}
-            onLoad={({ currentTarget }) => {
-              const nextDimensions = {
-                width: currentTarget.naturalWidth,
-                height: currentTarget.naturalHeight,
-              };
-              setDimensions(nextDimensions);
-              const next = clampMemoryCardPhotoPlacement(
-                nextDimensions.width,
-                nextDimensions.height,
-                viewport.width,
-                viewport.height,
-                placementRef.current,
-              );
-              placementRef.current = next;
-              setDraft(next);
-            }}
-            className="pointer-events-none absolute block max-w-none"
-            style={placed
-              ? {
-                  left: `${placed.x / viewport.width * 100}%`,
-                  top: `${placed.y / viewport.height * 100}%`,
-                  width: `${placed.width / viewport.width * 100}%`,
-                  height: `${placed.height / viewport.height * 100}%`,
-                  transform: `rotate(${placed.rotation}deg)`,
-                }
-              : { inset: 0, width: "100%", height: "100%", visibility: "hidden" }}
-          />
-        ) : (
-          <span className="flex size-full items-center justify-center px-4 text-center text-sm text-text-secondary">
-            사진을 표시할 수 없어요.
-          </span>
-        )}
-        <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-md ring-1 ring-inset ring-line" />
+      <div className="cards-crop-canvas-mat">
+        <div
+          ref={surfaceRef}
+          role="img"
+          aria-label={`사진 ${slotNumber} 자르기 영역`}
+          className="cards-crop-surface"
+          style={{
+            aspectRatio: `${viewport.width} / ${viewport.height}`,
+            backgroundColor: MEMORY_CARD_PHOTO_BACKGROUND_COLOR,
+            touchAction: "none",
+            userSelect: "none",
+          }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishPointer}
+          onPointerCancel={finishPointer}
+          onLostPointerCapture={finishPointer}
+        >
+          {photo.signedUrl ? (
+            /* Signed URLs are short-lived runtime values from private Storage. */
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={photo.signedUrl}
+              alt=""
+              draggable={false}
+              onError={onPhotoError}
+              onLoad={({ currentTarget }) => {
+                const nextDimensions = {
+                  width: currentTarget.naturalWidth,
+                  height: currentTarget.naturalHeight,
+                };
+                setDimensions(nextDimensions);
+                const next = clampMemoryCardPhotoPlacement(
+                  nextDimensions.width,
+                  nextDimensions.height,
+                  viewport.width,
+                  viewport.height,
+                  placementRef.current,
+                );
+                placementRef.current = next;
+                setDraft(next);
+              }}
+              className="pointer-events-none absolute block max-w-none"
+              style={placed
+                ? {
+                    left: `${placed.x / viewport.width * 100}%`,
+                    top: `${placed.y / viewport.height * 100}%`,
+                    width: `${placed.width / viewport.width * 100}%`,
+                    height: `${placed.height / viewport.height * 100}%`,
+                    transform: `rotate(${placed.rotation}deg)`,
+                  }
+                : { inset: 0, width: "100%", height: "100%", visibility: "hidden" }}
+            />
+          ) : (
+            <span className="flex size-full items-center justify-center px-4 text-center text-sm text-text-secondary">
+              사진을 표시할 수 없어요.
+            </span>
+          )}
+          <span aria-hidden="true" className="cards-crop-surface-edge" />
+        </div>
       </div>
 
-      <p className="mt-2 hidden text-caption text-text-secondary sm:block">
+      <p className="cards-crop-trackpad-note">
         트랙패드는 브라우저에 따라 확대만 지원될 수 있어요. 회전은 아래 조절을 사용해주세요.
       </p>
 
-      <label className="mt-4 flex items-center justify-between gap-3 text-sm font-semibold" htmlFor="memory-card-zoom">
-        확대
-        <span className="font-normal text-text-secondary">{draft.zoom.toFixed(2)}×</span>
-      </label>
-      <div className="mt-1 grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-2">
-        <button type="button" aria-label="사진 축소" onClick={() => updateDraft({ zoom: draft.zoom - 0.25 })} className="min-h-11 rounded-md border border-line text-lg font-semibold">
-          −
-        </button>
-        <input
-          id="memory-card-zoom"
-          type="range"
-          min="1"
-          max={maxZoom}
-          step="0.05"
-          value={draft.zoom}
-          onChange={(event) => updateDraft({ zoom: Number(event.target.value) })}
-          className="h-11 w-full accent-accent-primary"
-        />
-        <button type="button" aria-label="사진 확대" onClick={() => updateDraft({ zoom: draft.zoom + 0.25 })} className="min-h-11 rounded-md border border-line text-lg font-semibold">
-          +
-        </button>
+      <div className="cards-crop-controls">
+        <div className="cards-crop-tool">
+          <label className="cards-crop-tool-label" htmlFor="memory-card-zoom">
+            <span>확대</span>
+            <output htmlFor="memory-card-zoom">{draft.zoom.toFixed(2)}×</output>
+          </label>
+          <div className="cards-crop-zoom-control">
+            <button type="button" aria-label="사진 축소" onClick={() => updateDraft({ zoom: draft.zoom - 0.25 })} className="cards-crop-step">
+              −
+            </button>
+            <input
+              id="memory-card-zoom"
+              type="range"
+              min="1"
+              max={maxZoom}
+              step="0.05"
+              value={draft.zoom}
+              onChange={(event) => updateDraft({ zoom: Number(event.target.value) })}
+              className="cards-crop-range"
+            />
+            <button type="button" aria-label="사진 확대" onClick={() => updateDraft({ zoom: draft.zoom + 0.25 })} className="cards-crop-step">
+              +
+            </button>
+          </div>
+        </div>
+
+        <div className="cards-crop-tool">
+          <label className="cards-crop-tool-label" htmlFor="memory-card-rotation">
+            <span>회전</span>
+            <output htmlFor="memory-card-rotation">{Math.round(draft.rotation)}°</output>
+          </label>
+          <div className="cards-crop-rotation-control">
+            <input
+              id="memory-card-rotation"
+              type="range"
+              min="-180"
+              max="179"
+              step="1"
+              value={draft.rotation}
+              onChange={(event) => updateDraft({ rotation: Number(event.target.value) })}
+              className="cards-crop-range"
+            />
+            <div className="cards-crop-rotation-actions">
+              <button type="button" onClick={() => updateDraft({ rotation: normalizeDegrees(draft.rotation - 90) })}>
+                ↶ 90°
+              </button>
+              <button type="button" onClick={() => updateDraft({ rotation: normalizeDegrees(draft.rotation + 90) })}>
+                ↷ 90°
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="cards-crop-tool cards-crop-position-tool">
+          <div className="cards-crop-position-grid">
+            <label htmlFor="memory-card-offset-x">
+              <span>가로 위치</span>
+              <input
+                id="memory-card-offset-x"
+                type="range"
+                min={offsetBounds?.minX ?? -1}
+                max={offsetBounds?.maxX ?? 1}
+                step="0.01"
+                value={draft.offsetX}
+                onChange={(event) => updateDraft({ offsetX: Number(event.target.value) })}
+                className="cards-crop-range"
+              />
+            </label>
+            <label htmlFor="memory-card-offset-y">
+              <span>세로 위치</span>
+              <input
+                id="memory-card-offset-y"
+                type="range"
+                min={offsetBounds?.minY ?? -1}
+                max={offsetBounds?.maxY ?? 1}
+                step="0.01"
+                value={draft.offsetY}
+                onChange={(event) => updateDraft({ offsetY: Number(event.target.value) })}
+                className="cards-crop-range"
+              />
+            </label>
+          </div>
+        </div>
       </div>
 
-      <label className="mt-2 flex items-center justify-between gap-3 text-sm font-semibold" htmlFor="memory-card-rotation">
-        회전
-        <span className="font-normal text-text-secondary">{Math.round(draft.rotation)}°</span>
-      </label>
-      <input
-        id="memory-card-rotation"
-        type="range"
-        min="-180"
-        max="179"
-        step="1"
-        value={draft.rotation}
-        onChange={(event) => updateDraft({ rotation: Number(event.target.value) })}
-        className="mt-1 h-11 w-full accent-accent-primary"
-      />
-      <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => updateDraft({ rotation: normalizeDegrees(draft.rotation - 90) })} className="min-h-11 rounded-md border border-line text-sm font-semibold">
-          ↶ 90°
-        </button>
-        <button type="button" onClick={() => updateDraft({ rotation: normalizeDegrees(draft.rotation + 90) })} className="min-h-11 rounded-md border border-line text-sm font-semibold">
-          ↷ 90°
-        </button>
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-3">
-        <label className="text-sm font-semibold" htmlFor="memory-card-offset-x">
-          가로 위치
-          <input
-            id="memory-card-offset-x"
-            type="range"
-            min={offsetBounds?.minX ?? -1}
-            max={offsetBounds?.maxX ?? 1}
-            step="0.01"
-            value={draft.offsetX}
-            onChange={(event) => updateDraft({ offsetX: Number(event.target.value) })}
-            className="mt-1 h-11 w-full accent-accent-primary"
-          />
-        </label>
-        <label className="text-sm font-semibold" htmlFor="memory-card-offset-y">
-          세로 위치
-          <input
-            id="memory-card-offset-y"
-            type="range"
-            min={offsetBounds?.minY ?? -1}
-            max={offsetBounds?.maxY ?? 1}
-            step="0.01"
-            value={draft.offsetY}
-            onChange={(event) => updateDraft({ offsetY: Number(event.target.value) })}
-            className="mt-1 h-11 w-full accent-accent-primary"
-          />
-        </label>
-      </div>
-
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" onClick={showEntirePhoto} className="min-h-11 rounded-md border border-line text-sm font-semibold">
+      <div className="cards-crop-fit" aria-label="사진 맞춤 방식">
+        <button type="button" aria-pressed={fitMode === "contain"} onClick={showEntirePhoto}>
           사진 전체
         </button>
-        <button type="button" onClick={fillFrame} className="min-h-11 rounded-md border border-line text-sm font-semibold">
+        <button type="button" aria-pressed={fitMode === "cover"} onClick={fillFrame}>
           프레임 채우기
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <button type="button" onClick={fillFrame} className="min-h-11 rounded-md border border-line text-sm font-semibold">
+      <footer className="cards-crop-actions">
+        <button type="button" onClick={fillFrame} className="cards-crop-reset">
           초기화
         </button>
-        <button type="button" onClick={onCancel} className="min-h-11 rounded-md border border-line text-sm font-semibold">
+        <button type="button" onClick={onCancel} className="cards-crop-cancel">
           취소
         </button>
-        <button type="button" onClick={() => onApply(placementRef.current)} className="min-h-11 rounded-md bg-accent-primary px-2 text-sm font-semibold text-white">
+        <button type="button" onClick={() => onApply(placementRef.current)} className="cards-crop-apply">
           적용
         </button>
-      </div>
+      </footer>
     </section>
   );
 }

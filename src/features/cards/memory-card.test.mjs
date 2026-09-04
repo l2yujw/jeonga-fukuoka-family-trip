@@ -1141,6 +1141,27 @@ test("crop editor uses Pointer Events, active pointer rebasing, and honest track
   assert.doesNotMatch(source, /touches|changedTouches|fake/i);
 });
 
+test("preview and crop overlays keep the Cards hierarchy and reachable actions", async () => {
+  const [view, editor, css] = await Promise.all([
+    readFile(new URL("./memory-cards-view.tsx", import.meta.url), "utf8"),
+    readFile(new URL("./memory-card-crop-editor.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(view, /cards-preview-heading[\s\S]*FINAL REVIEW[\s\S]*카드 미리보기/);
+  assert.match(view, /cards-editor-heading[\s\S]*사진 위치 조정[\s\S]*위치와 크기를 바꿀 수 있어요/);
+  assert.match(view, /cards-slot-button/);
+  assert.match(editor, /cards-crop-workbench[\s\S]*PHOTO WORKBENCH[\s\S]*사진 \{slotNumber\} 조정/);
+  assert.match(editor, /cards-crop-controls[\s\S]*memory-card-zoom[\s\S]*memory-card-rotation[\s\S]*memory-card-offset-x[\s\S]*memory-card-offset-y/);
+  assert.match(editor, /cards-crop-fit[\s\S]*aria-pressed=\{fitMode === "contain"\}[\s\S]*aria-pressed=\{fitMode === "cover"\}/);
+  assert.match(editor, /cards-crop-actions[\s\S]*cards-crop-reset[\s\S]*cards-crop-cancel[\s\S]*cards-crop-apply/);
+  assert.match(css, /\.cards-dialog-preview\s*\{[^}]*padding:\s*18px[^}]*overflow:\s*hidden/s);
+  assert.match(css, /\.cards-editor-panel \.cards-slot-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3/s);
+  assert.match(css, /\.cards-crop-range\s*\{[^}]*height:\s*44px/s);
+  assert.match(css, /\.cards-crop-actions\s*\{[^}]*position:\s*sticky[^}]*env\(safe-area-inset-bottom\)/s);
+  assert.match(css, /\.cards-crop-reset\s*\{[^}]*background:\s*transparent/s);
+  assert.match(css, /\.cards-crop-apply\s*\{[^}]*background:\s*var\(--cards-coral-dark\)/s);
+});
+
 test("wrapped captions honor max lines and add an ellipsis when truncated", () => {
   const lines = wrapMemoryCardText("가나다라마바사아자차카타파하", 3, 2, (value) => value.length);
   assert.deepEqual(lines, ["가나다", "라마…"]);
