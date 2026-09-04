@@ -9,7 +9,7 @@ import {
   useState,
   type ChangeEvent,
 } from "react";
-import { Badge, Button, Card, EmptyState, LoadingState } from "@/components/ui";
+import { Button, Card, EmptyState, LoadingState } from "@/components/ui";
 import { useCurrentTripSession } from "@/features/boarding/trip-access-guard";
 import {
   deleteAlbumPhoto,
@@ -57,9 +57,62 @@ import {
   updateAlbumUploadDraftCaption,
 } from "./album-utils";
 
-type AlbumViewProps = {
-  onComposerOpenChange?: (isOpen: boolean) => void;
-};
+function UploadIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M7.5 18.5H6a4.5 4.5 0 0 1-.6-8.96A6.5 6.5 0 0 1 18.1 8.1a5 5 0 0 1-.6 9.96h-1" />
+      <path d="m8.5 11.5 3.5-3.5 3.5 3.5M12 8v11" />
+    </svg>
+  );
+}
+
+function FilterIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M3.5 5h17l-6.4 7.1v5.8l-4.2 2v-7.8L3.5 5Z" />
+    </svg>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
+function AlbumHeroBotanical() {
+  return (
+    // Protected decorative crop; all Album copy and controls remain live DOM.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/api/album-asset/Jeonga_Fukuoka_Album_TopFloral_v1.png"
+      alt=""
+      aria-hidden="true"
+      className="album-hero-botanical"
+      draggable={false}
+      width={220}
+      height={145}
+    />
+  );
+}
+
+function AlbumMomentsBotanical() {
+  return (
+    // Protected decorative crop; filter and gallery remain live DOM.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/api/album-asset/Jeonga_Fukuoka_Album_OurMomentsGarden_v1.png"
+      alt=""
+      aria-hidden="true"
+      className="album-moments-botanical"
+      draggable={false}
+      width={281}
+      height={168}
+    />
+  );
+}
 
 const AlbumPhotoMedia = memo(function AlbumPhotoMedia({
   alt,
@@ -80,7 +133,7 @@ const AlbumPhotoMedia = memo(function AlbumPhotoMedia({
   return (
     <div
       ref={observe}
-      className="flex w-full items-center justify-center overflow-hidden rounded-md bg-line/40 px-3 text-center text-caption text-text-secondary"
+      className="album-photo-media"
       style={{
         aspectRatio: photo.width && photo.height
           ? `${photo.width} / ${photo.height}`
@@ -98,7 +151,7 @@ const AlbumPhotoMedia = memo(function AlbumPhotoMedia({
           width={photo.width ?? undefined}
           height={photo.height ?? undefined}
           onError={onError}
-          className="size-full bg-line/30 object-cover"
+          className="size-full object-cover"
         />
       ) : mediaState === "error" ? (
         "이 사진은 현재 브라우저에서 표시할 수 없어요."
@@ -108,6 +161,10 @@ const AlbumPhotoMedia = memo(function AlbumPhotoMedia({
     </div>
   );
 });
+
+type AlbumViewProps = {
+  onComposerOpenChange?: (isOpen: boolean) => void;
+};
 
 export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
   const currentTripSession = useCurrentTripSession();
@@ -132,6 +189,8 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
   const [busyPhotoId, setBusyPhotoId] = useState<string | null>(null);
   const [downloadingPhotoId, setDownloadingPhotoId] = useState<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const filterRef = useRef<HTMLDivElement>(null);
+  const filterSummaryRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef(new Set<string>());
   const selectionVersion = useRef(0);
@@ -173,6 +232,28 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
     onComposerOpenChange?.(drafts.length > 0 || isDecoding);
   }, [drafts.length, isDecoding, onComposerOpenChange]);
 
+  useEffect(() => {
+    if (!isFilterPanelOpen) return;
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!filterRef.current?.contains(event.target as Node)) {
+        setIsFilterPanelOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setIsFilterPanelOpen(false);
+      filterSummaryRef.current?.focus();
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePress);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePress);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isFilterPanelOpen]);
+
   const uploaderOptions = useMemo(
     () => getAlbumUploaderOptions(photos),
     [photos],
@@ -207,6 +288,7 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
   const isFilterActive =
     uploaderFilter !== null || sort !== "newest" || groupMode !== "flat";
   const filterSummary = `${selectedUploaderLabel} · ${sort === "newest" ? "최신순" : "오래된순"} · ${groupMode === "flat" ? "전체 보기" : "올린 사람별"}`;
+  const tripDateLabel = `${currentTripSession.trip.startDate.replaceAll("-", ".")} - ${currentTripSession.trip.endDate.slice(5).replace("-", ".")}`;
 
   const revokeUrl = (url: string) => {
     URL.revokeObjectURL(url);
@@ -473,7 +555,7 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
     return (
       <article
         key={photo.id}
-        className="min-w-0 overflow-hidden rounded-lg border border-line/70 bg-surface p-1.5 shadow-card"
+        className="album-photo-card"
       >
         <AlbumPhotoMedia
           photo={photo}
@@ -483,18 +565,62 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
             ? `${uploaderLabel}님이 올린 사진: ${photo.caption}`
             : `${uploaderLabel}님이 올린 여행 사진`}
         />
-        <div className="px-2 pt-2 pb-1.5">
-          <p className="truncate text-caption font-semibold">{uploaderLabel}</p>
-          <button
-            type="button"
-            disabled={Boolean(downloadingPhotoId)}
-            onClick={() => savePhoto(photo)}
-            className="tap-target mt-1 px-2 text-caption font-semibold text-accent-secondary disabled:opacity-50"
-          >
-            {downloadingPhotoId === photo.id ? "저장 중" : "저장"}
-          </button>
-          {editingId === photo.id ? (
-            <div className="mt-2">
+        <div className="album-photo-copy">
+          {photo.caption && (
+            <p className="album-photo-caption">{photo.caption}</p>
+          )}
+          <p className="album-photo-meta">
+            <time dateTime={photo.createdAt}>
+              {photo.createdAt.slice(5, 10).replace("-", ".")}
+            </time>
+            <span aria-hidden="true" className="album-photo-meta-divider" />
+            <span aria-hidden="true" className="album-photo-uploader-dot" />
+            <span className="truncate">{uploaderLabel}</span>
+          </p>
+
+          <details className="album-photo-actions">
+            <summary aria-label={`${uploaderLabel}님 사진 작업 열기`}>
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <circle cx="5" cy="12" r="1.4" />
+                <circle cx="12" cy="12" r="1.4" />
+                <circle cx="19" cy="12" r="1.4" />
+              </svg>
+            </summary>
+            <div className="album-photo-action-menu">
+              <button
+                type="button"
+                disabled={Boolean(downloadingPhotoId)}
+                onClick={() => savePhoto(photo)}
+              >
+                {downloadingPhotoId === photo.id ? "저장 중" : "사진 저장"}
+              </button>
+              {photo.isOwner && (
+                <>
+                  <button
+                    type="button"
+                    disabled={Boolean(busyPhotoId)}
+                    onClick={() => {
+                      setEditingId(photo.id);
+                      setEditedCaption(photo.caption ?? "");
+                    }}
+                  >
+                    설명 수정
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(busyPhotoId)}
+                    onClick={() => deletePhoto(photo)}
+                    className="album-photo-delete-action"
+                  >
+                    {busyPhotoId === photo.id ? "처리 중" : "삭제"}
+                  </button>
+                </>
+              )}
+            </div>
+          </details>
+
+          {editingId === photo.id && (
+            <div className="album-caption-editor">
               <label htmlFor={`caption-${photo.id}`} className="sr-only">
                 사진 설명 수정
               </label>
@@ -504,17 +630,16 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
                 maxLength={ALBUM_CAPTION_MAX_LENGTH}
                 disabled={busyPhotoId === photo.id}
                 onChange={(event) => setEditedCaption(event.target.value)}
-                className="min-h-20 w-full resize-none rounded-md border border-line bg-background p-2 text-sm"
+                className="album-caption-input"
               />
-              <p className="mt-1 text-right text-[10px] text-text-secondary">
+              <p className="album-caption-count">
                 {editedCaption.length}/{ALBUM_CAPTION_MAX_LENGTH}
               </p>
-              <div className="mt-1 flex flex-wrap gap-1">
+              <div className="album-caption-buttons">
                 <button
                   type="button"
                   disabled={busyPhotoId === photo.id}
                   onClick={() => saveCaption(photo)}
-                  className="tap-target px-2 text-caption font-semibold text-accent-primary disabled:opacity-50"
                 >
                   저장
                 </button>
@@ -522,54 +647,45 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
                   type="button"
                   disabled={busyPhotoId === photo.id}
                   onClick={() => setEditingId(null)}
-                  className="tap-target px-2 text-caption font-semibold text-text-secondary disabled:opacity-50"
                 >
                   취소
                 </button>
               </div>
             </div>
-          ) : (
-            <>
-              {photo.caption && (
-                <p className="mt-1 break-words text-sm leading-snug text-text-secondary">
-                  {photo.caption}
-                </p>
-              )}
-              {photo.isOwner && (
-                <div className="mt-1 flex flex-wrap gap-1">
-                  <button
-                    type="button"
-                    disabled={Boolean(busyPhotoId)}
-                    onClick={() => {
-                      setEditingId(photo.id);
-                      setEditedCaption(photo.caption ?? "");
-                    }}
-                    className="tap-target px-2 text-caption font-semibold text-accent-primary disabled:opacity-50"
-                  >
-                    설명 수정
-                  </button>
-                  <button
-                    type="button"
-                    disabled={Boolean(busyPhotoId)}
-                    onClick={() => deletePhoto(photo)}
-                    className="tap-target px-2 text-caption font-semibold text-danger disabled:opacity-50"
-                  >
-                    {busyPhotoId === photo.id ? "처리 중" : "삭제"}
-                  </button>
-                </div>
-              )}
-            </>
           )}
         </div>
       </article>
     );
   };
 
+  const renderAlbumMasonry = (items: AlbumPhoto[]) => (
+    <div className="album-masonry">
+      {[0, 1].map((column) => (
+        <div key={column} className="album-masonry-column">
+          {items
+            .filter((_, index) => index % 2 === column)
+            .map(renderAlbumPhoto)}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <>
-      <div className="flex items-center justify-between gap-3">
-        <Badge tone="neutral">{photos.length}장</Badge>
-        <div>
+      <header className="album-hero">
+        <AlbumHeroBotanical />
+        <p className="album-hero-eyebrow">FUKUOKA · FAMILY ALBUM</p>
+        <h1>함께한 사진</h1>
+        <div className="album-hero-information">
+          <p>가족의 추억 기록</p>
+          <span
+            aria-label={`${currentTripSession.trip.startDate}부터 ${currentTripSession.trip.endDate}까지`}
+          >
+            {tripDateLabel}
+          </span>
+        </div>
+        <div className="album-hero-controls">
+          <span className="album-photo-count">{photos.length}장</span>
           <label htmlFor="album-photo-picker" className="sr-only">
             업로드할 사진 선택
           </label>
@@ -583,9 +699,11 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
             onChange={handleFileChange}
           />
           <Button
+            className="album-upload-button"
             onClick={() => inputRef.current?.click()}
             disabled={isDecoding || isUploading || isLoading}
           >
+            <UploadIcon />
             {isDecoding
               ? "미리보기 준비 중"
               : drafts.length > 0
@@ -593,26 +711,26 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
                 : "사진 올리기"}
           </Button>
         </div>
-      </div>
+      </header>
 
       {error && (
         <p
           role="alert"
-          className="mt-4 whitespace-pre-line rounded-md border border-danger/30 bg-danger/8 px-4 py-3 text-sm text-danger"
+          className="album-inline-error"
         >
           {error}
         </p>
       )}
 
       {uploadProgress && (
-        <p aria-live="polite" className="mt-3 text-sm text-text-secondary">
+        <p aria-live="polite" className="album-upload-progress">
           업로드 {uploadProgress.completed}/{uploadProgress.total} 완료 · 성공 {uploadProgress.succeeded}장
         </p>
       )}
 
       {drafts.length > 0 && (
         <Card
-          className="mt-5 overflow-hidden p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+          className="album-composer"
           aria-labelledby="album-composer-title"
         >
           <div className="flex items-center justify-between gap-3 px-1 pb-3">
@@ -728,40 +846,33 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
         </Card>
       )}
 
-      <section className="mt-8" aria-labelledby="album-photos-title">
-        <div className="flex items-end justify-between gap-3">
+      <section className="album-moments" aria-labelledby="album-photos-title">
+        <div className="album-moments-heading">
           <div>
-            <p className="text-caption font-bold tracking-[0.14em] text-accent-secondary">
+            <p className="album-moments-eyebrow">
               OUR MOMENTS
             </p>
             <h2
               id="album-photos-title"
-              className="font-editorial mt-1 text-section font-semibold"
             >
               여행의 장면들
             </h2>
           </div>
-          {photos.length > 0 && (
-            <span className="text-caption text-text-secondary">
-              {uploaderFilter
-                ? `${visiblePhotos.length}장 표시 중`
-                : sort === "newest"
-                  ? "최신순"
-                  : "오래된순"}
-            </span>
-          )}
+          <AlbumMomentsBotanical />
         </div>
 
         {!isLoading && !loadError && photos.length > 0 && (
-          <div className="mt-4 min-w-0 overflow-hidden rounded-md border border-line/70 bg-surface/55">
+          <div ref={filterRef} className="album-filter">
             <button
+              ref={filterSummaryRef}
               type="button"
               aria-expanded={isFilterPanelOpen}
               aria-controls="album-filter-panel"
               onClick={() => setIsFilterPanelOpen((current) => !current)}
-              className="tap-target flex w-full min-w-0 items-center gap-3 px-3 py-2 text-left"
+              className="album-filter-summary"
             >
-              <span className="flex shrink-0 items-center gap-1.5 text-sm font-bold">
+              <FilterIcon />
+              <span className="album-filter-label">
                 분류
                 {isFilterActive && (
                   <span
@@ -770,26 +881,26 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
                   />
                 )}
               </span>
-              <span className="min-w-0 flex-1 truncate text-caption text-text-secondary">
+              <span className="album-filter-value">
                 {filterSummary}
               </span>
               <span
                 aria-hidden="true"
-                className={`shrink-0 text-text-secondary transition-transform ${
+                className={`album-filter-chevron ${
                   isFilterPanelOpen ? "rotate-180" : ""
                 }`}
               >
-                ⌄
+                <ChevronIcon />
               </span>
             </button>
 
             <div
               id="album-filter-panel"
               hidden={!isFilterPanelOpen}
-              className="space-y-4 border-t border-line/70 p-3"
+              className="album-filter-panel"
             >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-caption font-semibold text-text-secondary">
+              <div className="album-filter-panel-heading">
+                <p>
                   업로더
                 </p>
                 {isFilterActive && (
@@ -800,7 +911,7 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
                       setSort("newest");
                       setGroupMode("flat");
                     }}
-                    className="tap-target px-2 text-caption font-semibold text-accent-primary"
+                    className="album-filter-reset"
                   >
                     초기화
                   </button>
@@ -809,17 +920,13 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
               <div
                 role="group"
                 aria-label="업로더"
-                className="flex max-w-full gap-2 overflow-x-auto pb-1"
+                className="album-uploader-options"
               >
                 <button
                   type="button"
                   aria-pressed={uploaderFilter === null}
                   onClick={() => setUploaderFilter(null)}
-                  className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold ${
-                    uploaderFilter === null
-                      ? "border-accent-primary bg-accent-primary text-white"
-                      : "border-line bg-surface text-text-secondary"
-                  }`}
+                  className="album-uploader-option"
                 >
                   전체 {photos.length}
                 </button>
@@ -830,80 +937,49 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
                     aria-pressed={uploaderFilter === option.memberId}
                     aria-label={`${option.label} 사진 ${option.count}장 보기`}
                     onClick={() => setUploaderFilter(option.memberId)}
-                    className={`min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold ${
-                      uploaderFilter === option.memberId
-                        ? "border-accent-primary bg-accent-primary text-white"
-                        : "border-line bg-surface text-text-secondary"
-                    }`}
+                    className="album-uploader-option"
                   >
                     {option.label} {option.count}
                   </button>
                 ))}
               </div>
 
-              <div>
-                <p
-                  id="album-sort-label"
-                  className="text-caption font-semibold text-text-secondary"
-                >
-                  정렬
-                </p>
-                <div
-                  role="group"
-                  aria-labelledby="album-sort-label"
-                  className="mt-2 grid min-w-0 grid-cols-2 gap-1"
-                >
-                  {([
-                    ["newest", "최신순"],
-                    ["oldest", "오래된순"],
-                  ] as const).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      aria-pressed={sort === value}
-                      onClick={() => setSort(value)}
-                      className={`min-h-11 rounded-md border px-2 text-sm font-semibold ${
-                        sort === value
-                          ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
-                          : "border-line bg-surface text-text-secondary"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+              <div className="album-filter-groups">
+                <div className="album-filter-group">
+                  <p id="album-sort-label">정렬</p>
+                  <div role="group" aria-labelledby="album-sort-label">
+                    {([
+                      ["newest", "최신순"],
+                      ["oldest", "오래된순"],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={sort === value}
+                        onClick={() => setSort(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <p
-                  id="album-group-label"
-                  className="text-caption font-semibold text-text-secondary"
-                >
-                  보기
-                </p>
-                <div
-                  role="group"
-                  aria-labelledby="album-group-label"
-                  className="mt-2 grid min-w-0 grid-cols-2 gap-1"
-                >
-                  {([
-                    ["flat", "전체 보기"],
-                    ["uploader", "올린 사람별"],
-                  ] as const).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      aria-pressed={groupMode === value}
-                      onClick={() => setGroupMode(value)}
-                      className={`min-h-11 rounded-md border px-2 text-sm font-semibold ${
-                        groupMode === value
-                          ? "border-accent-primary bg-accent-primary/10 text-accent-primary"
-                          : "border-line bg-surface text-text-secondary"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                <div className="album-filter-group">
+                  <p id="album-group-label">보기</p>
+                  <div role="group" aria-labelledby="album-group-label">
+                    {([
+                      ["flat", "전체"],
+                      ["uploader", "사람별"],
+                    ] as const).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={groupMode === value}
+                        onClick={() => setGroupMode(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -911,10 +987,10 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
         )}
 
         {isLoading ? (
-          <LoadingState className="mt-4" label="가족 앨범을 불러오고 있어요" />
+          <LoadingState className="album-gallery-state" label="가족 앨범을 불러오고 있어요" />
         ) : loadError ? (
           <EmptyState
-            className="mt-4 bg-surface/55"
+            className="album-gallery-state"
             title="앨범을 불러오지 못했어요."
             description="네트워크 연결을 확인하고 다시 시도해주세요."
             action={
@@ -932,13 +1008,13 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
           />
         ) : photos.length === 0 ? (
           <EmptyState
-            className="mt-4 bg-surface/55"
+            className="album-gallery-state"
             title="첫 번째 여행 사진을 올려보세요."
             description="함께 찍은 순간을 가족 앨범에 모아봐요."
           />
         ) : visiblePhotos.length === 0 ? (
           <EmptyState
-            className="mt-4 bg-surface/55"
+            className="album-gallery-state"
             title="선택한 사람이 올린 사진이 없어요."
             description="전체 사진으로 돌아가 다른 여행 장면을 확인해보세요."
             action={
@@ -948,24 +1024,20 @@ export function AlbumView({ onComposerOpenChange }: AlbumViewProps) {
             }
           />
         ) : groupMode === "flat" ? (
-          <div className="mt-4 grid grid-cols-2 items-start gap-3">
-            {visiblePhotos.map(renderAlbumPhoto)}
-          </div>
+          renderAlbumMasonry(visiblePhotos)
         ) : (
-          <div className="mt-5 space-y-7">
+          <div className="album-photo-groups">
             {photoGroups.map((group) => (
-              <section key={group.memberId}>
-                <div className="flex items-baseline justify-between gap-3">
-                  <h3 className="min-w-0 truncate text-base font-semibold">
+              <section key={group.memberId} className="album-photo-group">
+                <div className="album-photo-group-heading">
+                  <h3>
                     {group.label}
                   </h3>
-                  <span className="shrink-0 text-caption text-text-secondary">
+                  <span>
                     {group.count}장
                   </span>
                 </div>
-                <div className="mt-3 grid grid-cols-2 items-start gap-3">
-                  {group.photos.map(renderAlbumPhoto)}
-                </div>
+                {renderAlbumMasonry(group.photos)}
               </section>
             ))}
           </div>
