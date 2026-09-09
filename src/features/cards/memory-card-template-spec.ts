@@ -17,6 +17,8 @@ export type MemoryCardPhotoSlot = {
   r: number;
   z: number;
   frame: "polaroid" | "strip" | "plain";
+  // v4 declares its exact inner viewport; absent for the frozen v1–v3 geometry.
+  viewport?: { x: number; y: number; width: number; height: number };
 };
 
 export type MemoryCardTextStyleKey =
@@ -200,6 +202,7 @@ export const FOUR_CUT_EXPORT_BOUNDS = {
   background: "template",
 } as const satisfies ExportBounds;
 
+// Frozen canonical v1–v3 registry. New writers use watercolor-template-spec.
 export const MEMORY_CARD_TEMPLATE_SPECS = [
   {
     key: "polaroid_moodboard",

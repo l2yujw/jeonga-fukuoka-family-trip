@@ -1,4 +1,5 @@
 import type { AlbumPhoto } from "@/features/album/album-types";
+import { prepareWatercolorScene, renderWatercolorPng } from "./watercolor-scene";
 import {
   getMemoryCardRenderTemplate,
   resolveMemoryCardSlots,
@@ -251,6 +252,9 @@ export async function renderMemoryCardPng(
   size: ExportSize,
   imageLoader: MemoryCardImageLoader = loadImage,
 ) {
+  if (input.renderModel.kind === "watercolor") {
+    return renderWatercolorPng(await prepareWatercolorScene(input.templateKey, input.renderModel.layout, input.photos), size.width);
+  }
   const template = getMemoryCardRenderTemplate(input.templateKey, input.renderModel);
   if (!template) throw new Error("memory-card-template-missing");
   const photos = new Map(input.photos.map((photo) => [photo.id, photo]));
@@ -353,6 +357,15 @@ export async function exportMemoryCardPng(
   input: MemoryCardRenderInput,
   render = renderMemoryCardPng,
 ) {
+  if (input.renderModel.kind === "watercolor") {
+    const scene = await prepareWatercolorScene(input.templateKey, input.renderModel.layout, input.photos);
+    try {
+      return await renderWatercolorPng(scene, 1080);
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== "memory-card-canvas-size-exceeded") throw error;
+      return renderWatercolorPng(scene, 720);
+    }
+  }
   try {
     return await render(input, MEMORY_CARD_EXPORT_SIZES[0]);
   } catch {

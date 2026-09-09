@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, EmptyState, LoadingState } from "@/components/ui";
 import {
   useNearViewportPhoto,
@@ -40,22 +40,21 @@ import {
   shareOrDownloadMemoryCardPng,
 } from "./memory-card-export";
 import {
-  getMemoryCardTemplate,
   getMemoryCardReferencedPhotoIds,
   getMemoryCardRenderPhotoIds,
+  getMemoryCardRenderTemplate,
   getMinimumMemoryCardPhotoCount,
   getRandomPhotoCount,
-  MEMORY_CARD_TEMPLATES,
-  normalizeMemoryCardCaption,
   randomFillPhotoIds,
-  reshuffleMemoryCardLayout,
   type MemoryCard,
-  type MemoryCardLayoutV3,
   type MemoryCardRenderModel,
   type MemoryCardTemplateKey,
 } from "./memory-card";
 import {
   createMemoryCard,
+  MemoryCardOutcomeUnknown,
+  verifyMemoryCardSave,
+  type MemoryCardSaveAttempt,
   deleteMemoryCard,
   downloadMemoryCardResult,
   loadMemoryCards,
@@ -63,6 +62,11 @@ import {
 } from "./memory-card-repository";
 import { MemoryCardPreview } from "./memory-card-preview";
 import type { MemoryCardPhotoSlot } from "./memory-card-template-spec";
+import { WATERCOLOR_TEMPLATES as MEMORY_CARD_TEMPLATES, getWatercolorTemplate as getMemoryCardTemplate } from "./watercolor-template-spec";
+import { createWatercolorDraft, finalizeWatercolorLayout, projectWatercolorLayout, type MemoryCardLayoutV4, type WatercolorDraft } from "./watercolor-layout";
+import { WatercolorTextEditor } from "./watercolor-text-editor";
+import { WatercolorThumbnail, type WatercolorValidation } from "./watercolor-preview";
+import { getCurrentAuthSession } from "@/features/boarding/current-trip-session";
 
 type ComposerStep = "template" | "photos" | "preview";
 type ExportAction = "download" | "share";
@@ -89,8 +93,8 @@ function templatePhotoCountLabel(min: number, max: number) {
   return min === max ? `사진 ${min}장` : `사진 ${min}–${max}장`;
 }
 
-function TemplateGlyph({ templateKey }: { templateKey: MemoryCardTemplateKey }) {
-  const count = getMemoryCardTemplate(templateKey)?.acceptedMin ?? 1;
+function TemplateGlyph({ templateKey, renderModel }: { templateKey: MemoryCardTemplateKey; renderModel?: MemoryCardRenderModel | null }) {
+  const count = renderModel ? getMemoryCardRenderTemplate(templateKey, renderModel)?.slots.length ?? 1 : getMemoryCardTemplate(templateKey)?.acceptedMin ?? 1;
   return (
     <svg aria-hidden="true" viewBox="0 0 36 30" className="cards-template-glyph">
       <rect x="3" y="3" width="30" height="24" rx="2" />
@@ -126,7 +130,7 @@ function SaveIcon() {
 }
 
 function getSavedCardCaption(card: MemoryCard) {
-  return card.renderModel?.kind === "canonical"
+  return card.renderModel && card.renderModel.kind !== "legacy-simple-v1"
     ? card.renderModel.layout.caption
     : null;
 }
@@ -257,7 +261,16 @@ export function MemoryCardsView() {
     placementBySlotId: {},
   });
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
-  const [cardCaption, setCardCaption] = useState("");
+  const [textDraft, setTextDraft] = useState<WatercolorDraft>({cardValues:{},annotationsByPhotoId:{}});
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [sceneValidation, setSceneValidation] = useState<WatercolorValidation>({ready:false,errors:{}});
+  const validateScene = useCallback((state:WatercolorValidation)=>setSceneValidation(state),[]);
+  const templateDrafts = useRef<Record<string,{photo:PhotoDraft;text:WatercolorDraft}>>({});
+  const photoBaseline = useRef<{photo:PhotoDraft;step:ComposerStep}|null>(null);
+  const savingRef = useRef(false);
+  const [pendingAttempt,setPendingAttempt] = useState<MemoryCardSaveAttempt|null>(null);
+  const identityRef = useRef(tripSession);
+  useEffect(()=>{identityRef.current=tripSession;},[tripSession]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [exportingKey, setExportingKey] = useState<string | null>(null);
@@ -307,29 +320,24 @@ export function MemoryCardsView() {
 
   const template = templateKey ? getMemoryCardTemplate(templateKey) : null;
   const selectedPhotoIds = photoDraft.photoIds;
-  const draftLayout = useMemo<MemoryCardLayoutV3 | null>(() => {
+  const draftLayout = useMemo<MemoryCardLayoutV4 | null>(() => {
     if (!template) return null;
-    return {
-      version: 3,
-      slots: selectedPhotoIds.map((photoId, index) => ({
-        slotId: template.slots[index].id,
-        photoId,
-        placement: {
-          ...(photoDraft.placementBySlotId[template.slots[index].id] ??
-            getDefaultMemoryCardPhotoPlacement(
-              photos.find(({ id }) => id === photoId),
-              template.slots[index],
-            )),
-        },
-      })),
-      caption: normalizeMemoryCardCaption(cardCaption),
-    };
-  }, [cardCaption, photoDraft.placementBySlotId, photos, selectedPhotoIds, template]);
-  const draftRenderModel = useMemo<MemoryCardRenderModel | null>(() =>
-    draftLayout
-      ? { kind: "canonical", layoutVersion: 3, layout: draftLayout }
-      : null,
-  [draftLayout]);
+    return projectWatercolorLayout(template, selectedPhotoIds.map((photoId,index)=>({
+      slotId:template.slots[index].id,photoId,placement:{...(photoDraft.placementBySlotId[template.slots[index].id]??getDefaultMemoryCardPhotoPlacement(photos.find(p=>p.id===photoId),template.slots[index]))}
+    })),textDraft);
+  },[template,selectedPhotoIds,photoDraft.placementBySlotId,photos,textDraft]);
+  const draftRenderModel = useMemo<MemoryCardRenderModel | null>(() => draftLayout ? {kind:"watercolor",layoutVersion:4,layout:draftLayout}:null,[draftLayout]);
+  const selectedPhotoSignature = selectedPhotoIds.join(",");
+  useEffect(()=>{
+    const selected = new Set(selectedPhotoSignature.split(","));
+    const paths = photos.filter(p=>selected.has(p.id)&&!p.signedUrl).map(p=>p.storagePath);
+    if (!paths.length) return;
+    let active=true;
+    void loadAlbumPhotoSignedUrls(paths).then(urls=>{if(active)setPhotos(current=>applyAlbumPhotoSignedUrls(current,urls));}).catch(()=>{if(active)setError("사진을 불러오지 못했어요. 사진 선택에서 다시 확인해주세요.");});
+    return ()=>{active=false;};
+  // Signed URL refresh is keyed to the selected mapping; retries are explicit in photo selection.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[selectedPhotoSignature]);
   const selectedSlot = draftLayout?.slots.find(
     ({ slotId }) => slotId === selectedSlotId,
   ) ?? null;
@@ -414,10 +422,35 @@ export function MemoryCardsView() {
     selectedPhotoStoragePath,
   ]);
 
+  const openTextEditor = (fieldId: string) => {
+    if (savingRef.current || selectedSlotId || photoBaseline.current) return;
+    setEditingFieldId(fieldId);
+  };
+
+  const activateTemplate = (key:MemoryCardTemplateKey | null) => {
+    if (!key || savingRef.current || editingFieldId || selectedSlotId || photoBaseline.current) return;
+    if(templateKey) templateDrafts.current[templateKey] = structuredClone({photo:photoDraft,text:textDraft});
+    const next=getMemoryCardTemplate(key)!;
+    const cached=templateDrafts.current[key];
+    setTemplateKey(key);
+    setPhotoDraft(cached?structuredClone(cached.photo):{photoIds:[],placementBySlotId:{}});
+    setTextDraft(cached?structuredClone(cached.text):createWatercolorDraft(next,tripSession.trip));
+    setSceneValidation({ready:false,errors:{}});
+    setSelectedSlotId(null);
+  };
+  const openPhotoSelection = (step:ComposerStep="template") => {
+    if(savingRef.current||editingFieldId||selectedSlotId||photoBaseline.current)return;
+    photoBaseline.current={photo:structuredClone(photoDraft),step};
+    setComposerStep("photos");
+  };
+  const finishPhotoSelection = (apply:boolean) => {
+    if(!apply&&photoBaseline.current)setPhotoDraft(structuredClone(photoBaseline.current.photo));
+    setComposerStep(photoBaseline.current?.step??"template");photoBaseline.current=null;
+  };
   const openComposer = async () => {
     if (isLoadingComposerPhotos) return;
     if (composerPhotosLoaded) {
-      setTemplateKey(getDefaultComposerTemplateKey(albumPhotoCount));
+      activateTemplate(getDefaultComposerTemplateKey(albumPhotoCount));
       setComposerStep("template");
       return;
     }
@@ -433,7 +466,7 @@ export function MemoryCardsView() {
       setPhotos((current) => mergeAlbumPhotos(albumPhotos, current));
       setAlbumPhotoCount(albumPhotos.length);
       setComposerPhotosLoaded(true);
-      setTemplateKey(getDefaultComposerTemplateKey(albumPhotos.length));
+      activateTemplate(getDefaultComposerTemplateKey(albumPhotos.length));
       setComposerStep("template");
       void loadAlbumPhotoSignedUrls(
         firstViewPhotos.map(({ storagePath }) => storagePath),
@@ -453,6 +486,7 @@ export function MemoryCardsView() {
   };
 
   const closeComposer = () => {
+    if (savingRef.current || editingFieldId || selectedSlotId || photoBaseline.current) return;
     setComposerStep(null);
     setShowAllTemplates(false);
     setTemplateKey(null);
@@ -461,11 +495,13 @@ export function MemoryCardsView() {
     setCropPhotoReadyKey(null);
     setCropPhotoFailedKey(null);
     setCropRefreshVersion(0);
-    setCardCaption("");
+    templateDrafts.current={};
+    setTextDraft({cardValues:{},annotationsByPhotoId:{}});
     setError(null);
   };
 
   const selectSlotForCrop = (slotId: string | null) => {
+    if(savingRef.current||editingFieldId||photoBaseline.current)return;
     setCropPhotoReadyKey(null);
     setCropPhotoFailedKey(null);
     setCropRefreshVersion(0);
@@ -479,8 +515,7 @@ export function MemoryCardsView() {
       albumPhotoCount < nextTemplate.acceptedMin ||
       templateKey === nextTemplateKey
     ) return;
-    setTemplateKey(nextTemplateKey);
-    setPhotoDraft({ photoIds: [], placementBySlotId: {} });
+    activateTemplate(nextTemplateKey);
     setSelectedSlotId(null);
     setError(null);
   };
@@ -514,7 +549,7 @@ export function MemoryCardsView() {
     setPhotoDraft((current) => {
       const nextPhotoIds = randomFillPhotoIds(
         photos.map(({ id }) => id),
-        getRandomPhotoCount(templateKey, photos.length),
+        getRandomPhotoCount(templateKey, photos.length, 4),
       );
       return {
         photoIds: nextPhotoIds,
@@ -533,13 +568,11 @@ export function MemoryCardsView() {
   };
 
   const reshuffle = () => {
-    if (!templateKey || !template || !draftLayout) return;
-    const reshuffled = reshuffleMemoryCardLayout(
-      templateKey,
-      draftLayout,
-      photos.map(({ id }) => id),
-    );
-    const nextPhotoIds = reshuffled.slots.map(({ photoId }) => photoId);
+    if (!templateKey || !template || !draftLayout || savingRef.current || editingFieldId || selectedSlotId) return;
+    if (composerStep !== "photos") openPhotoSelection("preview");
+    let nextPhotoIds = randomFillPhotoIds(photos.map(p=>p.id),template.acceptedMax);
+    if(nextPhotoIds.every((id,i)=>id===photoDraft.photoIds[i])&&nextPhotoIds.length>1)nextPhotoIds=[...nextPhotoIds.slice(1),nextPhotoIds[0]];
+    else if(nextPhotoIds.length===1&&nextPhotoIds[0]===photoDraft.photoIds[0])nextPhotoIds=[photos.find(p=>p.id!==nextPhotoIds[0])?.id??nextPhotoIds[0]];
     setPhotoDraft({
       photoIds: nextPhotoIds,
       placementBySlotId: reconcileMemoryCardPhotoPlacements(
@@ -602,35 +635,56 @@ export function MemoryCardsView() {
   };
 
   const saveCard = async () => {
-    if (!templateKey || !draftRenderModel || !canPreview || isSaving) return;
+    if (!templateKey || !draftRenderModel || !canPreview || savingRef.current || editingFieldId || selectedSlotId || !sceneValidation.ready || Object.keys(sceneValidation.errors).length) return;
+    savingRef.current=true;
     setIsSaving(true);
     setError(null);
+    let unknownOutcome=false;
 
     try {
-      const resultPng = await renderCardBlob(templateKey, draftRenderModel);
+      const frozenLayout=finalizeWatercolorLayout(templateKey,draftLayout!);
+      const frozenSession=structuredClone(tripSession);
+      const auth=await getCurrentAuthSession();
+      if(!auth)throw new Error("인증을 확인해주세요.");
+      const resultPng = await renderCardBlob(templateKey, {kind:"watercolor",layoutVersion:4,layout:frozenLayout});
+      if(identityRef.current.trip.id!==frozenSession.trip.id||identityRef.current.member.id!==frozenSession.member.id)throw new Error("탑승 정보가 변경되었어요. 다시 확인해주세요.");
       const saved = await createMemoryCard({
         availablePhotoIds: photos.map(({ id }) => id),
-        layout: draftLayout!,
+        layout: frozenLayout,
         resultPng,
         templateKey,
-        tripSession,
+        tripSession: frozenSession,
+        expectedAuthUserId: auth.user.id,
       });
       setCards((current) => [saved, ...current]);
+      savingRef.current=false;
       closeComposer();
-    } catch {
-      setError("추억 카드를 저장하지 못했어요. 다시 시도해주세요.");
+    } catch (error) {
+      if(error instanceof MemoryCardOutcomeUnknown){unknownOutcome=true;setPendingAttempt(error.attempt);}
+      setError(error instanceof Error?error.message:"추억 카드를 저장하지 못했어요. 다시 시도해주세요.");
     } finally {
+      savingRef.current=unknownOutcome;
       setIsSaving(false);
     }
   };
 
+  const verifyPendingSave = async () => {
+    if(!pendingAttempt||isSaving)return;
+    setIsSaving(true);
+    try {
+      const saved=await verifyMemoryCardSave(pendingAttempt);
+      if(saved){setCards(current=>[saved,...current.filter(c=>c.id!==saved.id)]);setPendingAttempt(null);savingRef.current=false;closeComposer();}
+      else setError("아직 저장 결과를 확인하지 못했어요. 잠시 후 같은 저장 결과를 다시 확인해주세요.");
+    }catch(error){setError(error instanceof Error?error.message:"저장 결과를 확인하지 못했어요.");}
+    finally{setIsSaving(false);}
+  };
   const exportCard = async (
     key: string,
     action: ExportAction,
     exportTemplateKey: MemoryCardTemplateKey,
     renderModel: MemoryCardRenderModel,
   ) => {
-    if (exportingKey) return;
+    if (exportingKey || savingRef.current || editingFieldId || selectedSlotId) return;
     setExportingKey(`${key}-${action}`);
     setError(null);
     try {
@@ -725,7 +779,7 @@ export function MemoryCardsView() {
 
     return (
       <>
-        <section className="cards-studio" aria-labelledby="cards-studio-title">
+        <section className="cards-studio" aria-labelledby="cards-studio-title" inert={isSaving||Boolean(pendingAttempt)}>
           <header className="cards-studio-heading">
             <span className="cards-sparkle" aria-hidden="true">✦</span>
             <div>
@@ -748,7 +802,7 @@ export function MemoryCardsView() {
                 onClick={() => selectTemplate(item.key)}
                 className={`cards-template-tile ${selected ? "is-selected" : ""}`}
               >
-                <TemplateGlyph templateKey={item.key} />
+                <WatercolorThumbnail templateKey={item.key} />
                 <span>{item.displayName}</span>
               </button>
             );
@@ -760,6 +814,8 @@ export function MemoryCardsView() {
             <MemoryCardPreview
               templateKey={template.key}
               renderModel={draftRenderModel}
+              onValidation={validateScene}
+              onSelectField={openTextEditor}
               photos={photos}
               dateLabel={dateLabel}
               onPhotoMediaChange={handlePhotoMediaChange}
@@ -773,11 +829,13 @@ export function MemoryCardsView() {
 
         {error && <p role="alert" className="mt-4 rounded-md bg-danger/8 px-4 py-3 text-sm text-danger">{error}</p>}
 
+          <Button className="wc-edit-action" variant="secondary" disabled={isSaving} onClick={()=>openTextEditor(template.fields[0].id)}>문구 편집 · {template.fields.length}곳 <span aria-hidden="true">›</span></Button>
           <div className="cards-action-row cards-main-actions">
             <Button
               variant="secondary"
               disabled={!canPreview || isSaving || Boolean(draftBusy)}
               onClick={() => {
+                if (savingRef.current || editingFieldId || selectedSlotId || photoBaseline.current) return;
                 selectSlotForCrop(null);
                 setComposerStep("preview");
               }}
@@ -787,7 +845,7 @@ export function MemoryCardsView() {
             <Button
               className="cards-primary-action"
               disabled={isSaving || Boolean(draftBusy)}
-              onClick={() => setComposerStep("photos")}
+              onClick={() => openPhotoSelection(composerStep === "preview" ? "preview" : "template")}
             >
               사진 선택하기
             </Button>
@@ -813,9 +871,10 @@ export function MemoryCardsView() {
                   >
                     {selected && <span className="cards-template-check" aria-hidden="true">✓</span>}
                     <span className="cards-template-preview">
-                      <MemoryCardPreview templateKey={item.key} photos={[]} dateLabel={dateLabel} />
+                      <WatercolorThumbnail templateKey={item.key} />
                     </span>
                     <strong>{item.displayName}</strong>
+                    <small>{templatePhotoCountLabel(item.acceptedMin, item.acceptedMax)}</small>
                   </button>
                 );
               })}
@@ -824,7 +883,7 @@ export function MemoryCardsView() {
             <div className="cards-tip">
               <span aria-hidden="true">❧</span>
               <p><strong>카드 팁</strong>사진은 앨범에서 선택해 카드에 담을 수 있어요.</p>
-              <button type="button" onClick={() => setComposerStep("photos")}>사진 선택하기</button>
+              <button type="button" onClick={() => openPhotoSelection(composerStep === "preview" ? "preview" : "template")}>사진 선택하기</button>
             </div>
 
         {showAllTemplates && (
@@ -860,7 +919,7 @@ export function MemoryCardsView() {
                         }}
                         className={`cards-all-template-item ${selected ? "is-selected" : ""}`}
                       >
-                        <TemplateGlyph templateKey={item.key} />
+                        <span className="cards-template-preview"><WatercolorThumbnail templateKey={item.key} /></span>
                         <span><strong>{item.displayName}</strong><small>{templatePhotoCountLabel(item.acceptedMin, item.acceptedMax)}</small></span>
                         {selected && <span className="cards-all-template-check" aria-hidden="true">✓</span>}
                       </button>
@@ -873,7 +932,7 @@ export function MemoryCardsView() {
         )}
 
         {composerStep === "photos" && (
-          <div className="cards-dialog-backdrop" role="presentation" onClick={() => setComposerStep("template")}>
+          <div className="cards-dialog-backdrop" role="presentation" onKeyDown={e=>{if(e.key==="Escape")finishPhotoSelection(false);}} onClick={() => finishPhotoSelection(false)}>
             <section
               role="dialog"
               aria-modal="true"
@@ -886,7 +945,7 @@ export function MemoryCardsView() {
                   <h3 id="cards-photo-sheet-title">사진 선택</h3>
                   <p>{selectedPhotoIds.length}/{template.acceptedMax}장 선택 · {template.displayName}</p>
                 </div>
-                <button type="button" onClick={() => setComposerStep("template")} aria-label="사진 선택 닫기">×</button>
+                <button type="button" onClick={() => finishPhotoSelection(false)} aria-label="사진 선택 취소">×</button>
               </header>
 
               <div className="cards-sheet-body">
@@ -920,20 +979,11 @@ export function MemoryCardsView() {
                   })}
                 </div>
 
-                <label className="cards-caption-label" htmlFor="memory-card-caption">카드 문구</label>
-                <textarea
-                  id="memory-card-caption"
-                  value={cardCaption}
-                  onChange={(event) => setCardCaption(event.target.value)}
-                  placeholder="이 카드에만 남길 문구를 입력하세요"
-                  rows={2}
-                  className="cards-caption-input"
-                />
               </div>
 
               <div className="cards-action-row cards-sheet-actions">
-                <Button variant="secondary" disabled={!canPreview} onClick={reshuffle}>다시 섞기</Button>
-                <Button className="cards-primary-action" disabled={!canPreview} onClick={() => setComposerStep("template")}>선택 완료</Button>
+                <Button variant="secondary" onClick={() => finishPhotoSelection(false)}>취소</Button>
+                <Button className="cards-primary-action" disabled={!canPreview} onClick={() => finishPhotoSelection(true)}>선택 완료</Button>
               </div>
             </section>
           </div>
@@ -963,6 +1013,7 @@ export function MemoryCardsView() {
                     renderModel={draftRenderModel}
                     photos={photos}
                     dateLabel={dateLabel}
+                    onSelectField={openTextEditor}
                     selectedSlotId={selectedSlotId}
                     onSelectSlot={selectSlotForCrop}
                     onPhotoMediaChange={handlePhotoMediaChange}
@@ -1059,24 +1110,30 @@ export function MemoryCardsView() {
               </div>
             )}
 
+                <Button className="wc-edit-action" variant="secondary" disabled={isSaving||Boolean(selectedSlotId)} onClick={()=>openTextEditor(template.fields[0].id)}>문구 편집 · {template.fields.length}곳 <span aria-hidden="true">›</span></Button>
+                {!sceneValidation.ready&&<p className="wc-error">사진·장식·글꼴을 준비하는 중이에요.</p>}
+                {Object.values(sceneValidation.errors).map((message,i)=><p key={i} className="wc-error">{message}</p>)}
                 <div className="cards-preview-tools">
                   <Button variant="secondary" disabled={isSaving || Boolean(draftBusy)} onClick={reshuffle}>다시 섞기</Button>
-                  <Button variant="secondary" loading={exportingKey === "draft-download"} disabled={isSaving || Boolean(draftBusy)} onClick={() => draftRenderModel && exportCard("draft", "download", template.key, draftRenderModel)}>PNG 저장</Button>
-                  <Button variant="secondary" loading={exportingKey === "draft-share"} disabled={isSaving || Boolean(draftBusy)} onClick={() => draftRenderModel && exportCard("draft", "share", template.key, draftRenderModel)}>공유</Button>
+                  <Button variant="secondary" loading={exportingKey === "draft-download"} disabled={isSaving || Boolean(draftBusy) || !sceneValidation.ready || Boolean(Object.keys(sceneValidation.errors).length)} onClick={() => draftRenderModel && exportCard("draft", "download", template.key, draftRenderModel)}>PNG 저장</Button>
+                  <Button variant="secondary" loading={exportingKey === "draft-share"} disabled={isSaving || Boolean(draftBusy) || !sceneValidation.ready || Boolean(Object.keys(sceneValidation.errors).length)} onClick={() => draftRenderModel && exportCard("draft", "share", template.key, draftRenderModel)}>공유</Button>
                 </div>
                 <p className="cards-finalize-note">저장하면 이 모습으로 확정되며 이후에는 보기·다운로드·삭제만 할 수 있어요.</p>
               </div>
 
               <div className="cards-action-row cards-sheet-actions cards-preview-actions">
-                <Button variant="secondary" disabled={isSaving || Boolean(draftBusy)} onClick={() => setComposerStep("photos")}>사진 다시 선택</Button>
-                <Button className="cards-primary-action" loading={isSaving} disabled={Boolean(draftBusy)} onClick={saveCard}>
+                <Button variant="secondary" disabled={isSaving || Boolean(draftBusy)} onClick={() => openPhotoSelection(composerStep === "preview" ? "preview" : "template")}>사진 다시 선택</Button>
+                <Button className="cards-primary-action" loading={isSaving} disabled={Boolean(draftBusy)||!sceneValidation.ready||Boolean(Object.keys(sceneValidation.errors).length)||Boolean(selectedSlotId)} onClick={saveCard}>
                   <SaveIcon /> {isSaving ? "저장 중" : "카드 저장"}
                 </Button>
               </div>
             </section>
           </div>
         )}
+        {editingFieldId&&<WatercolorTextEditor template={template} initialDraft={textDraft} slots={draftLayout.slots} photos={photos} initialFieldId={editingFieldId} onCancel={()=>setEditingFieldId(null)} onApply={draft=>{setTextDraft(draft);setEditingFieldId(null);}}/>}
+
       </section>
+        {(isSaving||pendingAttempt)&&<div className="wc-save-lock" role="dialog" aria-modal="true" aria-label="카드 저장 상태"><p role="status">{pendingAttempt?"저장 결과 확인이 필요해요.":"카드를 이 모습으로 저장하고 있어요."}</p>{pendingAttempt&&<><p>{error}</p><button type="button" disabled={isSaving} onClick={verifyPendingSave}>저장 결과 다시 확인</button></>}</div>}
       </>
     );
   }
@@ -1142,7 +1199,7 @@ export function MemoryCardsView() {
                     onClick={() => setSelectedCardId(card.id)}
                   >
                     <span className="cards-saved-rail" aria-hidden="true" />
-                    <span className="cards-saved-icon" aria-hidden="true"><TemplateGlyph templateKey={card.templateKey} /></span>
+                    <span className="cards-saved-icon" aria-hidden="true"><TemplateGlyph templateKey={card.templateKey} renderModel={card.renderModel} /></span>
                     <span className="cards-saved-copy">
                       <span className="cards-saved-chips">
                         <span>{savedTemplate.displayName}</span>

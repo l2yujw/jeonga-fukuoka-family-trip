@@ -1,4 +1,5 @@
 {
+  "status": "Frozen v1-v3 contract. New v4 writer: docs/contracts/04_CARD_LAYOUT_V4_CONTRACT.md",
   "phase": "Phase 5 — Memory Card MVP",
   "coordinateAuthority": "docs/card_engine/01_TEMPLATE_COORDINATES.json",
   "readCompatibility": {
@@ -7,9 +8,22 @@
       "jsonVersion": 1,
       "caption": "absent",
       "templates": {
-        "polaroid_moodboard": ["hero", "left", "right"],
-        "four_cut": ["cut-1", "cut-2", "cut-3", "cut-4"],
-        "editorial_collage": ["feature", "top", "bottom"]
+        "polaroid_moodboard": [
+          "hero",
+          "left",
+          "right"
+        ],
+        "four_cut": [
+          "cut-1",
+          "cut-2",
+          "cut-3",
+          "cut-4"
+        ],
+        "editorial_collage": [
+          "feature",
+          "top",
+          "bottom"
+        ]
       },
       "behavior": "Read and render with the legacy three/four/three-slot composition. Never expand or rewrite it as canonical slots."
     },
@@ -52,42 +66,96 @@
       ],
       "caption": null
     },
-    "onlyNewWriteFormat": true
+    "onlyNewWriteFormat": false,
+    "scope": "Frozen pre-watercolor writer; kept for v3 rollout compatibility."
   },
   "canonicalTemplates": {
     "polaroid_moodboard": {
-      "photoSlotIds": ["p1", "p2", "p3", "p4", "p5", "p6"],
-      "acceptedPhotoCounts": [6]
+      "photoSlotIds": [
+        "p1",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p6"
+      ],
+      "acceptedPhotoCounts": [
+        6
+      ]
     },
     "four_cut": {
-      "photoSlotIds": ["f1", "f2", "f3", "f4"],
-      "acceptedPhotoCounts": [4]
+      "photoSlotIds": [
+        "f1",
+        "f2",
+        "f3",
+        "f4"
+      ],
+      "acceptedPhotoCounts": [
+        4
+      ]
     },
     "editorial_collage": {
-      "photoSlotIds": ["e1", "e2", "e3", "e4", "e5"],
-      "acceptedPhotoCounts": [4, 5],
+      "photoSlotIds": [
+        "e1",
+        "e2",
+        "e3",
+        "e4",
+        "e5"
+      ],
+      "acceptedPhotoCounts": [
+        4,
+        5
+      ],
       "fourPhotoBehavior": "Persist e1 through e4; render e5 as an intentional empty slot."
     },
     "postcard_duo": {
-      "photoSlotIds": ["pd1", "pd2"],
-      "acceptedPhotoCounts": [2]
+      "photoSlotIds": [
+        "pd1",
+        "pd2"
+      ],
+      "acceptedPhotoCounts": [
+        2
+      ]
     },
     "scrapbook_trio": {
-      "photoSlotIds": ["st1", "st2", "st3"],
-      "acceptedPhotoCounts": [3]
+      "photoSlotIds": [
+        "st1",
+        "st2",
+        "st3"
+      ],
+      "acceptedPhotoCounts": [
+        3
+      ]
     },
     "film_contact_sheet": {
-      "photoSlotIds": ["fc1", "fc2", "fc3", "fc4", "fc5", "fc6"],
-      "acceptedPhotoCounts": [6]
+      "photoSlotIds": [
+        "fc1",
+        "fc2",
+        "fc3",
+        "fc4",
+        "fc5",
+        "fc6"
+      ],
+      "acceptedPhotoCounts": [
+        6
+      ]
     },
     "one_moment": {
-      "photoSlotIds": ["om1"],
-      "acceptedPhotoCounts": [1],
+      "photoSlotIds": [
+        "om1"
+      ],
+      "acceptedPhotoCounts": [
+        1
+      ],
       "writeCompatibility": "canonicalV3Only"
     },
     "instant_memory": {
-      "photoSlotIds": ["im1"],
-      "acceptedPhotoCounts": [1],
+      "photoSlotIds": [
+        "im1"
+      ],
+      "acceptedPhotoCounts": [
+        1
+      ],
       "writeCompatibility": "canonicalV3Only"
     }
   },

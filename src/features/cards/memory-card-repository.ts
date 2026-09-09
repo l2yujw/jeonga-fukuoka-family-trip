@@ -1,5 +1,5 @@
 import type { CurrentTripSession } from "@/features/boarding/boarding-logic";
-import { getCurrentAuthSession } from "@/features/boarding/current-trip-session";
+import { getCurrentAuthSession, getCurrentTripSession } from "@/features/boarding/current-trip-session";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   buildMemoryCardInsertPayload,
@@ -10,6 +10,8 @@ import {
   type MemoryCardTemplateKey,
   type PersistedMemoryCardRow,
 } from "./memory-card";
+
+import type { MemoryCardLayoutV4 } from "./watercolor-layout";
 
 export const MEMORY_CARD_RESULT_BUCKET = "memory-card-results";
 const MEMORY_CARD_RESULT_SIGNED_URL_LIFETIME_SECONDS = 3600;
@@ -115,61 +117,94 @@ export async function loadLatestMemoryCard(tripId: string) {
   return (await loadMemoryCardsWithLimit(tripId, 1))[0] ?? null;
 }
 
-export async function createMemoryCard({
-  availablePhotoIds,
-  layout,
-  resultPng,
-  templateKey,
-  tripSession,
-}: {
-  availablePhotoIds: readonly string[];
-  layout: MemoryCardLayoutV3;
+export type MemoryCardSaveAttempt = {
+  payload: ReturnType<typeof buildMemoryCardInsertPayload>;
   resultPng: Blob;
-  templateKey: MemoryCardTemplateKey;
   tripSession: CurrentTripSession;
-}) {
-  const authUserId = await requireAuthUserId();
-  const resultStoragePath = buildMemoryCardResultStoragePath(
-    tripSession.trip.id,
-    authUserId,
-  );
-  const payload = buildMemoryCardInsertPayload({
-    authUserId,
-    availablePhotoIds: new Set(availablePhotoIds),
-    layout,
-    memberId: tripSession.member.id,
-    resultStoragePath,
-    templateKey,
-    tripId: tripSession.trip.id,
-  });
-  const supabase = getSupabaseBrowserClient();
-  const { error: uploadError } = await supabase.storage
-    .from(MEMORY_CARD_RESULT_BUCKET)
-    .upload(resultStoragePath, resultPng, {
-      contentType: "image/png",
-      upsert: false,
-    });
-  if (uploadError) throw uploadError;
-
-  const { data, error } = await supabase
-    .from("memory_cards")
-    .insert(payload)
-    .select(MEMORY_CARD_COLUMNS)
-    .single();
-
-  if (error) {
-    const cleanedUp = await removeResultStorageObject(resultStoragePath);
-    if (!cleanedUp) {
-      console.warn("[cards] failed finalize left an object for later cleanup");
-    }
-    throw error;
+  authUserId: string;
+};
+export class MemoryCardOutcomeUnknown extends Error {
+  attempt: MemoryCardSaveAttempt;
+  constructor(attempt: MemoryCardSaveAttempt) {
+    super("저장 결과를 확인 중이에요. 다시 확인해도 같은 카드의 저장 상태만 조회해요.");
+    this.name = "MemoryCardOutcomeUnknown";
+    this.attempt = attempt;
   }
-  return mapPersistedMemoryCardRows(
-    [data as PersistedMemoryCardRow],
-    new Map([[tripSession.member.id, tripSession.member.name]]),
-    authUserId,
-    await signResultStoragePaths([resultStoragePath]),
-  )[0];
+}
+const stableJson = (value: unknown): string => {
+  if(Array.isArray(value))return `[${value.map(stableJson).join(",")}]`;
+  if(value && typeof value === "object")return `{${Object.keys(value).sort().map(key=>`${JSON.stringify(key)}:${stableJson((value as Record<string,unknown>)[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+};
+async function requireAttemptIdentity(attempt: MemoryCardSaveAttempt) {
+  if(await requireAuthUserId() !== attempt.authUserId)throw new Error("인증 정보가 변경되었어요. 이전 저장 결과는 원래 탑승 정보에서 확인해주세요.");
+  if(attempt.payload.layout_version === 4){
+    const current = await getCurrentTripSession();
+    if(current?.trip.id !== attempt.tripSession.trip.id || current?.member.id !== attempt.tripSession.member.id)throw new Error("탑승 정보가 변경되었어요. 이전 저장 결과는 원래 탑승 정보에서 확인해주세요.");
+  }
+}
+function mapSavedAttempt(attempt:MemoryCardSaveAttempt,row:PersistedMemoryCardRow,signed:Map<string,string|null>) {
+  return mapPersistedMemoryCardRows([row],new Map([[attempt.tripSession.member.id,attempt.tripSession.member.name]]),attempt.authUserId,signed)[0];
+}
+export async function verifyMemoryCardSave(attempt: MemoryCardSaveAttempt): Promise<MemoryCard|null> {
+  await requireAttemptIdentity(attempt);
+  const {payload}=attempt;
+  try {
+    const {data,error}=await getSupabaseBrowserClient().from("memory_cards").select(MEMORY_CARD_COLUMNS)
+      .eq("trip_id",payload.trip_id).eq("creator_auth_user_id",attempt.authUserId)
+      .eq("creator_member_id",payload.creator_member_id).eq("result_storage_path",payload.result_storage_path).maybeSingle();
+    if(error||!data)return null;
+    const row=data as PersistedMemoryCardRow;
+    if(row.trip_id!==payload.trip_id||row.creator_auth_user_id!==attempt.authUserId||row.creator_member_id!==payload.creator_member_id||row.result_storage_path!==payload.result_storage_path||row.template_key!==payload.template_key||row.layout_version!==payload.layout_version||stableJson(row.layout_json)!==stableJson(payload.layout_json))return null;
+    return mapSavedAttempt(attempt,row,await signResultStoragePaths([payload.result_storage_path]));
+  } catch {return null;}
+}
+function definiteInsertRejection(error:unknown) {
+  const code = error && typeof error === "object" && "code" in error ? String(error.code):"";
+  return /^(22|23)[0-9A-Z]{3}$/.test(code)||["42501","PGRST102","PGRST204","PGRST205","PGRST301","PGRST302"].includes(code);
+}
+function definiteUploadRejection(error:unknown) {
+  const status=error&&typeof error==="object"&&"statusCode" in error?Number(error.statusCode):0;
+  return status>=400&&status<500&&status!==408;
+}
+export async function createMemoryCard({availablePhotoIds,layout,resultPng,templateKey,tripSession,expectedAuthUserId}: {
+  availablePhotoIds:readonly string[];layout: MemoryCardLayoutV3 | MemoryCardLayoutV4;resultPng:Blob;
+  templateKey:MemoryCardTemplateKey;tripSession:CurrentTripSession;expectedAuthUserId?:string;
+}) {
+  layout=structuredClone(layout);
+  tripSession=structuredClone(tripSession);
+  availablePhotoIds=[...availablePhotoIds];
+  const authUserId = await requireAuthUserId();
+  if(expectedAuthUserId&&expectedAuthUserId!==authUserId)throw new Error("인증 정보가 변경되었어요. 다시 확인해주세요.");
+  const resultStoragePath=buildMemoryCardResultStoragePath(tripSession.trip.id,authUserId);
+  const payload=buildMemoryCardInsertPayload({authUserId,availablePhotoIds:new Set(availablePhotoIds),layout,memberId: tripSession.member.id,resultStoragePath,templateKey,tripId: tripSession.trip.id});
+  const attempt:MemoryCardSaveAttempt={payload:structuredClone(payload),resultPng,tripSession:structuredClone(tripSession),authUserId};
+  await requireAttemptIdentity(attempt);
+  const supabase=getSupabaseBrowserClient();
+  const unknown=async()=>{
+    try {const saved=await verifyMemoryCardSave(attempt);if(saved)return saved;}catch{ /* Keep the original attempt under its original identity. */ }
+    throw new MemoryCardOutcomeUnknown(attempt);
+  };
+  try{
+    const {error}=await supabase.storage.from(MEMORY_CARD_RESULT_BUCKET).upload(resultStoragePath, resultPng,{contentType:"image/png",upsert: false});
+    if(error){if(definiteUploadRejection(error))throw Object.assign(new Error(error.message),{definiteUpload:true});return unknown();}
+  }catch(error){if(error&&typeof error==="object"&&"definiteUpload" in error)throw error;return unknown();}
+  // This attempt has not inserted yet; identity changes cannot reuse its bytes for another member.
+  try { await requireAttemptIdentity(attempt); } catch (error) {
+    throw new Error(`${error instanceof Error ? error.message : "인증 정보가 변경되었어요."} 업로드된 이미지의 정리는 원래 탑승 정보에서 별도 확인이 필요해요.`);
+  }
+  try{
+    const {data,error}=await supabase.from("memory_cards").insert(attempt.payload).select(MEMORY_CARD_COLUMNS).single();
+    if(error){
+      if(definiteInsertRejection(error)){
+        const cleaned=await removeResultStorageObject(resultStoragePath);
+        throw Object.assign(new Error(cleaned?error.message:`${error.message} (저장 이미지 정리는 별도 확인이 필요해요.)`),{definiteInsert:true});
+      }
+      return unknown();
+    }
+    if(!data)return unknown();
+    return mapSavedAttempt(attempt,data as PersistedMemoryCardRow,await signResultStoragePaths([resultStoragePath]));
+  }catch(error){if(error&&typeof error==="object"&&"definiteInsert" in error)throw error;return unknown();}
 }
 
 export async function downloadMemoryCardResult(card: MemoryCard) {

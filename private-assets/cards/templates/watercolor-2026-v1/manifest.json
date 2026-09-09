@@ -1,0 +1,206 @@
+[
+  {
+    "asset": "paper.png",
+    "source": "01_polaroid_moodboard_TARGET.png",
+    "sourceSha256": "a54da5322faaf03bafb65148bcad18ab5cea562ad416aa64d67d1f89e1053387",
+    "crop": [
+      36,
+      42,
+      245,
+      90
+    ],
+    "mask": "isolated clean crop",
+    "width": 245,
+    "height": 90,
+    "sha256": "1530c383e4e6fb5e6c37f7ab533f9a78a8e55afc638569c10ed6c81425e5851d",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "polaroid-flower.png",
+    "source": "01_polaroid_moodboard_TARGET.png",
+    "sourceSha256": "a54da5322faaf03bafb65148bcad18ab5cea562ad416aa64d67d1f89e1053387",
+    "crop": [
+      86,
+      135,
+      134,
+      182
+    ],
+    "mask": "neutral cream removal; saturation/luminance feather",
+    "width": 134,
+    "height": 182,
+    "sha256": "1751aa674c5a118b5eef40bf204bb64db07129da2e416bad60a567668eca627f",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "polaroid-sprig.png",
+    "source": "01_polaroid_moodboard_TARGET.png",
+    "sourceSha256": "a54da5322faaf03bafb65148bcad18ab5cea562ad416aa64d67d1f89e1053387",
+    "crop": [
+      433,
+      117,
+      84,
+      51
+    ],
+    "mask": "neutral cream removal; saturation/luminance feather",
+    "width": 84,
+    "height": 51,
+    "sha256": "7d61517f2567aac570a94edc8ba3f54d7f73547fc665af8ec8e2a5954af46449",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "fourcut-flower.png",
+    "source": "02_four_cut_TARGET.png",
+    "sourceSha256": "2226aef79ad751f5afb4e5267fcce409cce81c20e462246a57fc3d87a8b4903b",
+    "crop": [
+      172,
+      1090,
+      99,
+      203
+    ],
+    "mask": "neutral cream removal; saturation/luminance feather",
+    "width": 99,
+    "height": 203,
+    "sha256": "21a07ea77a19f914802a48c8e241038ac1ffd85b7761c132e213280a86257b5a",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "editorial-sprig.png",
+    "source": "03_editorial_collage_TARGET.png",
+    "sourceSha256": "0567fe4427b38e0a065dbf0fc457e7c85e6043c7a98e82a6a03c31090147e574",
+    "crop": [
+      413,
+      78,
+      107,
+      56
+    ],
+    "mask": "neutral cream removal; saturation/luminance feather",
+    "width": 107,
+    "height": 56,
+    "sha256": "1044a527bbcf2e4997a70c589f561e9277df8e1d792d9630c6b982a66bc59092",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "editorial-flower.png",
+    "source": "03_editorial_collage_TARGET.png",
+    "sourceSha256": "0567fe4427b38e0a065dbf0fc457e7c85e6043c7a98e82a6a03c31090147e574",
+    "crop": [
+      37,
+      679,
+      232,
+      124
+    ],
+    "mask": "neutral cream removal; saturation/luminance feather",
+    "width": 232,
+    "height": 124,
+    "sha256": "c34fb8b66ade3b3ca30d0ea979ba8767c1219982c48175c3a35afaffb1e656de",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "postcard-stamp.png",
+    "source": "04_postcard_duo_TARGET.png",
+    "sourceSha256": "858f4efeda5eaeccbfa8c395e893465156999d6a66c5ab7b9f0e5c16e62ee7e2",
+    "crop": [
+      752,
+      322,
+      139,
+      158
+    ],
+    "mask": "isolated clean crop",
+    "width": 139,
+    "height": 158,
+    "sha256": "8d4c480925a82854c4619bcded7fc9e77f0b4762026cc90252197441054c7cbc",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "scrapbook-flower.png",
+    "source": "05_scrapbook_trio_TARGET.png",
+    "sourceSha256": "ca557f26bd55a442c854c8a43a39af4d0798bd3fa7799617b30e7a542b6f583e",
+    "crop": [
+      53,
+      144,
+      111,
+      130
+    ],
+    "mask": "neutral cream removal; saturation/luminance feather",
+    "width": 111,
+    "height": 130,
+    "sha256": "d5937b54d75652a592f073c3f06635abdc45ab78f3e2dbdd50d31089d8e6881c",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "film-flower.png",
+    "source": "06_film_contact_sheet_TARGET.png",
+    "sourceSha256": "a80ed49c9ff844fbfcb7bd88b5b7e31d2a464b1d474703c36bb29988ea723187",
+    "crop": [
+      1,
+      81,
+      171,
+      245
+    ],
+    "mask": "neutral cream removal; saturation/luminance feather",
+    "width": 171,
+    "height": 245,
+    "sha256": "0e15cad4f8937eac1b54d622ddaff9ddc93c90ae031294a5758069b6d6979d2a",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "moment-sprig.png",
+    "source": "07_one_moment_TARGET.png",
+    "sourceSha256": "de9555cbc36ee81f3b8f9508cd311af30f8ecfe0dfbc4a75240689bca263e114",
+    "crop": [
+      276,
+      105,
+      48,
+      52
+    ],
+    "mask": "neutral cream removal; saturation/luminance feather",
+    "width": 48,
+    "height": 52,
+    "sha256": "26b3c560c45fff6fa1cfce4b31bfb1d8c5d36351ae0ffa8e2bdd98e3ae33ee3e",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "instant-sprig.png",
+    "source": "08_instant_memory_TARGET.png",
+    "sourceSha256": "83a4553e280bde93925ead5b884927aeab42df667616705ed8b3df14730fd2ad",
+    "crop": [
+      392,
+      180,
+      169,
+      69
+    ],
+    "mask": "neutral cream removal; saturation/luminance feather",
+    "width": 169,
+    "height": 69,
+    "sha256": "bc2867982ddefc102b672621b688dc16523e3949f52061bda480a66ede6162a9",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  },
+  {
+    "asset": "tape-pink.png",
+    "source": "01_polaroid_moodboard_TARGET.png",
+    "sourceSha256": "a54da5322faaf03bafb65148bcad18ab5cea562ad416aa64d67d1f89e1053387",
+    "crop": [
+      162,
+      840,
+      128,
+      40
+    ],
+    "mask": "isolated clean crop",
+    "width": 128,
+    "height": 40,
+    "sha256": "a2acd43dac63d30cf0190ad5e4bc6f1098df5b6f3c014ee0875e7b6266ba395d",
+    "containsPersonalData": false,
+    "purpose": "fixed Cards decoration only; no photo/user text content"
+  }
+]
