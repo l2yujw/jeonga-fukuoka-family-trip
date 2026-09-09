@@ -1714,7 +1714,7 @@ a {
   display: flex;
   width: auto;
   min-width: 0;
-  min-height: 76px;
+  min-height: 126px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -1741,7 +1741,7 @@ a {
 
 .cards-template-tile span {
   min-height: 24px;
-  font-size: 8.5px;
+  font-size: 9px;
   font-weight: 650;
   line-height: 1.35;
   text-align: center;
@@ -1798,8 +1798,8 @@ a {
 
 .cards-template-gallery {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 9px 7px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .cards-template-card {
@@ -1811,14 +1811,6 @@ a {
   border-radius: 11px;
   background: rgb(255 253 248 / 82%);
   text-align: center;
-}
-
-.cards-template-card:nth-child(-n + 3) {
-  grid-column: span 2;
-}
-
-.cards-template-card:nth-child(n + 4) {
-  grid-column: span 3;
 }
 
 .cards-template-card.is-selected {
@@ -1844,16 +1836,16 @@ a {
 
 .cards-template-preview {
   display: grid;
-  height: 58px;
+  height: 218px;
   place-items: center;
-  padding: 3px;
+  padding: 8px;
   overflow: hidden;
   border-radius: 7px;
-  background: #f3e8d8;
+  background: #f0e9dc;
 }
 
 .cards-template-preview > div {
-  width: 32px;
+  width: 112px;
 }
 
 .cards-template-card strong,
@@ -1865,14 +1857,14 @@ a {
 
 .cards-template-card strong {
   margin-top: 6px;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
 .cards-template-card small {
   margin-top: 1px;
   color: var(--cards-muted);
-  font-size: 9px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -1922,7 +1914,7 @@ a {
 
 .cards-preview-stage {
   display: grid;
-  height: 145px;
+  height: 324px;
   place-items: center;
   padding: 8px;
   overflow: hidden;
@@ -1933,7 +1925,7 @@ a {
 }
 
 .cards-preview-stage > div {
-  width: min(100%, 82px);
+  width: min(100%, 171px);
   box-shadow: 0 8px 18px rgb(58 48 40 / 14%);
 }
 
@@ -2214,10 +2206,11 @@ a {
 }
 
 .cards-all-template-item {
+  position: relative;
   display: grid;
   min-width: 0;
   min-height: 68px;
-  grid-template-columns: 34px minmax(0, 1fr) 20px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 8px;
   padding: 8px;
@@ -2225,7 +2218,7 @@ a {
   border-radius: 12px;
   color: var(--cards-muted);
   background: var(--cards-surface);
-  text-align: left;
+  text-align: center;
 }
 
 .cards-all-template-item.is-selected {
@@ -2246,11 +2239,9 @@ a {
 }
 
 .cards-all-template-item strong {
-  overflow: hidden;
   color: var(--cards-ink);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .cards-all-template-item small {
@@ -2259,6 +2250,9 @@ a {
 }
 
 .cards-all-template-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   font-weight: 800;
 }
 
@@ -2788,9 +2782,6 @@ body:has(.cards-viewer-backdrop) .cards-main {
     right: 115px;
   }
 
-  .cards-all-template-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 .bottom-nav-list {
@@ -5454,3 +5445,40 @@ body:has(.cards-viewer-backdrop) .cards-main {
     gap: 10px;
   }
 }
+
+/* Cards watercolor v4: scene coordinates stay logical; only the canvas scales. */
+.wc-miniature { width: 100%; }
+.wc-miniature canvas { display: block; width: 100%; height: auto; aspect-ratio: 9 / 16; }
+.cards-template-tile .wc-miniature { width: 48px; max-width: 100%; }
+.wc-edit-action { display: flex; align-items: center; gap: 16px; min-height: 44px; margin-top: 8px; padding: 0 14px; font-size: 14px; }
+.wc-preview { width: 100%; }
+.wc-scene { position: relative; width: 100%; aspect-ratio: 9 / 16; }
+.wc-scene canvas { display: block; width: 100%; height: 100%; }
+.wc-hit { border: 0; background: transparent; padding: 0; cursor: pointer; }
+.wc-text-hit { z-index: 2; border: 1px dashed #bc795655; }
+.wc-hit[aria-pressed="true"], .wc-hit:focus-visible { outline: 2px solid #b85d51; outline-offset: 1px; background: #e9ae9522; }
+.wc-error { color: #a63f35; font-size: 13px; overflow-wrap: anywhere; }
+.wc-text-dialog { padding: 0; border: 1px solid #e6caaa; border-radius: 20px 20px 0 0; width: min(100%, 520px); max-width: 100%; max-height: 92dvh; margin: auto auto 0; background: #fffaf3; color: #3b322a; }
+.wc-text-dialog::backdrop { background: #271c1577; }
+.wc-text-dialog[open] { display: flex; flex-direction: column; }
+.wc-text-dialog header, .wc-text-dialog footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 18px; flex-shrink: 0; }
+.wc-text-dialog h2 { font-size: 20px; font-weight: 700; }
+.wc-text-dialog button { min-width: 44px; min-height: 44px; }
+.wc-text-dialog footer { border-top: 1px solid #e6caaa; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.wc-text-dialog footer button { flex: 1; border: 1px solid #d6af98; border-radius: 10px; }
+.wc-text-dialog footer button:last-child { background: #ab6957; color: white; }
+.wc-text-dialog button:disabled { opacity: .45; }
+.wc-editor-scroll { overflow-y: auto; overscroll-behavior: contain; padding: 0 18px 16px; min-height: 0; }
+.wc-editor-scroll > p { font-size: 13px; margin-bottom: 12px; }
+.wc-editor-preview { width: min(100%, 250px); margin: 0 auto 18px; }
+.wc-text-dialog summary { min-height: 48px; padding: 12px 0; font-weight: 700; cursor: pointer; }
+.wc-field { padding: 8px 0 12px; }
+.wc-field label { display: block; font-size: 14px; font-weight: 650; margin-bottom: 7px; }
+.wc-field input, .wc-field textarea { display: block; width: 100%; min-width: 0; max-width: 100%; min-height: 48px; padding: 10px; font-size: 16px; border: 1px solid #d9c5ad; border-radius: 9px; background: white; }
+.wc-field[data-active="true"] input, .wc-field[data-active="true"] textarea { border-color: #aa6855; }
+.wc-field p { font-size: 12px; margin-top: 5px; }
+.wc-save-lock { position: fixed; inset: 0; z-index: 100; display: grid; place-content: center; background: #fffaf3e8; padding: 28px; text-align: center; }
+.wc-save-lock button { min-height: 48px; margin-top: 16px; border: 1px solid #bc8970; border-radius: 10px; }
+
+.wc-hit::after { content: ""; position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; min-width: 44px; min-height: 44px; transform: translate(-50%, -50%); }
+.wc-text-dialog .wc-hit { min-width: 0; min-height: 0; }

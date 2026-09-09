@@ -1314,7 +1314,7 @@ test("finalized repository uses the existing private result bucket without mutab
   assert.match(sources[1], /MEMORY_CARD_RESULT_BUCKET = "memory-card-results"/);
   assert.match(sources[1], /createSignedUrls/);
   assert.match(sources[1], /\.upload\(resultStoragePath, resultPng/);
-  assert.match(sources[1], /if \(error\) \{[\s\S]*removeResultStorageObject\(resultStoragePath\)/);
+  assert.match(sources[1], /if\s*\(definiteInsertRejection\(error\)\)\s*\{[\s\S]*removeResultStorageObject\(resultStoragePath\)/);
   assert.match(sources[1], /\.download\(card\.resultStoragePath\)/);
   assert.match(sources[1], /if \(!card\.resultStoragePath\) return \{ storageCleanupFailed: false \}/);
   assert.match(sources[3], /card\.isFinalized[\s\S]*downloadMemoryCardResult\(card\)/);
@@ -1355,7 +1355,7 @@ test("Cards first screen and composer use the approved live visual hierarchy", a
     /<div className="cards-action-row cards-main-actions">[\s\S]*?<\/div>/,
   )?.[0] ?? "";
   assert.match(templateActions, /<EyeIcon \/> 미리보기/);
-  assert.match(templateActions, /onClick=\{\(\) => setComposerStep\("photos"\)\}[\s\S]*사진 선택하기/);
+  assert.match(templateActions, /onClick=\{\(\) => openPhotoSelection\([\s\S]*사진 선택하기/);
   assert.doesNotMatch(templateActions, /카드 저장|saveCard/);
   assert.match(view, /cards-preview-actions[\s\S]*사진 다시 선택[\s\S]*onClick=\{saveCard\}[\s\S]*카드 저장/);
   assert.match(view, /<button type="button" onClick=\{\(\) => setShowAllTemplates\(true\)\}>더보기/);
@@ -1380,9 +1380,9 @@ test("Cards first screen and composer use the approved live visual hierarchy", a
   assert.match(view, /card\.isFinalized \? \([\s\S]*<FinalizedMemoryCardImage card=\{card\}/);
   assert.match(view, /<details className="cards-saved-menu">/);
   assert.match(css, /\.cards-template-strip[\s\S]*grid-template-columns: repeat\(5/);
-  assert.match(css, /\.cards-template-card:nth-child\(-n \+ 3\)[\s\S]*grid-column: span 2/);
-  assert.match(css, /\.cards-template-card:nth-child\(n \+ 4\)[\s\S]*grid-column: span 3/);
-  assert.match(css, /\.cards-preview-stage[\s\S]*height: 145px/);
+  assert.match(css, /\.cards-template-gallery\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.doesNotMatch(css, /\.cards-template-card:nth-child/);
+  assert.match(css, /\.cards-preview-stage\s*\{[^}]*height: 324px/);
   assert.match(css, /\.cards-dialog-backdrop[\s\S]*position: fixed/);
   assert.match(css, /\.cards-main\s*\{[^}]*padding-bottom: calc\(32px \+ env\(safe-area-inset-bottom\)\)/s);
   assert.doesNotMatch(css, /\.cards-bottom-nav\s*\{[^}]*position:\s*fixed/s);
@@ -1394,7 +1394,7 @@ test("Cards first screen and composer use the approved live visual hierarchy", a
   assert.match(css, /\.cards-sheet-actions\s*\{[^}]*flex:\s*none[^}]*env\(safe-area-inset-bottom\)/s);
   assert.match(css, /\.cards-crop-sheet\s*\{[^}]*max-height:\s*100%[^}]*overflow-y:\s*auto/s);
   assert.match(css, /body:has\(\.cards-dialog-backdrop\)[\s\S]*overflow:\s*hidden/);
-  assert.deepEqual(cardsAssets, ["Jeonga_Fukuoka_Cards_TopFloral_v1.png"]);
+  assert.deepEqual(cardsAssets, ["Jeonga_Fukuoka_Cards_TopFloral_v1.png", "templates"]);
   assert.match(route, /resolveInviteTrip\(request\)/);
   assert.match(route, /serveLandingVisual\(/);
   assert.match(route, /"private-assets", "cards", filename/);

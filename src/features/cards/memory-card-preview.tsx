@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { WatercolorPreview, WatercolorThumbnail, type WatercolorValidation } from "./watercolor-preview";
+import { getWatercolorTemplate } from "./watercolor-template-spec";
 import {
   useNearViewportPhoto,
   type AlbumPhotoMediaChange,
@@ -37,6 +39,9 @@ type MemoryCardPreviewProps = {
   selectedSlotId?: string | null;
   onSelectSlot?: (slotId: string) => void;
   onPhotoMediaChange?: AlbumPhotoMediaChange;
+  onSelectField?: (id: string) => void;
+  selectedFieldId?: string | null;
+  onValidation?: (state: WatercolorValidation) => void;
 };
 
 const percent = (value: number, total: number) => `${(value / total) * 100}%`;
@@ -160,10 +165,19 @@ export function MemoryCardPreview({
   selectedSlotId,
   templateKey,
   onPhotoMediaChange,
+  onSelectField,
+  selectedFieldId,
+  onValidation,
 }: MemoryCardPreviewProps) {
   const [naturalDimensions, setNaturalDimensions] = useState<
     Record<string, { width: number; height: number }>
   >({});
+
+  if (renderModel === undefined) return <WatercolorThumbnail templateKey={templateKey}/>;
+  if (renderModel?.kind === "watercolor") {
+    if (!getWatercolorTemplate(templateKey,renderModel.layout.templateRevision)) return null;
+    return <WatercolorPreview templateKey={templateKey} layout={renderModel.layout} photos={photos} onSelectField={onSelectField} selectedFieldId={selectedFieldId} onSelectSlot={onSelectSlot} selectedSlotId={selectedSlotId} onValidation={onValidation}/>;
+  }
 
   if (renderModel === null) {
     return (

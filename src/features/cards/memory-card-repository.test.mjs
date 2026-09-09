@@ -90,7 +90,7 @@ const supabase = {
 
 await mock.module(
   new URL("../boarding/current-trip-session.ts", import.meta.url).href,
-  { exports: { getCurrentAuthSession: async () => ({ user: { id: authUserId } }) } },
+  { exports: { getCurrentAuthSession: async () => ({ user: { id: authUserId } }), getCurrentTripSession: async () => tripSession } },
 );
 await mock.module(
   new URL("../../lib/supabase/client.ts", import.meta.url).href,
@@ -134,7 +134,7 @@ test("mocked finalization preserves upload/insert/sign/download/delete ordering 
   assert.deepEqual(events, [["delete"], ["remove", [uploadedPath]]]);
 
   events.length = 0;
-  insertError = new Error("insert-failed");
+  insertError = Object.assign(new Error("insert-failed"), {code:"42501"});
   await assert.rejects(
     createMemoryCard({
       availablePhotoIds: photoIds,

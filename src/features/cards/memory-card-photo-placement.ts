@@ -70,8 +70,9 @@ export function angleDeltaDegrees(startAngle: number, currentAngle: number) {
 }
 
 export function getMemoryCardPhotoViewport(
-  slot: Pick<MemoryCardPhotoSlot, "frame" | "w" | "h">,
+  slot: Pick<MemoryCardPhotoSlot, "frame" | "w" | "h" | "viewport">,
 ): Omit<PlacedImageRect, "rotation"> {
+  if (slot.viewport) return { ...slot.viewport };
   const padding = slot.frame === "polaroid" ? 18 : slot.frame === "strip" ? 8 : 0;
   const footer = slot.frame === "polaroid" ? 52 : 0;
   return {

@@ -10,6 +10,8 @@ import {
   reconcileMemoryCardPhotoPlacements,
   type MemoryCardPhotoPlacement,
 } from "./memory-card-photo-placement";
+import { parseMemoryCardLayoutV4, type MemoryCardLayoutV4 } from "./watercolor-layout";
+import { getWatercolorTemplate } from "./watercolor-template-spec";
 
 export {
   MEMORY_CARD_TEMPLATE_SPECS as MEMORY_CARD_TEMPLATES,
@@ -53,6 +55,7 @@ export type LegacyMemoryCardLayoutV1 = {
 };
 
 export type MemoryCardRenderModel =
+  | { kind: "watercolor"; layoutVersion: 4; layout: MemoryCardLayoutV4 }
   | {
       kind: "canonical";
       layoutVersion: 1 | 2 | 3;
@@ -379,6 +382,10 @@ export function parseMemoryCardRenderModel(
   layoutVersion: number,
   value: unknown,
 ): MemoryCardRenderModel | null {
+  if (layoutVersion === 4) {
+    const layout = parseMemoryCardLayoutV4(templateKey, value);
+    return layout ? { kind: "watercolor", layoutVersion: 4, layout } : null;
+  }
   if (layoutVersion === 3) {
     const layout = parseMemoryCardLayoutV3(templateKey, value);
     return layout ? { kind: "canonical", layoutVersion: 3, layout } : null;
@@ -400,8 +407,9 @@ export function parseMemoryCardRenderModel(
 }
 
 export function createMemoryCardRenderModel(
-  layout: MemoryCardLayoutV2 | MemoryCardLayoutV3,
+  layout: MemoryCardLayoutV2 | MemoryCardLayoutV3 | MemoryCardLayoutV4,
 ): MemoryCardRenderModel {
+  if (layout.version === 4) return { kind: "watercolor", layoutVersion: 4, layout };
   return { kind: "canonical", layoutVersion: layout.version, layout };
 }
 
@@ -424,8 +432,9 @@ export function randomFillPhotoIds(
 export function getRandomPhotoCount(
   templateKey: MemoryCardTemplateKey,
   availableCount: number,
+  layoutVersion: 1 | 2 | 3 | 4 = 3,
 ) {
-  const template = getMemoryCardTemplateSpec(templateKey);
+  const template = layoutVersion === 4 ? getWatercolorTemplate(templateKey) : getMemoryCardTemplateSpec(templateKey);
   if (!template || availableCount < template.acceptedMin) return 0;
   return Math.min(availableCount, template.acceptedMax);
 }
@@ -488,6 +497,7 @@ export function getMemoryCardRenderTemplate(
   templateKey: MemoryCardTemplateKey,
   renderModel: MemoryCardRenderModel,
 ) {
+  if (renderModel.kind === "watercolor") return getWatercolorTemplate(templateKey, renderModel.layout.templateRevision);
   return renderModel.kind === "legacy-simple-v1"
     ? getLegacyMemoryCardTemplateSpec(templateKey)
     : getMemoryCardTemplateSpec(templateKey);
@@ -611,7 +621,9 @@ export function buildMemoryCardInsertPayload({
   templateKey: MemoryCardTemplateKey;
   tripId: string;
 }) {
-  const validatedLayout = parseMemoryCardLayoutV3(templateKey, layout);
+  const validatedLayout = layout && typeof layout === "object" && "version" in layout && layout.version === 4
+    ? parseMemoryCardLayoutV4(templateKey, layout)
+    : parseMemoryCardLayoutV3(templateKey, layout);
   if (!validatedLayout) throw new Error("invalid-memory-card-layout");
   if (
     validatedLayout.slots.some(
@@ -629,7 +641,7 @@ export function buildMemoryCardInsertPayload({
     creator_member_id: memberId,
     creator_auth_user_id: authUserId,
     template_key: templateKey,
-    layout_version: 3,
+    layout_version: validatedLayout.version,
     layout_json: validatedLayout,
     result_storage_path: resultStoragePath,
   };

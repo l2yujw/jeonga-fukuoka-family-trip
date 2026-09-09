@@ -1,0 +1,915 @@
+[
+  {
+    "key": "polaroid_moodboard",
+    "displayName": "Polaroid Moodboard",
+    "primary": "main_title",
+    "slotIds": [
+      "p1",
+      "p2",
+      "p3",
+      "p4"
+    ],
+    "fields": [
+      {
+        "id": "main_title",
+        "kind": "plainText",
+        "label": "상단 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 34,
+        "maxLines": 2,
+        "defaultPolicy": "trip title"
+      },
+      {
+        "id": "subtitle",
+        "kind": "plainText",
+        "label": "상단 소개",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 54,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.p1.caption",
+        "kind": "plainText",
+        "label": "사진 1 아래 문구",
+        "photoSlotId": "p1",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.p2.caption",
+        "kind": "plainText",
+        "label": "사진 2 아래 문구",
+        "photoSlotId": "p2",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.p3.caption",
+        "kind": "plainText",
+        "label": "사진 3 아래 문구",
+        "photoSlotId": "p3",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.p4.caption",
+        "kind": "plainText",
+        "label": "사진 4 아래 문구",
+        "photoSlotId": "p4",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "footer_note",
+        "kind": "plainText",
+        "label": "하단 메모",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 100,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      }
+    ]
+  },
+  {
+    "key": "four_cut",
+    "displayName": "Four Cut",
+    "primary": "vertical_title",
+    "slotIds": [
+      "f1",
+      "f2",
+      "f3",
+      "f4"
+    ],
+    "fields": [
+      {
+        "id": "vertical_title",
+        "kind": "plainText",
+        "label": "왼쪽 세로 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": true,
+        "maxCodePoints": 22,
+        "maxLines": 1,
+        "defaultPolicy": "trip title"
+      },
+      {
+        "id": "vertical_subtitle",
+        "kind": "plainText",
+        "label": "왼쪽 세로 소개",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": true,
+        "maxCodePoints": 36,
+        "maxLines": 1,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "footer_note",
+        "kind": "plainText",
+        "label": "하단 메모",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 90,
+        "maxLines": 4,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      }
+    ]
+  },
+  {
+    "key": "editorial_collage",
+    "displayName": "Editorial Collage",
+    "primary": "main_title",
+    "slotIds": [
+      "e1",
+      "e2",
+      "e3",
+      "e4",
+      "e5",
+      "e6"
+    ],
+    "fields": [
+      {
+        "id": "main_title",
+        "kind": "plainText",
+        "label": "상단 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 32,
+        "maxLines": 2,
+        "defaultPolicy": "trip title"
+      },
+      {
+        "id": "subtitle",
+        "kind": "plainText",
+        "label": "상단 소개",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 45,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "lead_note",
+        "kind": "plainText",
+        "label": "상단 본문",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 140,
+        "maxLines": 5,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "photo.e2.title",
+        "kind": "plainText",
+        "label": "사진 2 제목",
+        "photoSlotId": "e2",
+        "role": "title",
+        "vertical": false,
+        "maxCodePoints": 30,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.e2.note",
+        "kind": "plainText",
+        "label": "사진 2 설명",
+        "photoSlotId": "e2",
+        "role": "note",
+        "vertical": false,
+        "maxCodePoints": 80,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.e3.title",
+        "kind": "plainText",
+        "label": "사진 3 제목",
+        "photoSlotId": "e3",
+        "role": "title",
+        "vertical": false,
+        "maxCodePoints": 30,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.e3.note",
+        "kind": "plainText",
+        "label": "사진 3 설명",
+        "photoSlotId": "e3",
+        "role": "note",
+        "vertical": false,
+        "maxCodePoints": 80,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.e4.title",
+        "kind": "plainText",
+        "label": "사진 4 제목",
+        "photoSlotId": "e4",
+        "role": "title",
+        "vertical": false,
+        "maxCodePoints": 30,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.e4.note",
+        "kind": "plainText",
+        "label": "사진 4 설명",
+        "photoSlotId": "e4",
+        "role": "note",
+        "vertical": false,
+        "maxCodePoints": 80,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.e5.title",
+        "kind": "plainText",
+        "label": "사진 5 제목",
+        "photoSlotId": "e5",
+        "role": "title",
+        "vertical": false,
+        "maxCodePoints": 30,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.e5.note",
+        "kind": "plainText",
+        "label": "사진 5 설명",
+        "photoSlotId": "e5",
+        "role": "note",
+        "vertical": false,
+        "maxCodePoints": 80,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.e6.title",
+        "kind": "plainText",
+        "label": "사진 6 제목",
+        "photoSlotId": "e6",
+        "role": "title",
+        "vertical": false,
+        "maxCodePoints": 30,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.e6.note",
+        "kind": "plainText",
+        "label": "사진 6 설명",
+        "photoSlotId": "e6",
+        "role": "note",
+        "vertical": false,
+        "maxCodePoints": 80,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "closing_note",
+        "kind": "plainText",
+        "label": "맨 아래 메모",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 120,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      }
+    ]
+  },
+  {
+    "key": "postcard_duo",
+    "displayName": "Travel Postcard",
+    "primary": "main_title",
+    "slotIds": [
+      "pd1",
+      "pd2"
+    ],
+    "fields": [
+      {
+        "id": "main_title",
+        "kind": "plainText",
+        "label": "상단 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 30,
+        "maxLines": 2,
+        "defaultPolicy": "trip title"
+      },
+      {
+        "id": "subtitle",
+        "kind": "plainText",
+        "label": "상단 소개",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 48,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.pd1.note",
+        "kind": "plainText",
+        "label": "첫 번째 엽서 문구",
+        "photoSlotId": "pd1",
+        "role": "note",
+        "vertical": false,
+        "maxCodePoints": 100,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.pd2.note",
+        "kind": "plainText",
+        "label": "두 번째 엽서 문구",
+        "photoSlotId": "pd2",
+        "role": "note",
+        "vertical": false,
+        "maxCodePoints": 100,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "location",
+        "kind": "plainText",
+        "label": "하단 장소",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 24,
+        "maxLines": 1,
+        "defaultPolicy": "trip destination"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      }
+    ]
+  },
+  {
+    "key": "scrapbook_trio",
+    "displayName": "Scrapbook Trio",
+    "primary": "main_title",
+    "slotIds": [
+      "st1",
+      "st2",
+      "st3"
+    ],
+    "fields": [
+      {
+        "id": "main_title",
+        "kind": "plainText",
+        "label": "상단 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 30,
+        "maxLines": 2,
+        "defaultPolicy": "세 장의 추억"
+      },
+      {
+        "id": "subtitle",
+        "kind": "plainText",
+        "label": "상단 소개",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 46,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.st1.title",
+        "kind": "plainText",
+        "label": "사진 1 태그 제목",
+        "photoSlotId": "st1",
+        "role": "title",
+        "vertical": false,
+        "maxCodePoints": 30,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.st1.note",
+        "kind": "plainText",
+        "label": "사진 1 태그 문구",
+        "photoSlotId": "st1",
+        "role": "note",
+        "vertical": false,
+        "maxCodePoints": 100,
+        "maxLines": 4,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.st2.title",
+        "kind": "plainText",
+        "label": "사진 2 태그 제목",
+        "photoSlotId": "st2",
+        "role": "title",
+        "vertical": false,
+        "maxCodePoints": 30,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.st2.note",
+        "kind": "plainText",
+        "label": "사진 2 태그 문구",
+        "photoSlotId": "st2",
+        "role": "note",
+        "vertical": false,
+        "maxCodePoints": 100,
+        "maxLines": 4,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.st3.title",
+        "kind": "plainText",
+        "label": "사진 3 태그 제목",
+        "photoSlotId": "st3",
+        "role": "title",
+        "vertical": false,
+        "maxCodePoints": 30,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.st3.note",
+        "kind": "plainText",
+        "label": "사진 3 태그 문구",
+        "photoSlotId": "st3",
+        "role": "note",
+        "vertical": false,
+        "maxCodePoints": 100,
+        "maxLines": 4,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "footer_note",
+        "kind": "plainText",
+        "label": "하단 한 줄 기록",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 96,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      }
+    ]
+  },
+  {
+    "key": "film_contact_sheet",
+    "displayName": "Film Contact Sheet",
+    "primary": "main_title",
+    "slotIds": [
+      "fc1",
+      "fc2",
+      "fc3",
+      "fc4",
+      "fc5",
+      "fc6"
+    ],
+    "fields": [
+      {
+        "id": "badge_title",
+        "kind": "plainText",
+        "label": "상단 작은 라벨",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 18,
+        "maxLines": 1,
+        "defaultPolicy": "여행 필름"
+      },
+      {
+        "id": "main_title",
+        "kind": "plainText",
+        "label": "상단 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 34,
+        "maxLines": 2,
+        "defaultPolicy": "trip title"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "photo.fc1.caption",
+        "kind": "plainText",
+        "label": "필름 1 설명",
+        "photoSlotId": "fc1",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 38,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.fc1.date",
+        "kind": "isoDate",
+        "label": "필름 1 날짜",
+        "photoSlotId": "fc1",
+        "role": "date",
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "available same-trip photo date, else empty; never infer from sample artwork"
+      },
+      {
+        "id": "photo.fc2.caption",
+        "kind": "plainText",
+        "label": "필름 2 설명",
+        "photoSlotId": "fc2",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 38,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.fc2.date",
+        "kind": "isoDate",
+        "label": "필름 2 날짜",
+        "photoSlotId": "fc2",
+        "role": "date",
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "available same-trip photo date, else empty; never infer from sample artwork"
+      },
+      {
+        "id": "photo.fc3.caption",
+        "kind": "plainText",
+        "label": "필름 3 설명",
+        "photoSlotId": "fc3",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 38,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.fc3.date",
+        "kind": "isoDate",
+        "label": "필름 3 날짜",
+        "photoSlotId": "fc3",
+        "role": "date",
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "available same-trip photo date, else empty; never infer from sample artwork"
+      },
+      {
+        "id": "photo.fc4.caption",
+        "kind": "plainText",
+        "label": "필름 4 설명",
+        "photoSlotId": "fc4",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 38,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.fc4.date",
+        "kind": "isoDate",
+        "label": "필름 4 날짜",
+        "photoSlotId": "fc4",
+        "role": "date",
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "available same-trip photo date, else empty; never infer from sample artwork"
+      },
+      {
+        "id": "photo.fc5.caption",
+        "kind": "plainText",
+        "label": "필름 5 설명",
+        "photoSlotId": "fc5",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 38,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.fc5.date",
+        "kind": "isoDate",
+        "label": "필름 5 날짜",
+        "photoSlotId": "fc5",
+        "role": "date",
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "available same-trip photo date, else empty; never infer from sample artwork"
+      },
+      {
+        "id": "photo.fc6.caption",
+        "kind": "plainText",
+        "label": "필름 6 설명",
+        "photoSlotId": "fc6",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 38,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.fc6.date",
+        "kind": "isoDate",
+        "label": "필름 6 날짜",
+        "photoSlotId": "fc6",
+        "role": "date",
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "available same-trip photo date, else empty; never infer from sample artwork"
+      },
+      {
+        "id": "footer_note",
+        "kind": "plainText",
+        "label": "하단 메모",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 72,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "signoff",
+        "kind": "plainText",
+        "label": "하단 서명 문구",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 40,
+        "maxLines": 1,
+        "defaultPolicy": "empty"
+      }
+    ]
+  },
+  {
+    "key": "one_moment",
+    "displayName": "One Moment",
+    "primary": "overlay_title",
+    "slotIds": [
+      "om1"
+    ],
+    "fields": [
+      {
+        "id": "overlay_title",
+        "kind": "plainText",
+        "label": "하단 첫 번째 문구",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 32,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "overlay_subtitle",
+        "kind": "plainText",
+        "label": "하단 두 번째 문구",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 54,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      }
+    ]
+  },
+  {
+    "key": "instant_memory",
+    "displayName": "Instant Memory",
+    "primary": "main_title",
+    "slotIds": [
+      "im1"
+    ],
+    "fields": [
+      {
+        "id": "short_message",
+        "kind": "plainText",
+        "label": "사진 아래 짧은 문구",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 38,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "main_title",
+        "kind": "plainText",
+        "label": "하단 큰 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 34,
+        "maxLines": 2,
+        "defaultPolicy": "trip title"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      }
+    ]
+  }
+]
