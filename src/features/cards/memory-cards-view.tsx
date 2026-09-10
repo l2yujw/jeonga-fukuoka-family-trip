@@ -65,6 +65,7 @@ import { WATERCOLOR_TEMPLATES as MEMORY_CARD_TEMPLATES, getWatercolorTemplate as
 import { createWatercolorDraft, finalizeWatercolorLayout, projectWatercolorLayout, type MemoryCardLayoutV4, type WatercolorDraft } from "./watercolor-layout";
 import { WatercolorTextEditor } from "./watercolor-text-editor";
 import { WatercolorThumbnail, type WatercolorValidation } from "./watercolor-preview";
+import { DEFAULT_WATERCOLOR_APPEARANCE, WATERCOLOR_BACKGROUNDS, freezeWatercolorAppearance, type WatercolorAppearance } from "./watercolor-appearance";
 import { getCurrentAuthSession } from "@/features/boarding/current-trip-session";
 
 import { CARD_DATE_FILTERS, CARD_TRIP_TIMEZONE, filterSavedCards, type CardDateFilter, type CardSort } from "./memory-card-list";
@@ -249,10 +250,11 @@ export function MemoryCardsView() {
   });
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [textDraft, setTextDraft] = useState<WatercolorDraft>({cardValues:{},annotationsByPhotoId:{}});
+  const [appearance, setAppearance] = useState(DEFAULT_WATERCOLOR_APPEARANCE);
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [sceneValidation, setSceneValidation] = useState<WatercolorValidation>({ready:false,errors:{}});
   const validateScene = useCallback((state:WatercolorValidation)=>setSceneValidation(state),[]);
-  const templateDrafts = useRef<Record<string,{photo:PhotoDraft;text:WatercolorDraft}>>({});
+  const templateDrafts = useRef<Record<string,{photo:PhotoDraft;text:WatercolorDraft;appearance:WatercolorAppearance}>>({});
   const photoBaseline = useRef<{photo:PhotoDraft;step:ComposerStep}|null>(null);
   const savingRef = useRef(false);
   const [pendingAttempt,setPendingAttempt] = useState<MemoryCardSaveAttempt|null>(null);
@@ -427,12 +429,13 @@ export function MemoryCardsView() {
 
   const activateTemplate = (key:MemoryCardTemplateKey | null) => {
     if (!key || savingRef.current || editingFieldId || selectedSlotId || photoBaseline.current) return;
-    if(templateKey) templateDrafts.current[templateKey] = structuredClone({photo:photoDraft,text:textDraft});
+    if(templateKey) templateDrafts.current[templateKey] = structuredClone({photo:photoDraft,text:textDraft,appearance});
     const next=getMemoryCardTemplate(key)!;
     const cached=templateDrafts.current[key];
     setTemplateKey(key);
     setPhotoDraft(cached?structuredClone(cached.photo):{photoIds:[],placementBySlotId:{}});
     setTextDraft(cached?structuredClone(cached.text):createWatercolorDraft(next,tripSession.trip));
+    setAppearance(freezeWatercolorAppearance(cached?.appearance));
     setSceneValidation({ready:false,errors:{}});
     setSelectedSlotId(null);
   };
@@ -495,7 +498,14 @@ export function MemoryCardsView() {
     setCropRefreshVersion(0);
     templateDrafts.current={};
     setTextDraft({cardValues:{},annotationsByPhotoId:{}});
+    setAppearance(DEFAULT_WATERCOLOR_APPEARANCE);
     setError(null);
+  };
+
+  const changeBackground = (backgroundVariant: WatercolorAppearance["backgroundVariant"]) => {
+    if (savingRef.current || exportingKey || editingFieldId || selectedSlotId || photoBaseline.current) return;
+    setAppearance(freezeWatercolorAppearance({ backgroundVariant }));
+    setSceneValidation({ ready: false, errors: {} });
   };
 
   const selectSlotForCrop = (slotId: string | null) => {
@@ -604,7 +614,9 @@ export function MemoryCardsView() {
   const renderCardBlob = async (
     renderTemplateKey: MemoryCardTemplateKey,
     renderModel: MemoryCardRenderModel,
+    renderAppearance: WatercolorAppearance = DEFAULT_WATERCOLOR_APPEARANCE,
   ) => {
+    const frozenAppearance = freezeWatercolorAppearance(renderAppearance);
     const requiredPhotoIds = getMemoryCardRenderPhotoIds(renderModel);
     const requiredPhotoIdSet = new Set(requiredPhotoIds);
     const requiredPhotos = photos.filter(({ id }) => requiredPhotoIdSet.has(id));
@@ -625,6 +637,7 @@ export function MemoryCardsView() {
       throw new Error("memory-card-export-photo-unavailable");
     }
     return exportMemoryCardPng({
+      appearance: frozenAppearance,
       templateKey: renderTemplateKey,
       renderModel,
       photos: hydratedPhotos,
@@ -641,10 +654,11 @@ export function MemoryCardsView() {
 
     try {
       const frozenLayout=finalizeWatercolorLayout(templateKey,draftLayout!);
+      const frozenAppearance=freezeWatercolorAppearance(appearance);
       const frozenSession=structuredClone(tripSession);
       const auth=await getCurrentAuthSession();
       if(!auth)throw new Error("인증을 확인해주세요.");
-      const resultPng = await renderCardBlob(templateKey, {kind:"watercolor",layoutVersion:4,layout:frozenLayout});
+      const resultPng = await renderCardBlob(templateKey, {kind:"watercolor",layoutVersion:4,layout:frozenLayout}, frozenAppearance);
       if(identityRef.current.trip.id!==frozenSession.trip.id||identityRef.current.member.id!==frozenSession.member.id)throw new Error("탑승 정보가 변경되었어요. 다시 확인해주세요.");
       const saved = await createMemoryCard({
         availablePhotoIds: photos.map(({ id }) => id),
@@ -685,8 +699,10 @@ export function MemoryCardsView() {
     if (exportingKey || savingRef.current || editingFieldId || selectedSlotId) return;
     setExportingKey(`${key}-${action}`);
     setError(null);
+    const frozenAppearance = freezeWatercolorAppearance(appearance);
+    const frozenRenderModel = structuredClone(renderModel);
     try {
-      const blob = await renderCardBlob(exportTemplateKey, renderModel);
+      const blob = await renderCardBlob(exportTemplateKey, frozenRenderModel, frozenAppearance);
       const filename = `fukuoka-memory-card-${exportTemplateKey}.png`;
       if (action === "share") {
         await shareOrDownloadMemoryCardPng(blob, filename);
@@ -812,6 +828,7 @@ export function MemoryCardsView() {
             <MemoryCardPreview
               templateKey={template.key}
               renderModel={draftRenderModel}
+              appearance={appearance}
               onValidation={validateScene}
               onSelectField={openTextEditor}
               onSelectSlot={selectSlotForCrop}
@@ -833,6 +850,15 @@ export function MemoryCardsView() {
           <section className="wc-card-information" aria-label="카드 정보">
             <div><h3>카드 정보</h3><p>전체 제목 · 메모 · 여행 날짜</p></div>
             <Button className="wc-edit-action" variant="secondary" disabled={isSaving} onClick={()=>openTextEditor(template.primary)}>카드 정보 편집 <span aria-hidden="true">›</span></Button>
+            <fieldset className="wc-background" disabled={isSaving || Boolean(exportingKey)}>
+              <legend>배경색</legend>
+              <div className="wc-background-options">
+                {WATERCOLOR_BACKGROUNDS.map(preset => <button type="button" key={preset.key} aria-pressed={appearance.backgroundVariant === preset.key} onClick={() => changeBackground(preset.key)}>
+                  <span aria-hidden="true" style={{ backgroundColor: preset.paper }}>{appearance.backgroundVariant === preset.key ? "✓" : ""}</span>
+                  {preset.label}
+                </button>)}
+              </div>
+            </fieldset>
           </section>
           <div className="cards-action-row cards-main-actions">
             <Button
@@ -1015,6 +1041,7 @@ export function MemoryCardsView() {
                   <MemoryCardPreview
                     templateKey={template.key}
                     renderModel={draftRenderModel}
+                    appearance={appearance}
                     photos={photos}
                     dateLabel={dateLabel}
                     onSelectField={openTextEditor}
@@ -1147,7 +1174,7 @@ export function MemoryCardsView() {
               </dialog>
             )}
 
-        {editingFieldId&&<WatercolorTextEditor template={template} initialDraft={textDraft} trip={tripSession.trip} slots={draftLayout.slots} photos={photos} initialFieldId={editingFieldId} onCancel={()=>setEditingFieldId(null)} onApply={draft=>{setTextDraft(draft);setEditingFieldId(null);}}/>}
+        {editingFieldId&&<WatercolorTextEditor template={template} initialDraft={textDraft} trip={tripSession.trip} slots={draftLayout.slots} photos={photos} appearance={appearance} initialFieldId={editingFieldId} onCancel={()=>setEditingFieldId(null)} onApply={draft=>{setTextDraft(draft);setEditingFieldId(null);}}/>}
 
       </section>
         {(isSaving||pendingAttempt)&&<div className="wc-save-lock" role="dialog" aria-modal="true" aria-label="카드 저장 상태"><p role="status">{pendingAttempt?"저장 결과 확인이 필요해요.":"카드를 이 모습으로 저장하고 있어요."}</p>{pendingAttempt&&<><p>{error}</p><button type="button" disabled={isSaving} onClick={verifyPendingSave}>저장 결과 다시 확인</button></>}</div>}

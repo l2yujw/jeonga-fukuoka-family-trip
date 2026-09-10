@@ -5,15 +5,17 @@ import { getWatercolorFieldBox, getWatercolorTemplate, type WatercolorBox } from
 import type { MemoryCardTemplateKey } from "./memory-card-template-spec";
 import { createWatercolorDraft, projectWatercolorLayout, type MemoryCardLayoutV4 } from "./watercolor-layout";
 import { paintWatercolorScene, prepareWatercolorScene } from "./watercolor-scene";
+import { DEFAULT_WATERCOLOR_APPEARANCE, watercolorContentInset, type WatercolorAppearance } from "./watercolor-appearance";
 export type WatercolorValidation = {
   ready: boolean;
   errors: Record<string, string>;
 };
-export const watercolorHitStyle = (b: WatercolorBox) => ({ position: "absolute" as const, left: `${b.x / 1080 * 100}%`, top: `${b.y / 1920 * 100}%`, width: `${b.w / 1080 * 100}%`, height: `${b.h / 1920 * 100}%`, transform: `rotate(${b.r}deg)` });
-export function WatercolorPreview({ templateKey, layout, photos, onSelectField, onSelectSlot, selectedFieldId, selectedSlotId, onValidation }: {
+export const watercolorHitStyle = (b: WatercolorBox, inset = 0) => ({ position: "absolute" as const, left: `${(inset + b.x / 1080 * (1 - inset * 2)) * 100}%`, top: `${(inset + b.y / 1920 * (1 - inset * 2)) * 100}%`, width: `${b.w / 1080 * (1 - inset * 2) * 100}%`, height: `${b.h / 1920 * (1 - inset * 2) * 100}%`, transform: `rotate(${b.r}deg)` });
+export function WatercolorPreview({ templateKey, layout, photos, appearance = DEFAULT_WATERCOLOR_APPEARANCE, onSelectField, onSelectSlot, selectedFieldId, selectedSlotId, onValidation }: {
   templateKey: MemoryCardTemplateKey;
   layout: MemoryCardLayoutV4;
   photos: readonly AlbumPhoto[];
+  appearance?: WatercolorAppearance;
   onSelectField?: (id: string) => void;
   onSelectSlot?: (id: string) => void;
   selectedFieldId?: string | null;
@@ -23,11 +25,12 @@ export function WatercolorPreview({ templateKey, layout, photos, onSelectField, 
   const canvas = useRef<HTMLCanvasElement>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const template = getWatercolorTemplate(templateKey, layout.templateRevision);
+  const inset = watercolorContentInset(templateKey, appearance);
   const width = 540;
   useEffect(() => {
     let active = true;
     onValidation?.({ ready: false, errors: {} });
-    void prepareWatercolorScene(templateKey, layout, photos, true).then(scene => {
+    void prepareWatercolorScene(templateKey, layout, photos, true, appearance).then(scene => {
       if (!active)
         return;
       const c = canvas.current?.getContext("2d");
@@ -44,14 +47,14 @@ export function WatercolorPreview({ templateKey, layout, photos, onSelectField, 
       onValidation?.({ ready: false, errors: { _scene: message } });
     });
     return () => { active = false; };
-  }, [templateKey, layout, photos, width, onValidation]);
+  }, [templateKey, layout, photos, appearance, width, onValidation]);
   if (!template)
     return <p role="alert">지원하지 않는 카드 버전이에요.</p>;
   return <div className="wc-preview" aria-label={`${template.displayName} 카드 미리보기`}>
   <div className="wc-scene">
    <canvas ref={canvas} width={width} height={width * 16 / 9} role="img" aria-label={`${template.displayName} 합성 미리보기`}/>
-   {onSelectSlot && template.slots.map((s, i) => layout.slots.some(x => x.slotId === s.id) && <button type="button" key={s.id} className="wc-hit wc-photo-hit" aria-label={`사진 ${i + 1} 편집`} aria-pressed={s.id === selectedSlotId} onClick={() => onSelectSlot(s.id)} style={watercolorHitStyle(s)}/>)}
-   {onSelectField && template.fields.filter(f => !f.photoSlotId).map(f => <button type="button" key={f.id} className="wc-hit wc-text-hit" aria-label={`${f.label} 편집`} aria-pressed={f.id === selectedFieldId} onClick={() => onSelectField(f.id)} style={watercolorHitStyle(getWatercolorFieldBox(template, f))}/>)}
+   {onSelectSlot && template.slots.map((s, i) => layout.slots.some(x => x.slotId === s.id) && <button type="button" key={s.id} className="wc-hit wc-photo-hit" aria-label={`사진 ${i + 1} 편집`} aria-pressed={s.id === selectedSlotId} onClick={() => onSelectSlot(s.id)} style={watercolorHitStyle(s, inset)}/>)}
+   {onSelectField && template.fields.filter(f => !f.photoSlotId).map(f => <button type="button" key={f.id} className="wc-hit wc-text-hit" aria-label={`${f.label} 편집`} aria-pressed={f.id === selectedFieldId} onClick={() => onSelectField(f.id)} style={watercolorHitStyle(getWatercolorFieldBox(template, f), inset)}/>)}
   </div>
   {failure && <p role="alert" className="wc-error">{failure}</p>}
  </div>;

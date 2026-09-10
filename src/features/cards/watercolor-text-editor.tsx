@@ -5,8 +5,10 @@ import type { MemoryCardSlotMappingV3 } from "./memory-card";
 import { getWatercolorDraftValue, projectWatercolorLayout, setWatercolorDraftValue, setWatercolorTripDateDisplay, validateWatercolorValues, type WatercolorDraft } from "./watercolor-layout";
 import type { WatercolorField, WatercolorTemplate } from "./watercolor-template-spec";
 import { WatercolorPreview, type WatercolorValidation } from "./watercolor-preview";
+import type { WatercolorAppearance } from "./watercolor-appearance";
 const groupOf = (f: WatercolorField) => f.kind === "isoDate" || /note|signoff|location/.test(f.id) ? "메모·날짜" : "제목·소개";
-export function WatercolorTextEditor({ template, initialDraft, slots, photos, initialFieldId, trip, onApply, onCancel }: {
+export function WatercolorTextEditor({ template, initialDraft, slots, photos, appearance, initialFieldId, trip, onApply, onCancel }: {
+  appearance?: WatercolorAppearance;
   template: WatercolorTemplate;
   initialDraft: WatercolorDraft;
   slots: readonly MemoryCardSlotMappingV3[];
@@ -58,7 +60,7 @@ export function WatercolorTextEditor({ template, initialDraft, slots, photos, in
   <header><h2 id="wc-text-title">카드 정보</h2><button type="button" onClick={onCancel} aria-label="카드 정보 취소">×</button></header>
   <div className="wc-editor-scroll">
    <p>모든 문구는 선택이에요. 비워두면 카드에 표시되지 않아요.<br />사진별 문구와 날짜는 사진을 눌러 편집하세요.</p>
-   <details className="wc-info-preview"><summary>카드 미리보기</summary><div className="wc-editor-preview"><WatercolorPreview templateKey={template.key} layout={layout} photos={photos} selectedFieldId={activeId} onSelectField={selectField} onValidation={onValidation}/></div></details>
+   <details className="wc-info-preview"><summary>카드 미리보기</summary><div className="wc-editor-preview"><WatercolorPreview templateKey={template.key} layout={layout} photos={photos} appearance={appearance} selectedFieldId={activeId} onSelectField={selectField} onValidation={onValidation}/></div></details>
    <label className="wc-date-toggle"><input type="checkbox" checked={showTripDates} onChange={event => {
      setValidation({ ready: false, errors: {} });
      setWorkingDraft(current => setWatercolorTripDateDisplay(current, event.target.checked, trip));

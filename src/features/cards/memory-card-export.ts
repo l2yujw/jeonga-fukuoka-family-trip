@@ -1,5 +1,6 @@
 import type { AlbumPhoto } from "@/features/album/album-types";
 import { prepareWatercolorScene, renderWatercolorPng } from "./watercolor-scene";
+import type { WatercolorAppearance } from "./watercolor-appearance";
 import {
   getMemoryCardRenderTemplate,
   resolveMemoryCardSlots,
@@ -32,6 +33,7 @@ export const MEMORY_CARD_REQUIRED_IMAGE_ERROR =
 type ExportSize = (typeof MEMORY_CARD_EXPORT_SIZES)[number];
 
 export type MemoryCardRenderInput = {
+  appearance?: WatercolorAppearance;
   templateKey: MemoryCardTemplateKey;
   renderModel: MemoryCardRenderModel;
   photos: readonly AlbumPhoto[];
@@ -253,7 +255,7 @@ export async function renderMemoryCardPng(
   imageLoader: MemoryCardImageLoader = loadImage,
 ) {
   if (input.renderModel.kind === "watercolor") {
-    return renderWatercolorPng(await prepareWatercolorScene(input.templateKey, input.renderModel.layout, input.photos), size.width);
+    return renderWatercolorPng(await prepareWatercolorScene(input.templateKey, input.renderModel.layout, input.photos, false, input.appearance), size.width);
   }
   const template = getMemoryCardRenderTemplate(input.templateKey, input.renderModel);
   if (!template) throw new Error("memory-card-template-missing");
@@ -358,7 +360,7 @@ export async function exportMemoryCardPng(
   render = renderMemoryCardPng,
 ) {
   if (input.renderModel.kind === "watercolor") {
-    const scene = await prepareWatercolorScene(input.templateKey, input.renderModel.layout, input.photos);
+    const scene = await prepareWatercolorScene(input.templateKey, input.renderModel.layout, input.photos, false, input.appearance);
     try {
       return await renderWatercolorPng(scene, 1080);
     } catch (error) {

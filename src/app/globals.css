@@ -5278,6 +5278,14 @@ body:has(.cards-viewer-backdrop) .cards-main {
 }
 .wc-card-information h3 { margin: 0; font-size: 14px; font-weight: 700; }
 .wc-card-information p { margin: 3px 0 0; color: #796858; font-size: 12px; }
+.wc-background { width: 100%; min-width: 0; border: 0; padding: 0; margin: 0; }
+.wc-background legend { margin-bottom: 8px; color: #49372d; font-size: 13px; font-weight: 650; }
+.wc-background-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.wc-background-options button { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 56px; min-width: 44px; padding: 6px 2px; border: 1px solid #dbc7b6; border-radius: 10px; background: #fffdf9; color: #49372d; font-size: 12px; }
+.wc-background-options button > span { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid #897462; border-radius: 50%; font-size: 14px; line-height: 1; }
+.wc-background-options button[aria-pressed="true"] { border-color: #a86149; box-shadow: inset 0 0 0 1px #a86149; font-weight: 700; }
+.wc-background-options button:focus-visible { outline: 2px solid #a86149; outline-offset: 2px; }
+.wc-background:disabled { opacity: .6; }
 .wc-edit-action { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; font-size: 14px; }
 .wc-preview { width: 100%; }
 .wc-scene { position: relative; width: 100%; aspect-ratio: 9 / 16; }
