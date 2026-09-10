@@ -99,3 +99,17 @@ export async function loadFamilyRoster(tripId: string) {
     }),
   );
 }
+
+// UI state only. The server cookie and RPC authorize all profile transfers.
+export async function getMemberSwitchState(method: "GET" | "DELETE" = "GET") {
+  const session = await getCurrentAuthSession();
+  if (!session) return { active: false, expiresAt: 0 };
+  const response = await fetch("/api/member-switch", {
+    method,
+    cache: "no-store",
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  if (!response.ok) throw new Error("변경 상태를 확인할 수 없어요. 다시 시도해주세요.");
+  const body = await response.json();
+  return { active: body.active === true, expiresAt: Number(body.expiresAt) || 0 };
+}

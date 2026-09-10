@@ -3,6 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import { WatercolorPreview, WatercolorThumbnail, type WatercolorValidation } from "./watercolor-preview";
 import { getWatercolorTemplate } from "./watercolor-template-spec";
+import type { WatercolorAppearance } from "./watercolor-appearance";
 import {
   useNearViewportPhoto,
   type AlbumPhotoMediaChange,
@@ -32,6 +33,7 @@ import {
 } from "./memory-card-template-spec";
 
 type MemoryCardPreviewProps = {
+  appearance?: WatercolorAppearance;
   templateKey: MemoryCardTemplateKey;
   renderModel?: MemoryCardRenderModel | null;
   photos: readonly AlbumPhoto[];
@@ -158,6 +160,7 @@ function MemoryCardPhoto({
 }
 
 export function MemoryCardPreview({
+  appearance,
   dateLabel = "",
   onSelectSlot,
   renderModel,
@@ -176,7 +179,7 @@ export function MemoryCardPreview({
   if (renderModel === undefined) return <WatercolorThumbnail templateKey={templateKey}/>;
   if (renderModel?.kind === "watercolor") {
     if (!getWatercolorTemplate(templateKey,renderModel.layout.templateRevision)) return null;
-    return <WatercolorPreview templateKey={templateKey} layout={renderModel.layout} photos={photos} onSelectField={onSelectField} selectedFieldId={selectedFieldId} onSelectSlot={onSelectSlot} selectedSlotId={selectedSlotId} onValidation={onValidation}/>;
+    return <WatercolorPreview templateKey={templateKey} layout={renderModel.layout} photos={photos} appearance={appearance} onSelectField={onSelectField} selectedFieldId={selectedFieldId} onSelectSlot={onSelectSlot} selectedSlotId={selectedSlotId} onValidation={onValidation}/>;
   }
 
   if (renderModel === null) {

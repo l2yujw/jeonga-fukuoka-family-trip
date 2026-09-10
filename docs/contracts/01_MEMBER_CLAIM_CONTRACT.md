@@ -38,21 +38,45 @@ id/name/displayRole/boardedAt만 반환한다.
 - 같은 브라우저에서 Supabase session을 유지하면 같은 family member로 복원되고 `/`에서 `/home`으로 이동한다.
 - 브라우저 auth storage를 지우면 anonymous identity도 사라진다.
 - 새 identity는 이미 claim된 member를 자동으로 인계받을 수 없다.
-- 다른 auth user가 claim한 member의 reassignment/takeover는 관리자 수동 절차이며 현재 범위 밖이다.
+- 일반 최초 claim은 다른 auth user의 member를 인계받지 않는다. 아래 명시적 Home 변경만 예외다.
 
-## Wrong-member recovery v1
+## Explicit Home profile switch v1 (migration 16, unapplied)
 
-`POST /api/member-switch`는 Bearer token의 현재 anonymous auth user와 HttpOnly invite
-cookie의 trip을 서버에서 결정한다. client member ID는 받지 않는다.
+`POST /api/member-switch` authenticates the anonymous Bearer user, resolves the existing
+invite cookie, and verifies a boarded membership in that trip. It preserves that membership
+and sets `jeonga_member_switch`: HttpOnly, SameSite=Lax, Secure in production, path `/`,
+300-second max age. No client flag authorizes transfer.
 
-service-role 전용 `release_trip_membership_for_switch` 함수가 현재 membership row와
-family member row를 lock하고 한 transaction 안에서 membership 삭제와 기존 member의
-`boarded_at = null`을 함께 처리한다. 기존 Photo나 Memory Card가 있어도 변경할 수 있으며,
-과거 content의 family-member attribution은 이전하거나 다시 쓰지 않는다.
+The HMAC-SHA256 value binds auth user, trip, current membership row ID and expiration.
+It uses the existing server-only `SUPABASE_SECRET_KEY` with the domain prefix
+`jeonga:member-switch:v1:`. No new secret is required. Never expose/log this key or token;
+key rotation invalidates pending switch intents. Missing signing configuration fails closed.
 
-성공 후에도 anonymous auth session과 invite cookie는 유지된다. 기존 landing/claim
-흐름으로 돌아가 새 member를 claim하며, 이후 새 content는 새 membership의 member로
-attribution된다. 양쪽 unique conflict 보호는 그대로 적용된다.
+`GET /api/member-switch` validates the intent and current membership (no-store). Landing
+keeps ordinary auto-forward unless this check returns active. The expiry timer returns Home;
+server validation also rejects expired/tampered cookies. `DELETE` cancels and clears the
+cookie; explicit cancel and returning Home, including browser Back, use this endpoint.
 
-같은 auth owner는 현재 해당 trip membership을 유지하는 동안 변경 전 Photo의
-`caption`과 `taken_at`을 계속 수정할 수 있다. Memory Card는 수정할 수 없다.
+In switch mode `/api/member-preview` permits any exact registered name in the invite trip,
+returns `claimedElsewhere` for the Boarding warning, and performs no mutation. Boarding
+revalidates preview on entry. Its final confirmation calls `/api/claim-member` once at a time.
+
+Only a valid intent selects `transfer_trip_membership_for_switch` in migration 16. The RPC
+accepts trip, authenticated user, target member and `p_expected_membership_id`; the fourth
+argument rejects intents whose original membership was revoked, inside the transaction.
+It serializes transfers per trip, locks both memberships/member rows, checks trip boundaries,
+replaces the current/target memberships, resets the previous boarded state and preserves or
+sets the target boarded timestamp. Same-target retries are idempotent. Both unique constraints
+remain authoritative. Execution is revoked from PUBLIC/anon/authenticated and granted only
+to service_role. Ordinary claim and its 409 conflict/race handling remain unchanged.
+
+The successful RPC returns status and boarded_at together, avoiding a post-commit read failure.
+The API then returns the normal CurrentTripSession and clears the intent. RPC errors retain
+intent, pending preview and existing access; no app-side release/delete/insert transfer exists.
+A lost successful response can retry the same target without another membership replacement.
+An evicted browser loses its CurrentTripSession on the next protected membership check.
+
+Historical photos/cards and auth accounts are never changed by the transfer. Their auth and
+member attribution stays immutable; new writes derive actual auth and current membership
+as before. Existing Album/Card RLS and private asset/invite boundaries are unchanged.
+Migration 16 must be applied in a separately authorized release before this flow can work remotely.

@@ -5,14 +5,28 @@ import {createHash} from 'node:crypto';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {WATERCOLOR_TEMPLATES,getWatercolorTemplate,getWatercolorFieldBox} from './watercolor-template-spec.ts';
-import {createWatercolorDraft,projectWatercolorLayout,setWatercolorDraftValue,parseMemoryCardLayoutV4,normalizeWatercolorText,isWatercolorDate,validateWatercolorValues,watercolorPayloadBytes} from './watercolor-layout.ts';
-import {layoutWatercolorText,wrapWatercolorText,supportsWatercolorGlyphs,watercolorCanvasFailure,paintWatercolorScene} from './watercolor-scene.ts';
+import {createWatercolorDraft,projectWatercolorLayout,setWatercolorDraftValue,parseMemoryCardLayoutV4,normalizeWatercolorText,isWatercolorDate,validateWatercolorValues,watercolorPayloadBytes,finalizeWatercolorLayout,setWatercolorTripDateDisplay} from './watercolor-layout.ts';
+import {layoutWatercolorText,wrapWatercolorText,supportsWatercolorGlyphs,watercolorCanvasFailure,paintWatercolorScene,prepareWatercolorScene} from './watercolor-scene.ts';
 import {getMemoryCardRenderTemplate,getRandomPhotoCount,parseMemoryCardRenderModel,buildMemoryCardLayoutV3,createMemoryCardRenderModel,mapPersistedMemoryCardRows} from './memory-card.ts';
 import {getMemoryCardExportDimensions} from './memory-card-export.ts';
+import {DEFAULT_WATERCOLOR_APPEARANCE,WATERCOLOR_BACKGROUNDS,freezeWatercolorAppearance,watercolorContentInset} from './watercolor-appearance.ts';
 const trip={title:'우리 가족',startDate:'2026-09-11',endDate:'2026-09-13'};
 const id=n=>`aaaaaaaa-aaaa-4aaa-8aaa-${String(n).padStart(12,'0')}`;
 const mapping=t=>t.slots.map((s,i)=>({slotId:s.id,photoId:id(i+1),placement:{zoom:1,rotation:0,offsetX:0,offsetY:0}}));
 const make=t=>projectWatercolorLayout(t,mapping(t),createWatercolorDraft(t,trip));
+test('all eight new drafts use the exact family title with blank notes and unchanged dates',()=>{
+ for(const t of WATERCOLOR_TEMPLATES){
+  const draft=createWatercolorDraft(t,trip),layout=projectWatercolorLayout(t,mapping(t),draft);
+  assert.equal(layout.textValues[t.primary],'전가네 가족여행',t.key);
+  assert.equal(layout.caption,'전가네 가족여행',t.key);
+  assert.equal(t.fields.find(f=>f.id===t.primary).defaultPolicy,'전가네 가족여행');
+  for(const [key,value] of Object.entries(layout.textValues))if(key!==t.primary)assert.equal(value,null,`${t.key}:${key}`);
+  assert.equal(layout.dateValues['trip.start'],trip.startDate);
+  assert.equal(layout.dateValues['trip.end'],trip.endDate);
+  for(const [key,value] of Object.entries(layout.dateValues))if(!key.startsWith('trip.'))assert.equal(value,null);
+  assert.deepEqual(parseMemoryCardLayoutV4(t.key,layout),layout);
+ }
+});
 test('empty Album composer retries leave the draft intact until a template is available',async()=>{
  const source=await readFile(new URL('./memory-cards-view.tsx',import.meta.url),'utf8');
  const callback=source.slice(source.indexOf('  const activateTemplate ='),source.indexOf('  const openPhotoSelection ='));
@@ -21,6 +35,7 @@ test('empty Album composer retries leave the draft intact until a template is av
   savingRef:{current:false},editingFieldId:null,selectedSlotId:null,photoBaseline:{current:null},
   templateKey:null,templateDrafts:{current:{}},tripSession:{trip},structuredClone,
   getMemoryCardTemplate:getWatercolorTemplate,createWatercolorDraft,
+  freezeWatercolorAppearance,setAppearance:()=>{},
   setTemplateKey:value=>{state.key=value;},setPhotoDraft:value=>{state.photo=value;},
   setTextDraft:value=>{state.text=value;},setSceneValidation:()=>{},setSelectedSlotId:()=>{},
  });
@@ -134,13 +149,13 @@ test('720 fallback classification requires a positive-size Canvas limit signal, 
  assert.equal(watercolorCanvasFailure({...canvas,toDataURL:()=>{throw security;}},'encode-failed'),security);
 });
 
-test('Wave A selector and both galleries use cached v4 miniatures and a selected-template edit count',async()=>{
+test('Wave A selector and both galleries use cached v4 miniatures and global Card Info entry points',async()=>{
  const [view,preview]=await Promise.all(['memory-cards-view.tsx','watercolor-preview.tsx'].map(f=>readFile(new URL(f,import.meta.url),'utf8')));
  const composer=view.slice(view.indexOf('if (composerStep && template && draftLayout)'),view.indexOf('const savedTemplate',view.indexOf('if (composerStep && template && draftLayout)')));
  assert.equal((composer.match(/<WatercolorThumbnail templateKey=\{item.key\}/g)??[]).length,3);
  assert.doesNotMatch(composer,/<TemplateGlyph templateKey=\{item.key\}/);
  assert.match(composer,/showAllTemplates[\s\S]*MEMORY_CARD_TEMPLATES\.map/);
- assert.equal((composer.match(/문구 편집 · \{template.fields.length\}곳/g)??[]).length,2);
+ assert.equal((composer.match(/카드 정보 편집/g)??[]).length,2);
  assert.match(preview,/miniatures = new Map/);assert.match(preview,/memo\(function WatercolorThumbnail/);
  assert.match(preview,/canvas.width = 180; canvas.height = 320/);
  assert.doesNotMatch(preview,/toDataURL|toBlob|renderWatercolorPng/);
@@ -183,7 +198,7 @@ test('all eight empty scenes expose each photo area only in the editor and keep 
   const words=[],gradients=[];
   const c=new Proxy({fillText:text=>words.push(text),createPattern:()=>({}),createLinearGradient:()=>{gradients.push(true);return {addColorStop(){}};}},{get:(target,key)=>target[key]??(()=>{})});
   const layout=projectWatercolorLayout(t,[],createWatercolorDraft(t,{title:'',startDate:'',endDate:''}));
-  const scene={template:t,layout,images:new Map(),art:new Map(),text:[],errors:{}};
+  const scene={template:t,layout,appearance:DEFAULT_WATERCOLOR_APPEARANCE,images:new Map(),art:new Map(),text:[],errors:{}};
   const before=structuredClone(layout);
   paintWatercolorScene(c,scene,180,true);
   assert.equal(words.filter(w=>w==='사진 선택').length,t.slots.length,t.key);
@@ -192,4 +207,194 @@ test('all eight empty scenes expose each photo area only in the editor and keep 
   assert.equal(words.includes('사진 선택'),false,t.key);
   assert.deepEqual(layout,before);
  }
+});
+
+
+test('all text is optional: all eight blank/date-off layouts finalize with no painted text runs',()=>{
+ const context={measureText:s=>({width:s.length*10})};
+ for(const t of WATERCOLOR_TEMPLATES){
+  const slots=mapping(t);let d=createWatercolorDraft(t,trip);
+  for(const field of t.fields.filter(f=>f.kind==='plainText'))d=setWatercolorDraftValue(d,field,slots,'  \n  ');
+  d=setWatercolorTripDateDisplay(d,false,trip);
+  const layout=finalizeWatercolorLayout(t.key,projectWatercolorLayout(t,slots,d));
+  assert.equal(layout.caption,null);assert.ok(Object.values(layout.textValues).every(v=>v===null));
+  assert.ok(Object.values(layout.dateValues).every(v=>v===null));
+  assert.ok(layoutWatercolorText(t,layout,context).every(plan=>plan.runs.length===0));
+ }
+});
+test('trip date display restores canonical dates and remembers an explicitly edited ordered pair',()=>{
+ const t=WATERCOLOR_TEMPLATES[0];let d=createWatercolorDraft(t,trip);
+ d=setWatercolorTripDateDisplay(d,false,trip);
+ assert.equal(d.cardValues['trip.start'],null);assert.equal(d.cardValues['trip.end'],null);
+ d=setWatercolorTripDateDisplay(d,true,trip);
+ assert.equal(d.cardValues['trip.start'],trip.startDate);assert.equal(d.cardValues['trip.end'],trip.endDate);
+ d.cardValues['trip.start']='2026-09-12';d.cardValues['trip.end']='2026-09-12';
+ d=setWatercolorTripDateDisplay(setWatercolorTripDateDisplay(d,false,trip),true,trip);
+ assert.equal(d.cardValues['trip.start'],'2026-09-12');assert.equal(d.cardValues['trip.end'],'2026-09-12');
+ assert.deepEqual(validateWatercolorValues(t,projectWatercolorLayout(t,mapping(t),d)),{});
+ assert.equal('hiddenTripDates' in finalizeWatercolorLayout(t.key,projectWatercolorLayout(t,mapping(t),d)),false);
+});
+test('Film photo dates are individually optional, independent of trip display, and never taken from uploads',()=>{
+ const t=getWatercolorTemplate('film_contact_sheet'),slots=mapping(t),field=t.fields.find(f=>f.photoSlotId&&f.kind==='isoDate');
+ let d=createWatercolorDraft(t,trip);assert.equal(projectWatercolorLayout(t,slots,d).dateValues[field.id],null);
+ d=setWatercolorDraftValue(d,field,slots,'2026-09-12');d=setWatercolorTripDateDisplay(d,false,trip);
+ let layout=finalizeWatercolorLayout(t.key,projectWatercolorLayout(t,slots,d));
+ assert.equal(layout.dateValues[field.id],'2026-09-12');assert.equal(layout.dateValues['trip.start'],null);
+ d=setWatercolorDraftValue(d,field,slots,null);layout=finalizeWatercolorLayout(t.key,projectWatercolorLayout(t,slots,d));
+ assert.ok(Object.values(layout.dateValues).every(v=>v===null));
+ for(const key of ['one_moment','instant_memory'])assert.equal(getWatercolorTemplate(key).fields.some(f=>f.photoSlotId),false);
+ assert.equal(getWatercolorTemplate('editorial_collage').fields.some(f=>f.photoSlotId==='e1'),false);
+});
+
+test('background appearance defaults to ivory, accepts only four presets, and freezes a copy',()=>{
+ assert.deepEqual(DEFAULT_WATERCOLOR_APPEARANCE,{backgroundVariant:'ivory'});
+ assert.deepEqual(WATERCOLOR_BACKGROUNDS.map(p=>p.key),['ivory','blush','butter','sky']);
+ for(const preset of WATERCOLOR_BACKGROUNDS){
+  const input={backgroundVariant:preset.key},snapshot=freezeWatercolorAppearance(input);
+  input.backgroundVariant='url(https://invalid)';
+  assert.equal(snapshot.backgroundVariant,preset.key);assert.ok(Object.isFrozen(snapshot));
+ }
+ for(const value of ['#ff0000','black','sage','__proto__','constructor','toString',{},null,undefined])
+  assert.equal(freezeWatercolorAppearance({backgroundVariant:value}).backgroundVariant,'ivory');
+});
+
+test('composer background is per-template session state; swatches leave layout untouched; close resets it',async()=>{
+ const source=await readFile(new URL('./memory-cards-view.tsx',import.meta.url),'utf8');
+ const state={
+  templateKey:null,photoDraft:{photoIds:[],placementBySlotId:{}},textDraft:{cardValues:{},annotationsByPhotoId:{}},
+  appearance:DEFAULT_WATERCOLOR_APPEARANCE,templateDrafts:{current:{}},
+  savingRef:{current:false},exportingKey:null,editingFieldId:null,selectedSlotId:null,photoBaseline:{current:null},
+  tripSession:{trip},structuredClone,getMemoryCardTemplate:getWatercolorTemplate,createWatercolorDraft,
+  freezeWatercolorAppearance,DEFAULT_WATERCOLOR_APPEARANCE,
+  setTemplateKey:value=>{state.templateKey=value;},setPhotoDraft:value=>{state.photoDraft=value;},
+  setTextDraft:value=>{state.textDraft=value;},setAppearance:value=>{state.appearance=value;},
+  setSceneValidation:()=>{},setSelectedSlotId:()=>{},setComposerStep:()=>{},setShowAllTemplates:()=>{},
+  setCropPhotoReadyKey:()=>{},setCropPhotoFailedKey:()=>{},setCropRefreshVersion:()=>{},setError:()=>{},
+ };
+ const callback=(start,end,name)=>runInNewContext(stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end))+`\n${name};`),state);
+ const activate=callback('  const activateTemplate =','  const openPhotoSelection =','activateTemplate');
+ const close=callback('  const closeComposer =','  const changeBackground =','closeComposer');
+ const change=callback('  const changeBackground =','  const selectSlotForCrop =','changeBackground');
+ activate('four_cut');assert.equal(state.appearance.backgroundVariant,'ivory');
+ const before=projectWatercolorLayout(getWatercolorTemplate('four_cut'),mapping(getWatercolorTemplate('four_cut')),state.textDraft);
+ change('blush');assert.equal(state.appearance.backgroundVariant,'blush');
+ assert.deepEqual(projectWatercolorLayout(getWatercolorTemplate('four_cut'),mapping(getWatercolorTemplate('four_cut')),state.textDraft),before);
+ activate('polaroid_moodboard');assert.equal(state.appearance.backgroundVariant,'ivory');change('sky');
+ activate('four_cut');assert.equal(state.appearance.backgroundVariant,'blush');
+ activate('polaroid_moodboard');assert.equal(state.appearance.backgroundVariant,'sky');
+ state.savingRef.current=true;change('butter');close();assert.equal(state.appearance.backgroundVariant,'sky');
+ state.savingRef.current=false;state.exportingKey='draft-share';change('butter');assert.equal(state.appearance.backgroundVariant,'sky');
+ state.exportingKey=null;close();assert.equal(state.appearance.backgroundVariant,'ivory');assert.equal(Object.keys(state.templateDrafts.current).length,0);
+ activate('four_cut');assert.equal(state.appearance.backgroundVariant,'ivory');
+ activate('polaroid_moodboard');assert.equal(state.appearance.backgroundVariant,'ivory');
+});
+
+test('same appearance yields deterministic paint operations; only paper paint changes across presets',()=>{
+ const gradient={addColorStop(){}};
+ const record=scene=>{
+  const commands=[],stack=[];
+  const values={globalAlpha:1,globalCompositeOperation:'source-over',fillStyle:'',strokeStyle:''};
+  const c=new Proxy(values,{
+   get(target,key){
+    if(key==='save')return()=>{stack.push({...target});};
+    if(key==='restore')return()=>Object.assign(target,stack.pop());
+    if(key==='createPattern')return()=> 'paper-texture';
+    if(key==='createLinearGradient')return()=>gradient;
+    return key in target ? target[key] : (...args)=>commands.push({op:key,args,fill:target.fillStyle,alpha:target.globalAlpha,composite:target.globalCompositeOperation});
+   },
+  });
+  paintWatercolorScene(c,scene,1080);
+  return commands;
+ };
+ for(const t of WATERCOLOR_TEMPLATES){
+  const layout=make(t),before=structuredClone(layout);
+  const scene={template:t,layout,images:new Map(layout.slots.map(s=>[s.photoId,{naturalWidth:800,naturalHeight:1000}])),art:new Map(t.art.map(a=>[a.asset,a.asset])),text:[],errors:{}};
+  const ivory=record({...scene,appearance:DEFAULT_WATERCOLOR_APPEARANCE});
+  for(const preset of WATERCOLOR_BACKGROUNDS){
+   const colored={...scene,appearance:freezeWatercolorAppearance({backgroundVariant:preset.key})};
+   const commands=record(colored);
+   assert.deepEqual(commands,record(colored),t.key+': deterministic plan');
+   const images=ops=>ops.filter(x=>x.op==='drawImage').map(({op,args,alpha,composite})=>({op,args,alpha,composite}));
+   assert.deepEqual(images(commands),images(ivory),t.key+': photo and decoration draw inputs unchanged');
+   if(preset.key!=='ivory')assert.notEqual(commands.find(x=>x.op==='fillRect').fill,ivory.find(x=>x.op==='fillRect').fill);
+   assert.equal(commands.some(x=>x.op==='fillText'&&x.args[0]==='사진 선택'),false);
+  }
+  assert.deepEqual(layout,before);
+  assert.deepEqual(Object.keys(finalizeWatercolorLayout(t.key,layout)).sort(),['caption','dateValues','slots','templateRevision','textValues','version']);
+  assert.equal(parseMemoryCardLayoutV4(t.key,{...layout,appearance:DEFAULT_WATERCOLOR_APPEARANCE}),null);
+ }
+});
+
+test('draft download/share and final save snapshot appearance before their first await',async()=>{
+ const source=await readFile(new URL('./memory-cards-view.tsx',import.meta.url),'utf8');
+ for(const action of ['save','download','share']){
+  const layout=make(getWatercolorTemplate('four_cut')),expected=structuredClone(layout),calls=[];
+  const state={
+   templateKey:'four_cut',draftRenderModel:{kind:'watercolor',layoutVersion:4,layout},draftLayout:layout,
+   appearance:{backgroundVariant:'blush'},canPreview:true,savingRef:{current:false},editingFieldId:null,selectedSlotId:null,
+   sceneValidation:{ready:true,errors:{}},tripSession:{trip,member:{id:'member'}},identityRef:{current:{trip,member:{id:'member'}}},
+   photos:mapping(getWatercolorTemplate('four_cut')).map(s=>({id:s.photoId})),exportingKey:null,
+   freezeWatercolorAppearance,finalizeWatercolorLayout,structuredClone,
+   setIsSaving:()=>{},setError:()=>{},setExportingKey:()=>{},setCards:()=>{},closeComposer:()=>{},setPendingAttempt:()=>{},
+   MemoryCardOutcomeUnknown:class extends Error{},
+   getCurrentAuthSession:async()=>{state.appearance.backgroundVariant='sky';state.draftLayout.caption='changed';return{user:{id:'auth'}};},
+   renderCardBlob:async(key,model,appearance)=>{
+    state.appearance.backgroundVariant='butter';
+    assert.equal(appearance.backgroundVariant,'blush');assert.ok(Object.isFrozen(appearance));
+    assert.deepEqual(model.layout,expected);calls.push('render');return new Blob(['blush'],{type:'image/png'});
+   },
+   createMemoryCard:async input=>{assert.deepEqual(input.layout,expected);assert.equal('appearance' in input,false);assert.equal(await input.resultPng.text(),'blush');calls.push('save');return{};},
+   downloadMemoryCardPng:blob=>{assert.equal(blob.type,'image/png');assert.equal(blob.size,5);calls.push('download');},
+   shareOrDownloadMemoryCardPng:async blob=>{assert.equal(await blob.text(),'blush');calls.push('share');},
+  };
+  const start=action==='save'?'  const saveCard =':'  const exportCard =';
+  const end=action==='save'?'  const verifyPendingSave =':'  const exportSavedCard =';
+  const callback=runInNewContext(stripTypeScriptTypes(source.slice(source.indexOf(start),source.indexOf(end))+`\n${action==='save'?'saveCard':'exportCard'};`),state);
+  await callback('draft',action,'four_cut',state.draftRenderModel);
+  assert.deepEqual(calls,['render',action]);
+ }
+});
+
+test('all draft preview surfaces and both watercolor PNG entry points forward appearance, never legacy or stored PNG paths',async()=>{
+ const files=Object.fromEntries(await Promise.all(['memory-cards-view.tsx','memory-card-preview.tsx','watercolor-preview.tsx','watercolor-text-editor.tsx','memory-card-export.ts'].map(async file=>[file,await readFile(new URL(file,import.meta.url),'utf8')])));
+ const composer=files['memory-cards-view.tsx'].split('if (composerStep && template && draftLayout)')[1].split('<section className="cards-first-actions"')[0];
+ assert.equal((composer.match(/<MemoryCardPreview[\s\S]*?appearance=\{appearance\}/g)??[]).length,2);
+ assert.equal((composer.match(/<fieldset className="wc-background"/g)??[]).length,1);
+ assert.match(files['memory-card-preview.tsx'],/if \(renderModel\?\.kind === "watercolor"\)[\s\S]*?<WatercolorPreview[^>]+appearance=\{appearance\}/);
+ assert.match(files['watercolor-preview.tsx'],/prepareWatercolorScene\(templateKey, layout, photos, true, appearance\)/);
+ assert.match(files['watercolor-text-editor.tsx'],/<WatercolorPreview[^>]+appearance=\{appearance\}/);
+ assert.equal((files['memory-card-export.ts'].match(/prepareWatercolorScene\(input.templateKey, input.renderModel.layout, input.photos, false, input.appearance\)/g)??[]).length,2);
+ assert.match(files['memory-cards-view.tsx'],/card.isFinalized\s*\? await downloadMemoryCardResult\(card\)/);
+ assert.doesNotMatch(composer,/localStorage|type="color"/);
+});
+
+test('scene preparation freezes appearance before asynchronous asset loading and keeps its plan deterministic',async()=>{
+ const originals=Object.fromEntries(['document','FontFace','Image'].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
+ let release;
+ const gate=new Promise(resolve=>{release=resolve;});
+ try{
+  globalThis.FontFace=class{status='loaded';async load(){await gate;return this;}};
+  globalThis.Image=class{naturalWidth=800;naturalHeight=1000;set src(value){this.url=value;queueMicrotask(()=>this.onload());}};
+  globalThis.document={fonts:{add(){},check:()=>true},createElement:()=>({getContext:()=>({measureText:value=>({width:value.length*10})})})};
+  const t=getWatercolorTemplate('four_cut'),layout=make(t),photos=layout.slots.map(s=>({id:s.photoId,signedUrl:'qa:'+s.photoId}));
+  const appearance={backgroundVariant:'blush'},pending=prepareWatercolorScene(t.key,layout,photos,false,appearance);
+  appearance.backgroundVariant='sky';release();
+  const scene=await pending;
+  assert.equal(scene.appearance.backgroundVariant,'blush');assert.ok(Object.isFrozen(scene.appearance));
+  assert.deepEqual(scene,await prepareWatercolorScene(t.key,layout,photos,false,{backgroundVariant:'blush'}));
+  assert.deepEqual(layout,make(t));
+ }finally{
+  for(const [key,descriptor]of Object.entries(originals))if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key];
+ }
+});
+
+test('One Moment uses the same trusted content inset for paper and preview hit geometry; ivory stays full bleed',()=>{
+ for(const t of WATERCOLOR_TEMPLATES)for(const preset of WATERCOLOR_BACKGROUNDS)
+  assert.equal(watercolorContentInset(t.key,{backgroundVariant:preset.key}),t.key==='one_moment'&&preset.key!=='ivory'?.025:0);
+ assert.equal(watercolorContentInset('one_moment',{backgroundVariant:'arbitrary'}),0);
+});
+
+test('Round 2B leaves SQL15 exactly at the Round 2A checkpoint',async()=>{
+ const sql=await readFile(new URL('../../../docs/data/15_MEMORY_CARD_TEMPLATE_TEXT_V4_MIGRATION.sql',import.meta.url));
+ assert.equal(createHash('sha256').update(sql).digest('hex'),'9e6e5f247726aa7f1fbddda2f250f98defbf12dff112a90ba5d983394005289c');
 });

@@ -7,6 +7,7 @@ import { Button, LoadingState, MobileShell } from "@/components/ui";
 import {
   createFamilySlots,
   isCurrentTripSession,
+  isSafeMemberPreview,
   resolveBoardingInitialization,
   type CurrentTripSession,
   type FamilyRosterMember,
@@ -24,41 +25,14 @@ import {
 
 type Stage = "loading" | "confirm" | "boarding" | "complete" | "error";
 
-type SourceBox = { left: number; top: number; width: number; height: number };
-const PLATE_WIDTH = 1122;
-const PLATE_HEIGHT = 1402;
-
-const sourceBoxStyle = ({ left, top, width, height }: SourceBox) => ({
-  left: `${left * 100 / PLATE_WIDTH}%`,
-  top: `${top * 100 / PLATE_HEIGHT}%`,
-  width: `${width * 100 / PLATE_WIDTH}%`,
-  height: `${height * 100 / PLATE_HEIGHT}%`,
-});
-
-const SEAT_OVERLAYS = [
-  { ring: { left: 446, top: 436, width: 74, height: 79 }, nameMask: { left: 463, top: 517, width: 41, height: 18 }, statusMask: { left: 475, top: 540, width: 17, height: 17 }, name: { left: 426, top: 517, width: 108, height: 18 }, state: { left: 477, top: 542, width: 40, height: 13 } },
-  { ring: { left: 594, top: 436, width: 74, height: 79 }, nameMask: { left: 612, top: 517, width: 41, height: 18 }, statusMask: { left: 624, top: 540, width: 17, height: 17 }, name: { left: 574, top: 517, width: 108, height: 18 }, state: { left: 626, top: 542, width: 40, height: 13 } },
-  { ring: { left: 446, top: 574, width: 74, height: 79 }, nameMask: { left: 463, top: 653, width: 41, height: 18 }, statusMask: { left: 475, top: 676, width: 17, height: 17 }, name: { left: 426, top: 653, width: 108, height: 18 }, state: { left: 477, top: 678, width: 40, height: 13 } },
-  { ring: { left: 594, top: 574, width: 74, height: 79 }, nameMask: { left: 612, top: 653, width: 41, height: 18 }, statusMask: { left: 624, top: 676, width: 17, height: 17 }, name: { left: 574, top: 653, width: 108, height: 18 }, state: { left: 626, top: 678, width: 40, height: 13 } },
-  { ring: { left: 446, top: 710, width: 74, height: 79 }, nameMask: { left: 463, top: 790, width: 41, height: 18 }, statusMask: { left: 475, top: 812, width: 38, height: 17 }, name: { left: 426, top: 790, width: 108, height: 18 }, state: { left: 477, top: 814, width: 40, height: 13 } },
-  { ring: { left: 594, top: 710, width: 74, height: 79 }, nameMask: { left: 612, top: 790, width: 41, height: 18 }, statusMask: { left: 624, top: 812, width: 17, height: 17 }, name: { left: 574, top: 790, width: 108, height: 18 }, state: { left: 626, top: 814, width: 40, height: 13 } },
-  { ring: { left: 446, top: 847, width: 74, height: 79 }, nameMask: { left: 463, top: 926, width: 41, height: 19 }, statusMask: { left: 475, top: 947, width: 17, height: 17 }, name: { left: 426, top: 926, width: 108, height: 19 }, state: { left: 477, top: 949, width: 40, height: 13 } },
-  { ring: { left: 594, top: 847, width: 74, height: 79 }, nameMask: { left: 612, top: 926, width: 41, height: 19 }, statusMask: { left: 624, top: 947, width: 17, height: 17 }, name: { left: 574, top: 926, width: 108, height: 19 }, state: { left: 626, top: 949, width: 40, height: 13 } },
-  { ring: { left: 446, top: 974, width: 74, height: 77 }, nameMask: { left: 463, top: 1051, width: 41, height: 19 }, statusMask: { left: 475, top: 1071, width: 17, height: 18 }, name: { left: 426, top: 1051, width: 108, height: 19 }, state: { left: 477, top: 1074, width: 40, height: 13 } },
-  { ring: { left: 594, top: 974, width: 74, height: 77 }, nameMask: { left: 612, top: 1051, width: 41, height: 19 }, statusMask: { left: 624, top: 1071, width: 17, height: 18 }, name: { left: 574, top: 1051, width: 108, height: 19 }, state: { left: 626, top: 1074, width: 40, height: 13 } },
-] as const;
-
-const FOOTER_MASKS = [
-  { left: 474, top: 1193, width: 97, height: 19 },
-  { left: 584, top: 1193, width: 49, height: 19 },
-] as const;
-
 export function BoardingFlow() {
   const router = useRouter();
+  const claimPendingRef = useRef(false);
+  const [claimedElsewhere, setClaimedElsewhere] = useState(false);
   const completionHeading = useRef<HTMLHeadingElement>(null);
-  const [pending, setPending] = useState<PendingMemberPreview | null>(null);
   const [session, setSession] = useState<CurrentTripSession | null>(null);
   const [roster, setRoster] = useState<FamilyRosterMember[]>([]);
+  const [pending, setPending] = useState<PendingMemberPreview | null>(null);
   const [stage, setStage] = useState<Stage>("loading");
   const [claiming, setClaiming] = useState(false);
   const [error, setError] = useState("");
@@ -72,6 +46,20 @@ export function BoardingFlow() {
         if (!active) return;
 
         if (initialization.stage === "confirm") {
+          const auth = await getCurrentAuthSession();
+          if (!auth) { router.replace("/"); return; }
+          const response = await fetch("/api/member-preview", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${auth.access_token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ name: initialization.pending.name }),
+          });
+          const preview: unknown = await response.json().catch(() => null);
+          if (!active) return;
+          if (!response.ok || !isSafeMemberPreview(preview) || preview.memberId !== initialization.pending.memberId) {
+            router.replace("/");
+            return;
+          }
+          setClaimedElsewhere("claimedElsewhere" in preview && preview.claimedElsewhere === true);
           setPending(initialization.pending);
           setStage("confirm");
           return;
@@ -101,13 +89,11 @@ export function BoardingFlow() {
 
   useEffect(() => {
     if (stage !== "boarding" || !session) return;
-    const delay = 1800;
     let active = true;
     let timer = 0;
     const animation = new Promise<void>((resolve) => {
-      timer = window.setTimeout(resolve, delay);
+      timer = window.setTimeout(resolve, window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1800);
     });
-
     Promise.all([animation, loadFamilyRoster(session.trip.id)])
       .then(([, members]) => {
         if (!active) return;
@@ -119,11 +105,7 @@ export function BoardingFlow() {
         setError("가족 탑승 현황을 불러오지 못했어요. 다시 시도해주세요.");
         setStage("error");
       });
-
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
+    return () => { active = false; window.clearTimeout(timer); };
   }, [session, stage]);
 
   useEffect(() => {
@@ -131,7 +113,8 @@ export function BoardingFlow() {
   }, [stage]);
 
   const claimMember = async () => {
-    if (!pending || claiming) return;
+    if (!pending || claimPendingRef.current) return;
+    claimPendingRef.current = true;
     setClaiming(true);
     setError("");
 
@@ -170,6 +153,7 @@ export function BoardingFlow() {
     } catch {
       setError("탑승을 완료할 수 없어요. 네트워크 연결을 확인해주세요.");
     } finally {
+      claimPendingRef.current = false;
       setClaiming(false);
     }
   };
@@ -293,6 +277,11 @@ export function BoardingFlow() {
     if (!pending) return null;
     return (
       <MobileShell className="boarding-confirm-raster-page">
+        {claimedElsewhere && (
+          <p id="boarding-transfer-warning" role="status" className="boarding-confirm-raster-error">
+            이 가족은 다른 기기에서 사용 중이에요. 계속하면 이 기기로 전환돼요.
+          </p>
+        )}
         {error && (
           <p id="boarding-confirm-error" role="alert" className="boarding-confirm-raster-error">
             {error}
@@ -345,7 +334,7 @@ export function BoardingFlow() {
             disabled={claiming}
             aria-busy={claiming || undefined}
             aria-label="네, 탑승할게요"
-            aria-describedby={error ? "boarding-confirm-error" : undefined}
+            aria-describedby={[error && "boarding-confirm-error", claimedElsewhere && "boarding-transfer-warning"].filter(Boolean).join(" ") || undefined}
             onClick={claimMember}
           />
           <button
@@ -362,114 +351,41 @@ export function BoardingFlow() {
 
   if (!session) return null;
   const slots = createFamilySlots(roster, session.member.id);
-  const boardedCount = roster.filter((member) => member.boardedAt).length;
+  const boardedCount = roster.filter(member => member.boardedAt).length;
 
   return (
     <MobileShell className="boarding-status-page">
-      <main className="boarding-status-artboard">
-        <Image
-          src="/api/boarding-status-visual"
-          alt=""
-          aria-hidden="true"
-          width={1122}
-          height={1402}
-          draggable="false"
-          priority
-          unoptimized
-          className="boarding-status-plate-image"
-        />
-
-        <h1 ref={completionHeading} tabIndex={-1} className="sr-only">가족 탑승 현황</h1>
-
-        <ol className="boarding-status-seats" aria-label="10개 좌석의 가족 탑승 상태">
-          {slots.map((slot) => {
-            const overlay = SEAT_OVERLAYS[slot.seatNumber - 1];
-            const state = slot.boarded ? "탑승 완료" : "탑승 대기";
-
-            return (
-              <li
-                key={slot.id}
-                aria-hidden={!slot.member || undefined}
-                aria-label={slot.member ? `${slot.seatNumber}번 좌석, ${slot.member.name}, ${state}${slot.current ? ", 현재 사용자" : ""}` : undefined}
-                className={`boarding-status-seat${slot.boarded ? " boarding-status-seat--boarded" : ""}${slot.current ? " boarding-status-seat--current" : ""}`}
-              >
-                {slot.seatNumber === 5 && (
-                  <span className="boarding-status-seat-five-patch" aria-hidden="true">
-                    <Image
-                      src="/api/boarding-status-visual?asset=neutral-seat-patch"
-                      alt=""
-                      aria-hidden="true"
-                      width={101}
-                      height={110}
-                      draggable="false"
-                      unoptimized
-                    />
-                    <span className="boarding-status-seat-five-number">5</span>
-                  </span>
-                )}
-
-                {slot.current && (
-                  <span
-                    className="boarding-status-current-ring"
-                    aria-hidden="true"
-                    style={sourceBoxStyle(overlay.ring)}
-                  />
-                )}
-
-                <span
-                  className="boarding-status-mask boarding-status-name-mask"
-                  aria-hidden="true"
-                  style={sourceBoxStyle(overlay.nameMask)}
-                />
-                <span
-                  className="boarding-status-mask boarding-status-state-mask"
-                  aria-hidden="true"
-                  style={sourceBoxStyle(overlay.statusMask)}
-                />
-
-                {slot.member && (
-                  <>
-                    <strong
-                      className="boarding-status-seat-name"
-                      aria-hidden="true"
-                      style={sourceBoxStyle(overlay.name)}
-                    >
-                      {slot.member.name}
-                    </strong>
-                    <span
-                      className="boarding-status-seat-state"
-                      aria-hidden="true"
-                      style={sourceBoxStyle(overlay.state)}
-                    >
-                      <span className="boarding-status-seat-dot" />
-                      {slot.current && <em>나</em>}
-                    </span>
-                  </>
-                )}
+      <div className="boarding-status-scenery" aria-hidden="true"><Image src="/api/boarding-status-visual" alt="" fill priority unoptimized /></div>
+      <main className="boarding-status-card">
+        <header className="boarding-status-heading">
+          <p className="boarding-status-eyebrow">FUKUOKA FAMILY TRIP <span aria-hidden="true">✈</span></p>
+          <h1 ref={completionHeading} tabIndex={-1}>우리 가족, 출발 준비 완료</h1>
+          <p className="boarding-status-date">{session.trip.startDate.replaceAll("-", ".")} — {session.trip.endDate.slice(5).replace("-", ".")}</p>
+          <p className="boarding-status-intro">함께라서 더 설레는 후쿠오카 여행.<br />{session.member.name}님의 자리가 준비됐어요.</p>
+        </header>
+        <section className="boarding-status-cabin" aria-label="가족 탑승 현황">
+          <div className="boarding-status-cabin-heading"><span>OUR FAMILY</span><strong>{boardedCount}<small> / {roster.length}명 탑승</small></strong></div>
+          <ul className="boarding-status-legend" aria-label="좌석 상태 안내">
+            <li><i data-state="boarded" />탑승 완료</li>
+            <li><i data-state="waiting" />탑승 대기</li>
+            <li><i data-state="empty" />빈자리</li>
+            <li><i data-state="current" />내 자리</li>
+          </ul>
+          <ol className="boarding-status-seats" aria-label="10개 좌석의 가족 탑승 상태">
+            {slots.map(slot => (
+              <li key={slot.id} className="boarding-status-seat" data-state={slot.current ? "current" : slot.boarded ? "boarded" : slot.member ? "waiting" : "empty"}
+                aria-current={slot.current ? "true" : undefined}
+                aria-label={`${slot.seatNumber}번 좌석, ${slot.member?.name ?? "빈자리"}${slot.member ? slot.boarded ? ", 탑승 완료" : ", 탑승 대기" : ""}${slot.current ? ", 내 자리" : ""}`}>
+                <span className="boarding-status-seat-icon" aria-hidden="true">{String(slot.seatNumber).padStart(2, "0")}</span>
+                <span className="boarding-status-seat-copy"><strong>{slot.member?.name ?? "빈자리"}</strong><small>{slot.current ? "내 자리 · 완료" : slot.boarded ? "탑승 완료" : slot.member ? "탑승 대기" : "함께할 자리"}</small></span>
+                {slot.current && <span className="boarding-status-me" aria-hidden="true">나</span>}
               </li>
-            );
-          })}
-        </ol>
-
-        {FOOTER_MASKS.map((mask, index) => (
-          <span
-            key={index}
-            className="boarding-status-mask boarding-status-footer-mask"
-            aria-hidden="true"
-            style={sourceBoxStyle(mask)}
-          />
-        ))}
-
-        <p className="boarding-status-summary">
-          {boardedCount} / {roster.length} 탑승 완료
-        </p>
-
-        <button
-          type="button"
-          className="boarding-status-cta"
-          aria-label="여행 시작하기"
-          onClick={() => router.push("/home")}
-        />
+            ))}
+          </ol>
+          <p className="boarding-status-cabin-note">전가네 가족을 위한 10개의 자리</p>
+        </section>
+        <button type="button" className="boarding-status-cta" onClick={() => router.push("/home")}>여행 시작하기 <span aria-hidden="true">↗</span></button>
+        <p className="boarding-status-signoff">우리의 가을, 후쿠오카에서</p>
       </main>
     </MobileShell>
   );

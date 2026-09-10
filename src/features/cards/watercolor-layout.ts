@@ -13,13 +13,22 @@ export type MemoryCardLayoutV4 = {
 export type WatercolorDraft = {
   cardValues: Record<string, string | null>;
   annotationsByPhotoId: Record<string, Record<string, string | null>>;
+  hiddenTripDates?: { startDate: string; endDate: string };
 };
+export function setWatercolorTripDateDisplay(draft: WatercolorDraft, show: boolean, trip: { startDate: string; endDate: string }): WatercolorDraft {
+  const start = draft.cardValues["trip.start"], end = draft.cardValues["trip.end"];
+  const remembered = isWatercolorDate(start) && isWatercolorDate(end) && start <= end
+    ? { startDate: start, endDate: end } : draft.hiddenTripDates ?? trip;
+  return { ...draft, hiddenTripDates: remembered, cardValues: { ...draft.cardValues,
+    "trip.start": show ? remembered.startDate : null, "trip.end": show ? remembered.endDate : null,
+  } };
+}
 export function createWatercolorDraft(template: WatercolorTemplate, trip: {
   title: string;
   startDate: string;
   endDate: string;
 }): WatercolorDraft {
-  return { cardValues: Object.fromEntries(template.fields.filter(f => !f.photoSlotId).map(f => [f.id, f.defaultPolicy === "trip title" ? trip.title : f.id === "trip.start" ? trip.startDate : f.id === "trip.end" ? trip.endDate : null])), annotationsByPhotoId: {} };
+  return { cardValues: Object.fromEntries(template.fields.filter(f => !f.photoSlotId).map(f => [f.id, f.id === template.primary ? "전가네 가족여행" : f.id === "trip.start" ? trip.startDate : f.id === "trip.end" ? trip.endDate : null])), annotationsByPhotoId: {} };
 }
 export function getWatercolorDraftValue(draft: WatercolorDraft, field: WatercolorTemplate["fields"][number], slots: readonly {
   slotId: string;

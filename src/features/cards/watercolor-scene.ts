@@ -3,6 +3,7 @@ import { getMemoryCardPhotoViewport, getPlacedImageRect } from "./memory-card-ph
 import { getWatercolorFieldBox, getWatercolorTemplate, WATERCOLOR_ASSET_PREFIX, type WatercolorBox, type WatercolorField, type WatercolorTemplate } from "./watercolor-template-spec";
 import { isWatercolorDate, normalizeWatercolorText, validateWatercolorValues, type MemoryCardLayoutV4 } from "./watercolor-layout";
 import type { MemoryCardTemplateKey } from "./memory-card-template-spec";
+import { DEFAULT_WATERCOLOR_APPEARANCE, WATERCOLOR_BACKGROUNDS, freezeWatercolorAppearance, watercolorContentInset, type WatercolorAppearance } from "./watercolor-appearance";
 import coverage from "./watercolor-font-coverage.json" with { type: "json" };
 export const WATERCOLOR_FONT_PROBE = "한글 가나다 0123456789 ♥♡–·";
 const fontFiles = { serif: "NanumMyeongjo-Regular.ttf", pen: "NanumPenScript-Regular.ttf" } as const;
@@ -114,6 +115,7 @@ export function layoutWatercolorText(template: WatercolorTemplate, layout: Memor
   return plans;
 }
 export type WatercolorScene = {
+  appearance: WatercolorAppearance;
   template: WatercolorTemplate;
   layout: MemoryCardLayoutV4;
   images: Map<string, HTMLImageElement>;
@@ -121,7 +123,8 @@ export type WatercolorScene = {
   text: WatercolorTextPlan[];
   errors: Record<string, string>;
 };
-export async function prepareWatercolorScene(templateKey: MemoryCardTemplateKey, layout: MemoryCardLayoutV4, photos: readonly AlbumPhoto[], allowIncomplete = false): Promise<WatercolorScene> {
+export async function prepareWatercolorScene(templateKey: MemoryCardTemplateKey, layout: MemoryCardLayoutV4, photos: readonly AlbumPhoto[], allowIncomplete = false, appearance: WatercolorAppearance = DEFAULT_WATERCOLOR_APPEARANCE): Promise<WatercolorScene> {
+  const frozenAppearance = freezeWatercolorAppearance(appearance);
   const template = getWatercolorTemplate(templateKey, layout.templateRevision);
   if (!template || layout.version !== 4)
     throw new Error("지원하지 않는 카드 버전이에요.");
@@ -142,7 +145,7 @@ export async function prepareWatercolorScene(templateKey: MemoryCardTemplateKey,
   if (!context)
     throw new Error("카드 미리보기를 준비하지 못했어요.");
   const text = layoutWatercolorText(template, layout, context);
-  return { template, layout: structuredClone(layout), images, art, text, errors: Object.fromEntries(text.filter(t => t.error).map(t => [t.field.id, t.error!])) };
+  return { template, layout: structuredClone(layout), appearance: frozenAppearance, images, art, text, errors: Object.fromEntries(text.filter(t => t.error).map(t => [t.field.id, t.error!])) };
 }
 function withBox(c: CanvasRenderingContext2D, b: WatercolorBox, paint: () => void) { c.save(); c.translate(b.x + b.w / 2, b.y + b.h / 2); c.rotate(b.r * Math.PI / 180); c.translate(-b.w / 2, -b.h / 2); paint(); c.restore(); }
 function rounded(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number | number[]) { c.beginPath(); c.roundRect(x, y, w, h, r); }
@@ -208,6 +211,9 @@ function paintPolaroidAccents(c: CanvasRenderingContext2D, art: WatercolorScene[
 }
 export function paintWatercolorScene(c: CanvasRenderingContext2D, scene: WatercolorScene, width: number, emptyPhotoHints = false) {
   const { template: t, layout, images, art, text } = scene;
+  const background = WATERCOLOR_BACKGROUNDS.find(preset => preset.key === scene.appearance?.backgroundVariant) ?? WATERCOLOR_BACKGROUNDS[0];
+  const tinted = background.key !== "ivory";
+  const paperPanelCount = ["scrapbook_trio", "instant_memory"].includes(t.key) ? 2 : ["polaroid_moodboard", "four_cut", "editorial_collage", "film_contact_sheet"].includes(t.key) ? 1 : 0;
   c.save();
   c.fontKerning = "normal";
   c.textRendering = "geometricPrecision";
@@ -216,20 +222,27 @@ export function paintWatercolorScene(c: CanvasRenderingContext2D, scene: Waterco
   c.direction = "ltr";
   c.scale(width / 1080, width / 1080);
   c.clearRect(0, 0, 1080, 1920);
-  c.fillStyle = t.backgroundColor;
+  c.fillStyle = tinted ? background.paper : t.backgroundColor;
   c.fillRect(0, 0, 1080, 1920);
   const texture = c.createPattern(art.get("paper")!, "repeat")!;
   const corrected = ["polaroid_moodboard", "four_cut", "editorial_collage"].includes(t.key);
   if (t.key !== "four_cut") {
+    c.save();
+    if (tinted) c.globalCompositeOperation = "multiply";
     c.fillStyle = texture;
     c.fillRect(0, 0, 1080, 1920);
+    c.restore();
   }
+  const inset = watercolorContentInset(t.key, scene.appearance);
+  c.translate(1080 * inset, 1920 * inset);
+  c.scale(1 - inset * 2, 1 - inset * 2);
   for (const p of t.panels)
     withBox(c, p, () => {
       c.shadowColor = t.key === "editorial_collage" && p !== t.panels[0] ? "transparent" : "rgba(109,71,39,.15)";
       c.shadowBlur = 9 * width / 1080;
       c.shadowOffsetY = 4 * width / 1080;
-      c.fillStyle = p.fill;
+      const tintedPanel = tinted && t.panels.indexOf(p) < paperPanelCount;
+      c.fillStyle = tintedPanel ? background.paper : p.fill;
       if (p.shape === "tag")
         paperEdge(c, p.w, p.h);
       else if (p.shape === "ticket")
@@ -241,6 +254,7 @@ export function paintWatercolorScene(c: CanvasRenderingContext2D, scene: Waterco
       c.save();
       c.clip();
       c.globalAlpha = corrected ? .7 : .38;
+      if (tintedPanel) c.globalCompositeOperation = "multiply";
       c.fillStyle = texture;
       c.fillRect(0, 0, p.w, p.h);
       c.restore();

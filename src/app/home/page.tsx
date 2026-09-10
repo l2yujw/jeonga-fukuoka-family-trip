@@ -16,7 +16,7 @@ import {
   loadHomeAlbumPreview,
 } from "@/features/album/album-repository";
 import type { AlbumPhoto } from "@/features/album/album-types";
-import { getCurrentAuthSession } from "@/features/boarding/current-trip-session";
+import { getCurrentAuthSession, getMemberSwitchState } from "@/features/boarding/current-trip-session";
 import { clearPendingMember } from "@/features/boarding/pending-member";
 import {
   TripAccessGuard,
@@ -217,6 +217,7 @@ function HomeScreen() {
   const memberSwitchDialogRef = useRef<HTMLElement>(null);
   const memberSwitchCancelRef = useRef<HTMLButtonElement>(null);
   const memberSwitchPendingRef = useRef(false);
+  const cancelSwitchRef = useRef<Promise<unknown>>(Promise.resolve());
   const [memberSwitchOpen, setMemberSwitchOpen] = useState(false);
   const [memberSwitchPending, setMemberSwitchPending] = useState(false);
   const [memberSwitchError, setMemberSwitchError] = useState<string | null>(null);
@@ -341,6 +342,13 @@ function HomeScreen() {
     };
   }, [closeMemberSwitchDialog, memberSwitchOpen]);
 
+  useEffect(() => {
+    // Returning Home (including browser Back) cancels an unfinished switch.
+    cancelSwitchRef.current = getMemberSwitchState("DELETE").catch(() => {
+      setMemberSwitchError("변경 취소를 확인하지 못했어요. 잠시 후 다시 시도해주세요.");
+    });
+  }, []);
+
   async function confirmMemberSwitch() {
     if (memberSwitchPendingRef.current) return;
 
@@ -349,6 +357,7 @@ function HomeScreen() {
     setMemberSwitchError(null);
 
     try {
+      await cancelSwitchRef.current;
       const authSession = await getCurrentAuthSession();
       if (!authSession) {
         throw new Error("인증 정보를 확인할 수 없어요. 초대 링크로 다시 접속해주세요.");
@@ -375,7 +384,7 @@ function HomeScreen() {
           : "사용자 변경을 완료할 수 없어요. 잠시 후 다시 시도해주세요.";
 
       if (!response.ok) throw new Error(responseError);
-      if (status !== "released" && status !== "already_released") {
+      if (status !== "switch_ready") {
         throw new Error("사용자 변경 결과를 확인할 수 없어요. 다시 시도해주세요.");
       }
 
@@ -656,10 +665,10 @@ function HomeScreen() {
             tabIndex={-1}
             className="home-v5-switch-dialog"
           >
-            <h2 id="home-member-switch-title">사용자를 변경할까요?</h2>
+            <h2 id="home-member-switch-title" className="break-keep [text-wrap:balance]">다른 가족으로 다시 입장할까요?</h2>
             <p id="home-member-switch-description">
-              현재 {member.name}(으)로 입장되어 있어요. 사용자 변경을 하면 이
-              기기의 탑승 연결을 해제하고 이름 선택 화면으로 돌아갑니다.
+              현재 {member.name}(으)로 입장되어 있어요. 변경하면 현재 프로필에서
+              나가고 선택한 가족으로 다시 입장해요.
             </p>
             {memberSwitchError ? (
               <p className="home-v5-switch-error" role="alert">

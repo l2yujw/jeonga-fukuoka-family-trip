@@ -11,27 +11,39 @@ import {
 import {
   ensureAnonymousAuthSession,
   getCurrentTripSession,
+  getMemberSwitchState,
 } from "./current-trip-session";
-import { savePendingMember } from "./pending-member";
+import { clearPendingMember, savePendingMember } from "./pending-member";
 
 export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolean }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [switchExpiresAt, setSwitchExpiresAt] = useState(0);
   const [checkingMembership, setCheckingMembership] = useState(true);
 
   useEffect(() => {
     if (invalidInvite) return;
 
     let active = true;
+    let timer = 0;
 
     getCurrentTripSession()
-      .then((session) => {
+      .then(async (session) => {
         if (!active) return;
         if (session) {
-          router.replace("/home");
-          return;
+          const switching = await getMemberSwitchState();
+          if (!active) return;
+          if (!switching.active) {
+            router.replace("/home");
+            return;
+          }
+          setSwitchExpiresAt(switching.expiresAt);
+          timer = window.setTimeout(() => {
+            void getMemberSwitchState("DELETE").then(() => router.replace("/home"))
+              .catch(() => setError("변경 시간이 만료됐어요. 현재 프로필로 돌아가주세요."));
+          }, Math.max(0, switching.expiresAt - Date.now()));
         }
         setCheckingMembership(false);
       })
@@ -41,6 +53,7 @@ export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolea
 
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
   }, [invalidInvite, router]);
 
@@ -134,6 +147,19 @@ export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolea
     }
   }
 
+  async function cancelSwitch() {
+    setLoading(true);
+    try {
+      await getMemberSwitchState("DELETE");
+      clearPendingMember();
+      router.replace("/home");
+    } catch {
+      setError("현재 프로필로 돌아갈 수 없어요. 다시 시도해주세요.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <MobileShell className="landing-raster-page">
       {error && (
@@ -196,6 +222,12 @@ export function LandingEntry({ invalidInvite = false }: { invalidInvite?: boolea
           </button>
         </form>
       </main>
+      {switchExpiresAt > 0 && (
+        <button type="button" disabled={loading} onClick={cancelSwitch}
+          className="min-h-11 w-full bg-surface px-4 py-3 text-sm font-semibold text-accent-primary">
+          변경 취소 · 현재 프로필로 돌아가기
+        </button>
+      )}
     </MobileShell>
   );
 }

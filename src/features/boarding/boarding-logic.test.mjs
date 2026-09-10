@@ -258,3 +258,15 @@ test("duplicate and invalid seat orders cannot overwrite an assigned seat", () =
     ["duplicate", "too-low", "too-high", "fraction"],
   );
 });
+
+
+test("retained final cabin restores roster, focuses completion, and uses the existing private asset boundary", async () => {
+ const source=await readFile(new URL('./boarding-flow.tsx',import.meta.url),'utf8');
+ assert.match(source,/createFamilySlots\(roster, session.member.id\)/);
+ assert.match(source,/Promise.all\(\[animation, loadFamilyRoster\(session.trip.id\)\]\)/);
+ assert.match(source,/completionHeading.current\?\.focus\(\)/);
+ assert.match(source,/prefers-reduced-motion: reduce/);
+ assert.match(source,/src="\/api\/boarding-status-visual"/);
+ assert.doesNotMatch(source,/BOARDING_FINAL_SEAT_CURRENT/);
+ assert.match(source,/onClick=\{\(\) => router.push\("\/home"\)\}/);
+});

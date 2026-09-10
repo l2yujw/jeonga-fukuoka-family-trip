@@ -1,4 +1,6 @@
 export async function resolve(specifier, context, nextResolve) {
+  if (specifier === "server-only") return { url: "data:text/javascript,export {};", shortCircuit: true };
+  if (specifier === "next/server") specifier = "next/server.js";
   if (specifier.startsWith("@/")) {
     specifier = new URL(`../src/${specifier.slice(2)}`, import.meta.url).href;
   }

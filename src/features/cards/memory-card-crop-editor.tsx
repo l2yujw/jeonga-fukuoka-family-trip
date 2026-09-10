@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -25,13 +26,22 @@ import {
   type MemoryCardPoint,
 } from "./memory-card-photo-placement";
 import type { MemoryCardPhotoSlot } from "./memory-card-template-spec";
+import type { MemoryCardSlotMappingV3 } from "./memory-card";
+import type { WatercolorTemplate } from "./watercolor-template-spec";
+import { getWatercolorDraftValue, projectWatercolorLayout, setWatercolorDraftValue, validateWatercolorValues, type WatercolorDraft } from "./watercolor-layout";
+import { prepareWatercolorScene } from "./watercolor-scene";
+import type { WatercolorValidation } from "./watercolor-preview";
 
 type MemoryCardCropEditorProps = {
   initialPlacement: MemoryCardPhotoPlacement;
   photo: AlbumPhoto;
   slot: MemoryCardPhotoSlot;
   slotNumber: number;
-  onApply: (placement: MemoryCardPhotoPlacement) => void;
+  template: WatercolorTemplate;
+  initialTextDraft: WatercolorDraft;
+  slots: readonly MemoryCardSlotMappingV3[];
+  photos: readonly AlbumPhoto[];
+  onApply: (placement: MemoryCardPhotoPlacement, text: WatercolorDraft) => void;
   onCancel: () => void;
   onPhotoError: () => void;
 };
@@ -49,6 +59,10 @@ export function MemoryCardCropEditor({
   photo,
   slot,
   slotNumber,
+  template,
+  initialTextDraft,
+  slots,
+  photos,
 }: MemoryCardCropEditorProps) {
   const viewport = getMemoryCardPhotoViewport(slot);
   const initialDimensions = photo.width && photo.height
@@ -69,6 +83,27 @@ export function MemoryCardCropEditor({
   const pointersRef = useRef(new Map<number, MemoryCardPoint>());
   const baselineRef = useRef<MemoryCardGestureBaseline | null>(null);
   const safariBaselineRef = useRef<MemoryCardPhotoPlacement | null>(null);
+  const [textDraft, setTextDraft] = useState(() => structuredClone(initialTextDraft));
+  const fields = template.fields.filter(field => field.photoSlotId === slot.id);
+  const dateField = fields.find(field => field.kind === "isoDate");
+  const [showDate, setShowDate] = useState(() => Boolean(dateField && getWatercolorDraftValue(initialTextDraft, dateField, slots)));
+  const rememberedDate = useRef(dateField ? getWatercolorDraftValue(initialTextDraft, dateField, slots) : null);
+  const composing = useRef(false);
+  const [validation, setValidation] = useState<WatercolorValidation>({ ready: false, errors: {} });
+  const layout = useMemo(() => projectWatercolorLayout(template, slots.map(s => s.slotId === slot.id ? { ...s, placement: draft } : s), textDraft), [template, slots, slot.id, draft, textDraft]);
+  useEffect(() => {
+    let active = true;
+    void prepareWatercolorScene(template.key, layout, photos, true).then(scene => {
+      if (active) setValidation({ ready: true, errors: scene.errors });
+    }).catch(error => { if (active) setValidation({ ready: false, errors: { _scene: error instanceof Error ? error.message : "미리보기를 준비하지 못했어요." } }); });
+    return () => { active = false; };
+  }, [template.key, layout, photos]);
+  const errors = { ...validateWatercolorValues(template, layout), ...validation.errors };
+  if (showDate && dateField && !getWatercolorDraftValue(textDraft, dateField, slots)) errors[dateField.id] = "표시할 날짜를 선택해주세요.";
+  const changeText = (field: WatercolorTemplate["fields"][number], value: string | null) => {
+    setValidation({ ready: false, errors: {} });
+    setTextDraft(current => setWatercolorDraftValue(current, field, slots, value));
+  };
 
   const setValidDraft = (placement: MemoryCardPhotoPlacement) => {
     const next = dimensions
@@ -81,6 +116,7 @@ export function MemoryCardCropEditor({
         )
       : placement;
     placementRef.current = next;
+    setValidation({ ready: false, errors: {} });
     setDraft(next);
   };
 
@@ -240,8 +276,8 @@ export function MemoryCardCropEditor({
     <section className="cards-crop-workbench" aria-labelledby="crop-editor-title">
       <header className="cards-crop-heading">
         <div>
-          <span>PHOTO WORKBENCH</span>
-          <h3 id="crop-editor-title">사진 {slotNumber} 조정</h3>
+          <span>PHOTO EDIT</span>
+          <h3 id="crop-editor-title">사진 {slotNumber} 편집</h3>
         </div>
         <p>한 손가락으로 이동 · 두 손가락으로 확대/회전</p>
       </header>
@@ -406,6 +442,32 @@ export function MemoryCardCropEditor({
         </button>
       </div>
 
+      <section className="wc-photo-annotations" aria-label="사진 문구">
+        <h4>사진 문구 <small>선택</small></h4>
+        {fields.length === 0 && <p>이 사진에는 별도 문구 영역이 없어요.</p>}
+        {fields.filter(field => field.kind === "plainText").map(field => {
+          const value = getWatercolorDraftValue(textDraft, field, slots) ?? "";
+          return <div className="wc-field" key={field.id}>
+            <label htmlFor={`photo-field-${field.id}`}>{field.label}</label>
+            <textarea id={`photo-field-${field.id}`} value={value} rows={Math.min(3, field.maxLines)} placeholder="문구 없음" aria-invalid={Boolean(errors[field.id])} aria-describedby={`photo-help-${field.id}`}
+              onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }}
+              onChange={event => changeText(field, event.target.value || null)} />
+            <p id={`photo-help-${field.id}`} className={errors[field.id] ? "wc-error" : ""}>{errors[field.id] ?? `${Array.from(value.normalize("NFC")).length}/${field.maxCodePoints}자 · 최대 ${field.maxLines}줄 · 비워도 괜찮아요`}</p>
+          </div>;
+        })}
+        {dateField && <div className="wc-field">
+          <label className="wc-date-toggle"><input type="checkbox" checked={showDate} onChange={event => {
+            const show = event.target.checked;
+            if (!show) rememberedDate.current = getWatercolorDraftValue(textDraft, dateField, slots);
+            setShowDate(show);
+            changeText(dateField, show ? rememberedDate.current : null);
+          }}/>사진 날짜 표시</label>
+          {showDate && <><label htmlFor="photo-date">사진 날짜</label><input id="photo-date" type="date" min="0001-01-01" max="9999-12-31" value={getWatercolorDraftValue(textDraft, dateField, slots) ?? ""} onChange={event => changeText(dateField, event.target.value || null)} aria-invalid={Boolean(errors[dateField.id])} aria-describedby="photo-date-help" />
+          <p id="photo-date-help" className={errors[dateField.id] ? "wc-error" : ""}>{errors[dateField.id] ?? "이 사진에 남길 날짜를 직접 선택해주세요."}</p></>}
+        </div>}
+        {Object.entries(errors).filter(([id]) => !fields.some(field => field.id === id)).map(([id, error]) => <p className="wc-error" role="alert" key={id}>{error}</p>)}
+      </section>
+
       <footer className="cards-crop-actions">
         <button type="button" onClick={fillFrame} className="cards-crop-reset">
           초기화
@@ -413,7 +475,7 @@ export function MemoryCardCropEditor({
         <button type="button" onClick={onCancel} className="cards-crop-cancel">
           취소
         </button>
-        <button type="button" onClick={() => onApply(placementRef.current)} className="cards-crop-apply">
+        <button type="button" disabled={!validation.ready || Boolean(Object.keys(errors).length)} onClick={() => { if (!composing.current) onApply(placementRef.current, structuredClone(textDraft)); }} className="cards-crop-apply">
           적용
         </button>
       </footer>
