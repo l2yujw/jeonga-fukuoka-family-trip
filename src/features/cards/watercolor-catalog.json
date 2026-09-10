@@ -19,7 +19,7 @@
         "vertical": false,
         "maxCodePoints": 34,
         "maxLines": 2,
-        "defaultPolicy": "trip title"
+        "defaultPolicy": "전가네 가족여행"
       },
       {
         "id": "subtitle",
@@ -131,7 +131,7 @@
         "vertical": true,
         "maxCodePoints": 22,
         "maxLines": 1,
-        "defaultPolicy": "trip title"
+        "defaultPolicy": "전가네 가족여행"
       },
       {
         "id": "vertical_subtitle",
@@ -201,7 +201,7 @@
         "vertical": false,
         "maxCodePoints": 32,
         "maxLines": 2,
-        "defaultPolicy": "trip title"
+        "defaultPolicy": "전가네 가족여행"
       },
       {
         "id": "subtitle",
@@ -388,7 +388,7 @@
         "vertical": false,
         "maxCodePoints": 30,
         "maxLines": 2,
-        "defaultPolicy": "trip title"
+        "defaultPolicy": "전가네 가족여행"
       },
       {
         "id": "subtitle",
@@ -477,7 +477,7 @@
         "vertical": false,
         "maxCodePoints": 30,
         "maxLines": 2,
-        "defaultPolicy": "세 장의 추억"
+        "defaultPolicy": "전가네 가족여행"
       },
       {
         "id": "subtitle",
@@ -624,7 +624,7 @@
         "vertical": false,
         "maxCodePoints": 34,
         "maxLines": 2,
-        "defaultPolicy": "trip title"
+        "defaultPolicy": "전가네 가족여행"
       },
       {
         "id": "trip.start",
@@ -821,7 +821,7 @@
         "vertical": false,
         "maxCodePoints": 32,
         "maxLines": 2,
-        "defaultPolicy": "empty"
+        "defaultPolicy": "전가네 가족여행"
       },
       {
         "id": "overlay_subtitle",
@@ -886,7 +886,7 @@
         "vertical": false,
         "maxCodePoints": 34,
         "maxLines": 2,
-        "defaultPolicy": "trip title"
+        "defaultPolicy": "전가네 가족여행"
       },
       {
         "id": "trip.start",

@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {WATERCOLOR_TEMPLATES,getWatercolorTemplate,getWatercolorFieldBox} from './watercolor-template-spec.ts';
-import {createWatercolorDraft,projectWatercolorLayout,setWatercolorDraftValue,parseMemoryCardLayoutV4,normalizeWatercolorText,isWatercolorDate,validateWatercolorValues,watercolorPayloadBytes} from './watercolor-layout.ts';
+import {createWatercolorDraft,projectWatercolorLayout,setWatercolorDraftValue,parseMemoryCardLayoutV4,normalizeWatercolorText,isWatercolorDate,validateWatercolorValues,watercolorPayloadBytes,finalizeWatercolorLayout,setWatercolorTripDateDisplay} from './watercolor-layout.ts';
 import {layoutWatercolorText,wrapWatercolorText,supportsWatercolorGlyphs,watercolorCanvasFailure,paintWatercolorScene} from './watercolor-scene.ts';
 import {getMemoryCardRenderTemplate,getRandomPhotoCount,parseMemoryCardRenderModel,buildMemoryCardLayoutV3,createMemoryCardRenderModel,mapPersistedMemoryCardRows} from './memory-card.ts';
 import {getMemoryCardExportDimensions} from './memory-card-export.ts';
@@ -13,6 +13,19 @@ const trip={title:'우리 가족',startDate:'2026-09-11',endDate:'2026-09-13'};
 const id=n=>`aaaaaaaa-aaaa-4aaa-8aaa-${String(n).padStart(12,'0')}`;
 const mapping=t=>t.slots.map((s,i)=>({slotId:s.id,photoId:id(i+1),placement:{zoom:1,rotation:0,offsetX:0,offsetY:0}}));
 const make=t=>projectWatercolorLayout(t,mapping(t),createWatercolorDraft(t,trip));
+test('all eight new drafts use the exact family title with blank notes and unchanged dates',()=>{
+ for(const t of WATERCOLOR_TEMPLATES){
+  const draft=createWatercolorDraft(t,trip),layout=projectWatercolorLayout(t,mapping(t),draft);
+  assert.equal(layout.textValues[t.primary],'전가네 가족여행',t.key);
+  assert.equal(layout.caption,'전가네 가족여행',t.key);
+  assert.equal(t.fields.find(f=>f.id===t.primary).defaultPolicy,'전가네 가족여행');
+  for(const [key,value] of Object.entries(layout.textValues))if(key!==t.primary)assert.equal(value,null,`${t.key}:${key}`);
+  assert.equal(layout.dateValues['trip.start'],trip.startDate);
+  assert.equal(layout.dateValues['trip.end'],trip.endDate);
+  for(const [key,value] of Object.entries(layout.dateValues))if(!key.startsWith('trip.'))assert.equal(value,null);
+  assert.deepEqual(parseMemoryCardLayoutV4(t.key,layout),layout);
+ }
+});
 test('empty Album composer retries leave the draft intact until a template is available',async()=>{
  const source=await readFile(new URL('./memory-cards-view.tsx',import.meta.url),'utf8');
  const callback=source.slice(source.indexOf('  const activateTemplate ='),source.indexOf('  const openPhotoSelection ='));
@@ -134,13 +147,13 @@ test('720 fallback classification requires a positive-size Canvas limit signal, 
  assert.equal(watercolorCanvasFailure({...canvas,toDataURL:()=>{throw security;}},'encode-failed'),security);
 });
 
-test('Wave A selector and both galleries use cached v4 miniatures and a selected-template edit count',async()=>{
+test('Wave A selector and both galleries use cached v4 miniatures and global Card Info entry points',async()=>{
  const [view,preview]=await Promise.all(['memory-cards-view.tsx','watercolor-preview.tsx'].map(f=>readFile(new URL(f,import.meta.url),'utf8')));
  const composer=view.slice(view.indexOf('if (composerStep && template && draftLayout)'),view.indexOf('const savedTemplate',view.indexOf('if (composerStep && template && draftLayout)')));
  assert.equal((composer.match(/<WatercolorThumbnail templateKey=\{item.key\}/g)??[]).length,3);
  assert.doesNotMatch(composer,/<TemplateGlyph templateKey=\{item.key\}/);
  assert.match(composer,/showAllTemplates[\s\S]*MEMORY_CARD_TEMPLATES\.map/);
- assert.equal((composer.match(/문구 편집 · \{template.fields.length\}곳/g)??[]).length,2);
+ assert.equal((composer.match(/카드 정보 편집/g)??[]).length,2);
  assert.match(preview,/miniatures = new Map/);assert.match(preview,/memo\(function WatercolorThumbnail/);
  assert.match(preview,/canvas.width = 180; canvas.height = 320/);
  assert.doesNotMatch(preview,/toDataURL|toBlob|renderWatercolorPng/);
@@ -192,4 +205,41 @@ test('all eight empty scenes expose each photo area only in the editor and keep 
   assert.equal(words.includes('사진 선택'),false,t.key);
   assert.deepEqual(layout,before);
  }
+});
+
+
+test('all text is optional: all eight blank/date-off layouts finalize with no painted text runs',()=>{
+ const context={measureText:s=>({width:s.length*10})};
+ for(const t of WATERCOLOR_TEMPLATES){
+  const slots=mapping(t);let d=createWatercolorDraft(t,trip);
+  for(const field of t.fields.filter(f=>f.kind==='plainText'))d=setWatercolorDraftValue(d,field,slots,'  \n  ');
+  d=setWatercolorTripDateDisplay(d,false,trip);
+  const layout=finalizeWatercolorLayout(t.key,projectWatercolorLayout(t,slots,d));
+  assert.equal(layout.caption,null);assert.ok(Object.values(layout.textValues).every(v=>v===null));
+  assert.ok(Object.values(layout.dateValues).every(v=>v===null));
+  assert.ok(layoutWatercolorText(t,layout,context).every(plan=>plan.runs.length===0));
+ }
+});
+test('trip date display restores canonical dates and remembers an explicitly edited ordered pair',()=>{
+ const t=WATERCOLOR_TEMPLATES[0];let d=createWatercolorDraft(t,trip);
+ d=setWatercolorTripDateDisplay(d,false,trip);
+ assert.equal(d.cardValues['trip.start'],null);assert.equal(d.cardValues['trip.end'],null);
+ d=setWatercolorTripDateDisplay(d,true,trip);
+ assert.equal(d.cardValues['trip.start'],trip.startDate);assert.equal(d.cardValues['trip.end'],trip.endDate);
+ d.cardValues['trip.start']='2026-09-12';d.cardValues['trip.end']='2026-09-12';
+ d=setWatercolorTripDateDisplay(setWatercolorTripDateDisplay(d,false,trip),true,trip);
+ assert.equal(d.cardValues['trip.start'],'2026-09-12');assert.equal(d.cardValues['trip.end'],'2026-09-12');
+ assert.deepEqual(validateWatercolorValues(t,projectWatercolorLayout(t,mapping(t),d)),{});
+ assert.equal('hiddenTripDates' in finalizeWatercolorLayout(t.key,projectWatercolorLayout(t,mapping(t),d)),false);
+});
+test('Film photo dates are individually optional, independent of trip display, and never taken from uploads',()=>{
+ const t=getWatercolorTemplate('film_contact_sheet'),slots=mapping(t),field=t.fields.find(f=>f.photoSlotId&&f.kind==='isoDate');
+ let d=createWatercolorDraft(t,trip);assert.equal(projectWatercolorLayout(t,slots,d).dateValues[field.id],null);
+ d=setWatercolorDraftValue(d,field,slots,'2026-09-12');d=setWatercolorTripDateDisplay(d,false,trip);
+ let layout=finalizeWatercolorLayout(t.key,projectWatercolorLayout(t,slots,d));
+ assert.equal(layout.dateValues[field.id],'2026-09-12');assert.equal(layout.dateValues['trip.start'],null);
+ d=setWatercolorDraftValue(d,field,slots,null);layout=finalizeWatercolorLayout(t.key,projectWatercolorLayout(t,slots,d));
+ assert.ok(Object.values(layout.dateValues).every(v=>v===null));
+ for(const key of ['one_moment','instant_memory'])assert.equal(getWatercolorTemplate(key).fields.some(f=>f.photoSlotId),false);
+ assert.equal(getWatercolorTemplate('editorial_collage').fields.some(f=>f.photoSlotId==='e1'),false);
 });

@@ -50,8 +50,8 @@ export function WatercolorPreview({ templateKey, layout, photos, onSelectField, 
   return <div className="wc-preview" aria-label={`${template.displayName} 카드 미리보기`}>
   <div className="wc-scene">
    <canvas ref={canvas} width={width} height={width * 16 / 9} role="img" aria-label={`${template.displayName} 합성 미리보기`}/>
-   {onSelectSlot && template.slots.map((s, i) => layout.slots.some(x => x.slotId === s.id) && <button type="button" key={s.id} className="wc-hit wc-photo-hit" aria-label={`사진 ${i + 1} 위치 조정`} aria-pressed={s.id === selectedSlotId} onClick={() => onSelectSlot(s.id)} style={watercolorHitStyle(s)}/>)}
-   {onSelectField && template.fields.map(f => <button type="button" key={f.id} className="wc-hit wc-text-hit" aria-label={`${f.label} 편집`} aria-pressed={f.id === selectedFieldId} onClick={() => onSelectField(f.id)} style={watercolorHitStyle(getWatercolorFieldBox(template, f))}/>)}
+   {onSelectSlot && template.slots.map((s, i) => layout.slots.some(x => x.slotId === s.id) && <button type="button" key={s.id} className="wc-hit wc-photo-hit" aria-label={`사진 ${i + 1} 편집`} aria-pressed={s.id === selectedSlotId} onClick={() => onSelectSlot(s.id)} style={watercolorHitStyle(s)}/>)}
+   {onSelectField && template.fields.filter(f => !f.photoSlotId).map(f => <button type="button" key={f.id} className="wc-hit wc-text-hit" aria-label={`${f.label} 편집`} aria-pressed={f.id === selectedFieldId} onClick={() => onSelectField(f.id)} style={watercolorHitStyle(getWatercolorFieldBox(template, f))}/>)}
   </div>
   {failure && <p role="alert" className="wc-error">{failure}</p>}
  </div>;

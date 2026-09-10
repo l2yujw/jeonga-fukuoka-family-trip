@@ -113,7 +113,7 @@ const geometry: Record<MemoryCardTemplateKey, Geometry> = {
   scrapbook_trio: {
     label: box(341, 64, 260, 42),
     slots: [photo("st1", 58, 345, 508, 367, -4, 15), photo("st2", 369, 725, 520, 362, 4, 15), photo("st3", 53, 1094, 514, 360, -3, 15)],
-    fields: { main_title: [258, 141, 426, 94, 68], subtitle: [294, 258, 375, 53, 32],
+    fields: { main_title: [205, 141, 530, 94, 68], subtitle: [294, 258, 375, 53, 32],
       "photo.st1.title": [609, 430, 199, 59, 34, "pen", "left", 13], "photo.st1.note": [592, 492, 210, 132, 33, "pen", "left", 13],
       "photo.st2.title": [120, 849, 212, 63, 34, "pen", "left", -9], "photo.st2.note": [129, 916, 202, 135, 33, "pen", "left", -9],
       "photo.st3.title": [608, 1202, 197, 55, 34, "pen", "left", 6], "photo.st3.note": [597, 1258, 207, 128, 33, "pen", "left", 6],

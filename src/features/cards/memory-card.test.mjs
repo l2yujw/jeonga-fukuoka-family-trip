@@ -1126,7 +1126,7 @@ test("crop editor uses Pointer Events, active pointer rebasing, and honest track
   assert.match(source, /event\.pointerType === "mouse"/);
   assert.match(source, /addEventListener\("wheel", wheel, \{ passive: false \}\)/);
   assert.match(source, /aspectRatio: `\$\{viewport\.width\} \/ \$\{viewport\.height\}`/);
-  assert.match(source, /onApply\(placementRef\.current\)/);
+  assert.match(source, /onApply\(placementRef\.current, structuredClone\(textDraft\)\)/);
   assert.match(source, /onClick=\{onCancel\}/);
   assert.match(source, /한 손가락으로 이동 · 두 손가락으로 확대\/회전/);
   assert.match(source, /memory-card-offset-x/);
@@ -1148,9 +1148,9 @@ test("preview and crop overlays keep the Cards hierarchy and reachable actions",
     readFile(new URL("../../app/globals.css", import.meta.url), "utf8"),
   ]);
   assert.match(view, /cards-preview-heading[\s\S]*FINAL REVIEW[\s\S]*카드 미리보기/);
-  assert.match(view, /cards-editor-heading[\s\S]*사진 위치 조정[\s\S]*위치와 크기를 바꿀 수 있어요/);
+  assert.match(view, /cards-editor-heading[\s\S]*사진 편집[\s\S]*크기 · 위치 · 문구를 함께 편집해요/);
   assert.match(view, /cards-slot-button/);
-  assert.match(editor, /cards-crop-workbench[\s\S]*PHOTO WORKBENCH[\s\S]*사진 \{slotNumber\} 조정/);
+  assert.match(editor, /cards-crop-workbench[\s\S]*PHOTO EDIT[\s\S]*사진 \{slotNumber\} 편집/);
   assert.match(editor, /cards-crop-controls[\s\S]*memory-card-zoom[\s\S]*memory-card-rotation[\s\S]*memory-card-offset-x[\s\S]*memory-card-offset-y/);
   assert.match(editor, /cards-crop-fit[\s\S]*aria-pressed=\{fitMode === "contain"\}[\s\S]*aria-pressed=\{fitMode === "cover"\}/);
   assert.match(editor, /cards-crop-actions[\s\S]*cards-crop-reset[\s\S]*cards-crop-cancel[\s\S]*cards-crop-apply/);
@@ -1362,7 +1362,7 @@ test("Cards first screen and composer use the approved live visual hierarchy", a
   assert.match(view, /showAllTemplates[\s\S]*cards-template-sheet[\s\S]*MEMORY_CARD_TEMPLATES\.map/);
   assert.equal(MEMORY_CARD_TEMPLATE_SPECS.length, 8);
   assert.match(view, /cards-dialog-backdrop[\s\S]*cards-photo-sheet/);
-  assert.match(view, /cards-crop-backdrop[\s\S]*<MemoryCardCropEditor/);
+  assert.match(view, /<dialog ref=\{cropDialog\}[\s\S]*<MemoryCardCropEditor/);
   assert.doesNotMatch(view, /STEP [123]|템플릿을 골라주세요/);
   const selectTemplateSource = view.match(
     /const selectTemplate = \(nextTemplateKey:[\s\S]*?\n  const togglePhoto/,
@@ -1428,3 +1428,24 @@ function memoryCardRow(overrides = {}) {
     ...overrides,
   };
 }
+
+
+test('saved-card filters use Tokyo midnight and deterministic timestamp/id order without mutating input', async () => {
+ const {filterSavedCards}=await import('./memory-card-list.ts');
+ const rows=[
+  {id:'pre',createdAt:'2026-09-10T23:59:59+09:00'},
+  {id:'b',createdAt:'2026-09-10T15:00:00Z'},
+  {id:'a',createdAt:'2026-09-11T00:00:00+09:00'},
+  {id:'late',createdAt:'2026-09-11T14:59:59Z'},
+  {id:'day2',createdAt:'2026-09-11T15:00:00Z'},
+  {id:'day3',createdAt:'2026-09-13T23:59:59+09:00'},
+  {id:'post',createdAt:'2026-09-13T15:00:00Z'},
+ ];
+ const baseline=structuredClone(rows),ids=(date,sort='newest')=>filterSavedCards(rows,date,sort).map(r=>r.id);
+ assert.deepEqual(ids('2026-09-11'),['late','a','b']);
+ assert.deepEqual(ids('2026-09-11','oldest'),['a','b','late']);
+ assert.deepEqual(ids('2026-09-12'),['day2']);assert.deepEqual(ids('2026-09-13'),['day3']);
+ assert.deepEqual(ids('all'),['post','day3','day2','late','a','b','pre']);
+ assert.deepEqual(ids('all','oldest'),['pre','a','b','late','day2','day3','post']);
+ assert.deepEqual(rows,baseline);
+});
