@@ -11,11 +11,13 @@ export type WatercolorValidation = {
   errors: Record<string, string>;
 };
 export const watercolorHitStyle = (b: WatercolorBox, inset = 0) => ({ position: "absolute" as const, left: `${(inset + b.x / 1080 * (1 - inset * 2)) * 100}%`, top: `${(inset + b.y / 1920 * (1 - inset * 2)) * 100}%`, width: `${b.w / 1080 * (1 - inset * 2) * 100}%`, height: `${b.h / 1920 * (1 - inset * 2) * 100}%`, transform: `rotate(${b.r}deg)` });
-export function WatercolorPreview({ templateKey, layout, photos, appearance = DEFAULT_WATERCOLOR_APPEARANCE, onSelectField, onSelectSlot, selectedFieldId, selectedSlotId, onValidation }: {
+export function WatercolorPreview({ templateKey, layout, photos, appearance = DEFAULT_WATERCOLOR_APPEARANCE, width = 540, emptyPhotoHints = true, onSelectField, onSelectSlot, selectedFieldId, selectedSlotId, onValidation }: {
   templateKey: MemoryCardTemplateKey;
   layout: MemoryCardLayoutV4;
   photos: readonly AlbumPhoto[];
   appearance?: WatercolorAppearance;
+  width?: 540 | 1080;
+  emptyPhotoHints?: boolean;
   onSelectField?: (id: string) => void;
   onSelectSlot?: (id: string) => void;
   selectedFieldId?: string | null;
@@ -26,7 +28,6 @@ export function WatercolorPreview({ templateKey, layout, photos, appearance = DE
   const [failure, setFailure] = useState<string | null>(null);
   const template = getWatercolorTemplate(templateKey, layout.templateRevision);
   const inset = watercolorContentInset(templateKey, appearance);
-  const width = 540;
   useEffect(() => {
     let active = true;
     onValidation?.({ ready: false, errors: {} });
@@ -35,7 +36,7 @@ export function WatercolorPreview({ templateKey, layout, photos, appearance = DE
         return;
       const c = canvas.current?.getContext("2d");
       if (c) {
-        paintWatercolorScene(c, scene, width, true);
+        paintWatercolorScene(c, scene, width, emptyPhotoHints);
         setFailure(null);
         onValidation?.({ ready: true, errors: scene.errors });
       }
@@ -47,7 +48,7 @@ export function WatercolorPreview({ templateKey, layout, photos, appearance = DE
       onValidation?.({ ready: false, errors: { _scene: message } });
     });
     return () => { active = false; };
-  }, [templateKey, layout, photos, appearance, width, onValidation]);
+  }, [templateKey, layout, photos, appearance, width, emptyPhotoHints, onValidation]);
   if (!template)
     return <p role="alert">지원하지 않는 카드 버전이에요.</p>;
   return <div className="wc-preview" aria-label={`${template.displayName} 카드 미리보기`}>
@@ -59,7 +60,7 @@ export function WatercolorPreview({ templateKey, layout, photos, appearance = DE
   {failure && <p role="alert" className="wc-error">{failure}</p>}
  </div>;
 }
-// Eight trusted templates only. Reuse the small bitmap across strip/gallery mounts;
+// Trusted catalog only. Reuse the small bitmap across strip/gallery mounts;
 // user photos and draft text never enter this cache, and no PNG encoding is needed.
 const miniatures = new Map<MemoryCardTemplateKey, Promise<HTMLCanvasElement>>();
 function getMiniature(templateKey: MemoryCardTemplateKey) {

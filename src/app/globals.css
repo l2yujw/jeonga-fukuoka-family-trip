@@ -5290,6 +5290,17 @@ body:has(.cards-viewer-backdrop) .cards-main {
 .wc-preview { width: 100%; }
 .wc-scene { position: relative; width: 100%; aspect-ratio: 9 / 16; }
 .wc-scene canvas { display: block; width: 100%; height: 100%; }
+.wc-expand { display: flex; align-items: center; gap: 6px; min-height: 44px; margin: 0 0 4px auto; padding: 0 12px; border: 1px solid #d8bca1; border-radius: 10px; background: #fffcf6; color: #694b37; font-size: 13px; }
+.wc-expand svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.wc-expand:disabled { opacity: .45; }
+.wc-enlarged { position: fixed; inset: 0; width: 100%; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #332d27; color: #fffaf0; }
+.wc-enlarged[open] { display: flex; flex-direction: column; }
+.wc-enlarged::backdrop { background: #332d27e8; }
+.wc-enlarged header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: max(8px, env(safe-area-inset-top)) 12px 8px; background: #332d27; }
+.wc-enlarged h2 { font-size: 16px; }
+.wc-enlarged header button { width: 44px; height: 44px; font-size: 28px; border: 1px solid #807466; border-radius: 50%; }
+.wc-enlarged-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 12px max(20px, env(safe-area-inset-bottom)); }
+.wc-enlarged-scroll > .wc-preview { width: min(100%, 650px); margin: 0 auto; }
 .wc-hit { border: 0; background: transparent; padding: 0; cursor: pointer; }
 .wc-text-hit { z-index: 2; border: 1px dashed #bc795655; }
 .wc-hit[aria-pressed="true"], .wc-hit:focus-visible { outline: 2px solid #b85d51; outline-offset: 1px; background: #e9ae9522; }

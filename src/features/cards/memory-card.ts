@@ -543,7 +543,7 @@ export function mapPersistedMemoryCardRows(
   resultSignedUrls: ReadonlyMap<string, string | null> = new Map(),
 ): MemoryCard[] {
   return rows.flatMap((row) => {
-    const template = getMemoryCardTemplateSpec(row.template_key);
+    const template = getWatercolorTemplate(row.template_key) ?? getMemoryCardTemplateSpec(row.template_key);
     if (!template) return [];
 
     return [

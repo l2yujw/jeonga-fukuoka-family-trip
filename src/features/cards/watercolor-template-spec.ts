@@ -32,12 +32,14 @@ export type WatercolorField = WatercolorBox & {
 export type WatercolorArt = WatercolorBox & {
   asset: string;
   z: number;
+  tripDateOnly?: true;
 };
 export type WatercolorPanel = WatercolorBox & {
   fill: string;
   dashed?: boolean;
   radius?: number;
   shape?: "tag" | "ticket";
+  tripDateOnly?: true;
 };
 export type WatercolorTemplate = MemoryCardTemplateSpec & {
   revision: typeof WATERCOLOR_REVISION;
@@ -81,14 +83,14 @@ const geometry: Record<MemoryCardTemplateKey, Geometry> = {
       "photo.p1.caption": [27, 415, 357, 65, 26, "serif", "center", 0, "p1"], "photo.p2.caption": [25, 383, 338, 62, 25, "serif", "center", 0, "p2"],
       "photo.p3.caption": [25, 369, 350, 62, 25, "serif", "center", 0, "p3"], "photo.p4.caption": [25, 373, 342, 62, 25, "serif", "center", 0, "p4"],
       footer_note: [192, 1425, 354, 120, 28, "serif", "left"], "trip.start": [635, 1441, 199, 40, 27], "trip.end": [635, 1500, 199, 40, 27] },
-    panels: [panel(33, 27, 876, 1619), panel(79, 1370, 500, 189, "#fffaf4", 0, true), { ...panel(612, 1358, 242, 205), shape: "ticket" }],
-    art: [art("polaroid-flower", 87, 138, 132, 180), art("polaroid-flower", 727, 144, 131, 176, 24), art("polaroid-sprig", 433, 119, 84, 51), art("fourcut-flower", 93, 1421, 79, 123), art("scrapbook-flower", 802, 1459, 73, 106, 18), art("tape-pink", 158, 840, 138, 48, 2)]
+    panels: [panel(33, 27, 876, 1619), panel(79, 1370, 500, 189, "#fffaf4", 0, true), { ...panel(612, 1358, 242, 205), shape: "ticket", tripDateOnly: true }],
+    art: [art("polaroid-flower", 87, 138, 132, 180), art("polaroid-flower", 727, 144, 131, 176, 24), art("polaroid-sprig", 433, 119, 84, 51), art("fourcut-flower", 93, 1421, 79, 123), { ...art("scrapbook-flower", 802, 1459, 73, 106, 18), tripDateOnly: true }, art("tape-pink", 158, 840, 138, 48, 2)]
   },
   four_cut: {
     label: box(406, 72, 145, 40),
     slots: [0, 1, 2, 3].map(i => photo(`f${i + 1}`, 310, 132 + i * 288, 439, 273)),
     fields: { vertical_title: [193, 220, 66, 499, 52, "serif"], vertical_subtitle: [208, 780, 36, 309, 24, "serif"], footer_note: [210, 1383, 285, 158, 28, "serif", "left"], "trip.start": [564, 1438, 190, 40, 25], "trip.end": [564, 1501, 190, 40, 25] },
-    panels: [panel(146, 33, 655, 1545, "#fffcf6", 0, false, 26), panel(299, 119, 463, 1164), panel(565, 1361, 189, 57, "#fff1e8", 0, false, 20)],
+    panels: [panel(146, 33, 655, 1545, "#fffcf6", 0, false, 26), panel(299, 119, 463, 1164), { ...panel(565, 1361, 189, 57, "#fff1e8", 0, false, 20), tripDateOnly: true }],
     art: [art("fourcut-flower", 172, 1090, 99, 203), art("moment-sprig", 350, 69, 44, 40, -50), art("moment-sprig", 556, 69, 44, 40, 50), art("polaroid-sprig", 193, 721, 65, 45), art("moment-sprig", 174, 135, 55, 51, -30), art("polaroid-sprig", 451, 1306, 42, 32)]
   },
   editorial_collage: {
@@ -125,7 +127,7 @@ const geometry: Record<MemoryCardTemplateKey, Geometry> = {
     label: box(301, 49, 339, 42),
     slots: [0, 1, 2, 3, 4, 5].map(i => photo(`fc${i + 1}`, 53 + i % 2 * 444, 390 + Math.floor(i / 2) * 402, 393, i < 4 ? 304 : 215)),
     fields: { badge_title: [387, 121, 163, 51, 29], main_title: [226, 189, 491, 71, 53], "trip.start": [320, 282, 145, 38, 25], "trip.end": [477, 282, 153, 38, 25],
-      ...Object.fromEntries([0, 1, 2, 3, 4, 5].flatMap(i => [[`photo.fc${i + 1}.caption`, [82 + i % 2 * 444, (i < 4 ? 710 : 1425) + Math.floor(i / 2) * (i < 4 ? 402 : 0), 245, 43, 21, "pen"]], [`photo.fc${i + 1}.date`, [353 + i % 2 * 444, (i < 4 ? 712 : 1427) + Math.floor(i / 2) * (i < 4 ? 402 : 0), 89, 28, 14]]])) as Record<string, FieldPosition>,
+      ...Object.fromEntries([0, 1, 2, 3, 4, 5].flatMap(i => [[`photo.fc${i + 1}.caption`, [82 + i % 2 * 444, (i < 4 ? 710 : 1425) + Math.floor(i / 2) * (i < 4 ? 402 : 0), 230, 66, 26, "pen"]], [`photo.fc${i + 1}.date`, [322 + i % 2 * 444, (i < 4 ? 712 : 1427) + Math.floor(i / 2) * (i < 4 ? 402 : 0), 120, 32, 18]]])) as Record<string, FieldPosition>,
       footer_note: [303, 1512, 365, 55, 22, "serif"], signoff: [322, 1569, 339, 45, 26, "pen"] },
     panels: [panel(30, 343, 882, 1125), panel(381, 116, 170, 48, "#fff1e8")],
     art: [art("film-flower", 0, 81, 171, 245), art("film-flower", 793, 159, 127, 190, 80), art("postcard-stamp", 773, 1505, 129, 140, 11)]
@@ -140,6 +142,43 @@ const geometry: Record<MemoryCardTemplateKey, Geometry> = {
     fields: { short_message: [314, 1193, 313, 69, 43, "pen"], main_title: [209, 1310, 526, 101, 56], "trip.start": [323, 1481, 144, 42, 27], "trip.end": [482, 1481, 153, 42, 27] },
     panels: [panel(71, 48, 812, 1587, "#fffaf0", 0, false, 44), panel(82, 60, 789, 1563, "#fffaf0", 0, false, 44)],
     art: [art("instant-sprig", 392, 180, 169, 69), art("fourcut-flower", 698, 906, 194, 269, 35), art("tape-pink", 64, 286, 204, 59, -24), art("instant-sprig", 389, 1414, 166, 49)]
+  },
+  double_memory: {
+    label: box(270, 83, 401, 42),
+    slots: [photo("dm1", 72, 401, 451, 790, -3, 16, 84), photo("dm2", 486, 664, 381, 639, 4, 16, 84)],
+    fields: { main_title: [100, 176, 741, 104, 64], subtitle: [166, 294, 609, 80, 30],
+      "photo.dm1.caption": [25, 694, 340, 80, 32, "pen", "center", 0, "dm1"],
+      "photo.dm2.caption": [24, 543, 333, 80, 32, "pen", "center", 0, "dm2"],
+      footer_note: [128, 1373, 685, 124, 32, "pen"], "trip.start": [280, 1552, 178, 42, 27], "trip.end": [484, 1552, 178, 42, 27] },
+    panels: [],
+    art: [art("editorial-sprig", 404, 127, 133, 57), art("tape-pink", 124, 375, 166, 43, -12), art("fourcut-flower", 717, 460, 93, 164, 15)]
+  },
+  triptych_story: {
+    label: box(67, 62, 330, 42),
+    slots: [photo("ts1", 65, 420, 811, 548, 0, 10), photo("ts2", 65, 1010, 388, 337, 0, 10, 70), photo("ts3", 488, 1010, 388, 337, 0, 10, 70)],
+    fields: { main_title: [65, 158, 811, 100, 64, "serif", "left"], subtitle: [67, 278, 805, 76, 30, "serif", "left"], lead_note: [67, 356, 805, 60, 24, "serif", "left"],
+      "photo.ts2.title": [18, 264, 352, 68, 26, "serif", "left", 0, "ts2"], "photo.ts3.title": [18, 264, 352, 68, 26, "serif", "left", 0, "ts3"],
+      footer_note: [67, 1410, 658, 116, 30, "pen", "left"], "trip.start": [480, 1560, 178, 42, 27], "trip.end": [688, 1560, 178, 42, 27] },
+    panels: [],
+    art: [art("editorial-sprig", 754, 91, 114, 60), art("moment-sprig", 765, 1418, 81, 83, 12)]
+  },
+  gallery_four: {
+    label: box(285, 89, 371, 42),
+    slots: [0, 1, 2, 3].map(i => photo(`gf${i + 1}`, 70 + i % 2 * 417, 398 + Math.floor(i / 2) * 509, 384, 461, 0, 12, 82)),
+    fields: { main_title: [90, 187, 761, 99, 62], subtitle: [120, 294, 701, 80, 30],
+      ...Object.fromEntries([1, 2, 3, 4].map(i => [`photo.gf${i}.caption`, [20, 373, 344, 80, 28, "serif", "center", 0, `gf${i}`]])) as Record<string, FieldPosition>,
+      "trip.start": [280, 1538, 178, 42, 27], "trip.end": [484, 1538, 178, 42, 27] },
+    panels: [],
+    art: [art("instant-sprig", 393, 1417, 155, 63)]
+  },
+  hero_mosaic: {
+    label: box(61, 58, 324, 42),
+    slots: [photo("hm1", 60, 395, 821, 575, 0, 10), photo("hm2", 60, 1010, 188, 332, 0, 8, 86), photo("hm3", 271, 1010, 188, 332, 0, 8, 86), photo("hm4", 482, 1010, 188, 332, 0, 8, 86), photo("hm5", 693, 1010, 188, 332, 0, 8, 86)],
+    fields: { main_title: [60, 153, 821, 99, 64, "serif", "left"], subtitle: [62, 270, 815, 70, 28, "serif", "left"], lead_note: [62, 342, 815, 52, 21, "serif", "left"],
+      ...Object.fromEntries([2, 3, 4, 5].map(i => [`photo.hm${i}.caption`, [12, 247, 164, 76, 27, "pen", "left", 0, `hm${i}`]])) as Record<string, FieldPosition>,
+      closing_note: [62, 1408, 650, 124, 32, "pen", "left"], "trip.start": [488, 1570, 178, 42, 27], "trip.end": [696, 1570, 178, 42, 27] },
+    panels: [],
+    art: [art("editorial-sprig", 743, 70, 122, 60), art("scrapbook-flower", 770, 1416, 82, 108, 15)]
   },
 };
 export const WATERCOLOR_TEMPLATES: WatercolorTemplate[] = catalog.map(entry => {

@@ -911,5 +911,418 @@
         "defaultPolicy": "trip snapshot"
       }
     ]
+  },
+  {
+    "key": "double_memory",
+    "displayName": "Double Memory",
+    "primary": "main_title",
+    "slotIds": [
+      "dm1",
+      "dm2"
+    ],
+    "fields": [
+      {
+        "id": "main_title",
+        "kind": "plainText",
+        "label": "카드 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 34,
+        "maxLines": 2,
+        "defaultPolicy": "전가네 가족여행"
+      },
+      {
+        "id": "subtitle",
+        "kind": "plainText",
+        "label": "짧은 소개",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 54,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.dm1.caption",
+        "kind": "plainText",
+        "label": "사진 1 문구",
+        "photoSlotId": "dm1",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.dm2.caption",
+        "kind": "plainText",
+        "label": "사진 2 문구",
+        "photoSlotId": "dm2",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "footer_note",
+        "kind": "plainText",
+        "label": "하단 메모",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 100,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      }
+    ]
+  },
+  {
+    "key": "triptych_story",
+    "displayName": "Triptych Story",
+    "primary": "main_title",
+    "slotIds": [
+      "ts1",
+      "ts2",
+      "ts3"
+    ],
+    "fields": [
+      {
+        "id": "main_title",
+        "kind": "plainText",
+        "label": "카드 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 34,
+        "maxLines": 2,
+        "defaultPolicy": "전가네 가족여행"
+      },
+      {
+        "id": "subtitle",
+        "kind": "plainText",
+        "label": "짧은 소개",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 54,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "lead_note",
+        "kind": "plainText",
+        "label": "시작 메모",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 80,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.ts2.title",
+        "kind": "plainText",
+        "label": "사진 2 제목",
+        "photoSlotId": "ts2",
+        "role": "title",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.ts3.title",
+        "kind": "plainText",
+        "label": "사진 3 제목",
+        "photoSlotId": "ts3",
+        "role": "title",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "footer_note",
+        "kind": "plainText",
+        "label": "하단 메모",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 100,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      }
+    ]
+  },
+  {
+    "key": "gallery_four",
+    "displayName": "Gallery Four",
+    "primary": "main_title",
+    "slotIds": [
+      "gf1",
+      "gf2",
+      "gf3",
+      "gf4"
+    ],
+    "fields": [
+      {
+        "id": "main_title",
+        "kind": "plainText",
+        "label": "카드 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 34,
+        "maxLines": 2,
+        "defaultPolicy": "전가네 가족여행"
+      },
+      {
+        "id": "subtitle",
+        "kind": "plainText",
+        "label": "짧은 소개",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 54,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.gf1.caption",
+        "kind": "plainText",
+        "label": "사진 1 문구",
+        "photoSlotId": "gf1",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.gf2.caption",
+        "kind": "plainText",
+        "label": "사진 2 문구",
+        "photoSlotId": "gf2",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.gf3.caption",
+        "kind": "plainText",
+        "label": "사진 3 문구",
+        "photoSlotId": "gf3",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.gf4.caption",
+        "kind": "plainText",
+        "label": "사진 4 문구",
+        "photoSlotId": "gf4",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      }
+    ]
+  },
+  {
+    "key": "hero_mosaic",
+    "displayName": "Hero Mosaic",
+    "primary": "main_title",
+    "slotIds": [
+      "hm1",
+      "hm2",
+      "hm3",
+      "hm4",
+      "hm5"
+    ],
+    "fields": [
+      {
+        "id": "main_title",
+        "kind": "plainText",
+        "label": "카드 제목",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 34,
+        "maxLines": 2,
+        "defaultPolicy": "전가네 가족여행"
+      },
+      {
+        "id": "subtitle",
+        "kind": "plainText",
+        "label": "짧은 소개",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 54,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "lead_note",
+        "kind": "plainText",
+        "label": "시작 메모",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 80,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.hm2.caption",
+        "kind": "plainText",
+        "label": "사진 2 문구",
+        "photoSlotId": "hm2",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.hm3.caption",
+        "kind": "plainText",
+        "label": "사진 3 문구",
+        "photoSlotId": "hm3",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.hm4.caption",
+        "kind": "plainText",
+        "label": "사진 4 문구",
+        "photoSlotId": "hm4",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "photo.hm5.caption",
+        "kind": "plainText",
+        "label": "사진 5 문구",
+        "photoSlotId": "hm5",
+        "role": "caption",
+        "vertical": false,
+        "maxCodePoints": 42,
+        "maxLines": 2,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "closing_note",
+        "kind": "plainText",
+        "label": "마무리 메모",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 100,
+        "maxLines": 3,
+        "defaultPolicy": "empty"
+      },
+      {
+        "id": "trip.start",
+        "kind": "isoDate",
+        "label": "카드에 표시할 시작일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      },
+      {
+        "id": "trip.end",
+        "kind": "isoDate",
+        "label": "카드에 표시할 종료일",
+        "photoSlotId": null,
+        "role": null,
+        "vertical": false,
+        "maxCodePoints": 10,
+        "maxLines": 1,
+        "defaultPolicy": "trip snapshot"
+      }
+    ]
   }
 ]

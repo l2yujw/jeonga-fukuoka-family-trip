@@ -180,7 +180,7 @@ function ticketEdge(c: CanvasRenderingContext2D, w: number, h: number) {
   });
   c.closePath();
 }
-function paintPolaroidAccents(c: CanvasRenderingContext2D, art: WatercolorScene["art"], texture: CanvasPattern) {
+function paintPolaroidAccents(c: CanvasRenderingContext2D, art: WatercolorScene["art"], texture: CanvasPattern, showTripDates: boolean) {
   for (const [x, y, w, h, r, color] of [[94, 353, 126, 52, -30, "#ead5ad"], [657, 854, 128, 48, 16, "#bcc7a5"], [51, 1360, 105, 43, -20, "#efb4a0"]] as const) {
     withBox(c, { x, y, w, h, r }, () => {
       c.beginPath(); c.moveTo(0, 0); c.lineTo(w, 0);
@@ -201,6 +201,7 @@ function paintPolaroidAccents(c: CanvasRenderingContext2D, art: WatercolorScene[
   c.beginPath(); c.arc(831, 443, 30, 0, Math.PI * 2); c.stroke();
   // Reuse only the isolated flower within the private sprig, never reference photo pixels.
   c.drawImage(art.get("polaroid-sprig")!, 15, 0, 46, 43, 807, 420, 48, 45);
+  if (!showTripDates) return;
   c.strokeStyle = "#e8a28b"; c.lineWidth = 1.6;
   rounded(c, 713, 1384, 44, 42, 10); c.stroke();
   c.beginPath(); c.moveTo(713, 1397); c.lineTo(757, 1397);
@@ -211,6 +212,7 @@ function paintPolaroidAccents(c: CanvasRenderingContext2D, art: WatercolorScene[
 }
 export function paintWatercolorScene(c: CanvasRenderingContext2D, scene: WatercolorScene, width: number, emptyPhotoHints = false) {
   const { template: t, layout, images, art, text } = scene;
+  const showTripDates = isWatercolorDate(layout.dateValues["trip.start"]) && isWatercolorDate(layout.dateValues["trip.end"]);
   const background = WATERCOLOR_BACKGROUNDS.find(preset => preset.key === scene.appearance?.backgroundVariant) ?? WATERCOLOR_BACKGROUNDS[0];
   const tinted = background.key !== "ivory";
   const paperPanelCount = ["scrapbook_trio", "instant_memory"].includes(t.key) ? 2 : ["polaroid_moodboard", "four_cut", "editorial_collage", "film_contact_sheet"].includes(t.key) ? 1 : 0;
@@ -236,7 +238,7 @@ export function paintWatercolorScene(c: CanvasRenderingContext2D, scene: Waterco
   const inset = watercolorContentInset(t.key, scene.appearance);
   c.translate(1080 * inset, 1920 * inset);
   c.scale(1 - inset * 2, 1 - inset * 2);
-  for (const p of t.panels)
+  for (const p of t.panels.filter(p => !p.tripDateOnly || showTripDates))
     withBox(c, p, () => {
       c.shadowColor = t.key === "editorial_collage" && p !== t.panels[0] ? "transparent" : "rgba(109,71,39,.15)";
       c.shadowBlur = 9 * width / 1080;
@@ -328,12 +330,14 @@ export function paintWatercolorScene(c: CanvasRenderingContext2D, scene: Waterco
   }
   if (corrected) {
     c.save(); c.scale(1080 / 941, 1080 / 941);
-    if (t.key === "polaroid_moodboard") paintPolaroidAccents(c, art, texture);
+    if (t.key === "polaroid_moodboard") paintPolaroidAccents(c, art, texture, showTripDates);
     if (t.key === "four_cut") {
       c.strokeStyle = "#df9686"; c.lineWidth = 3.5; c.lineCap = "round"; c.setLineDash([.1, 10.5]);
-      c.beginPath(); c.moveTo(190, 1321); c.lineTo(438, 1321); c.moveTo(500, 1321); c.lineTo(758, 1321); c.moveTo(530, 1365); c.lineTo(530, 1534); c.stroke();
+      c.beginPath(); c.moveTo(190, 1321); c.lineTo(438, 1321); c.moveTo(500, 1321); c.lineTo(758, 1321);
+      if (showTripDates) { c.moveTo(530, 1365); c.lineTo(530, 1534); }
+      c.stroke();
     }
-    if (t.key === "editorial_collage") {
+    if (t.key === "editorial_collage" && showTripDates) {
       c.strokeStyle = "#d9b68d"; c.lineWidth = 1;
       c.beginPath(); c.moveTo(58, 434); c.lineTo(147, 434); c.moveTo(208, 434); c.lineTo(314, 434); c.stroke();
       c.beginPath(); c.moveTo(177, 430); c.lineTo(182, 434); c.lineTo(177, 438); c.lineTo(172, 434); c.closePath(); c.stroke();
@@ -367,16 +371,18 @@ export function paintWatercolorScene(c: CanvasRenderingContext2D, scene: Waterco
     string,
     number,
     number,
-    number
+    number,
+    boolean?
   ][]>> = {
-    four_cut: [["여행 기간", 759, 1600, 25]],
-    postcard_duo: [["장소", 268, 1775, 24], ["날짜", 629, 1775, 24]],
-    scrapbook_trio: [["여행 날짜", 173, 1764, 25], ["짧은 한 줄 기록", 621, 1764, 25]],
+    four_cut: [["여행 기간", 759, 1600, 25, true]],
+    postcard_duo: [["장소", 268, 1775, 24], ["날짜", 629, 1775, 24, true]],
+    scrapbook_trio: [["여행 날짜", 173, 1764, 25, true], ["짧은 한 줄 기록", 621, 1764, 25]],
   };
   c.font = '400 24px "CardsSerif"';
   c.fillStyle = "#bd8270";
   c.textAlign = "center";
-  for (const [label, x, y, size] of fixedLabels[t.key] ?? []) {
+  for (const [label, x, y, size, tripDateOnly] of fixedLabels[t.key] ?? []) {
+    if (tripDateOnly && !showTripDates) continue;
     c.font = `400 ${size}px "CardsSerif"`;
     c.fillText(label, x, y);
   }
@@ -387,7 +393,7 @@ export function paintWatercolorScene(c: CanvasRenderingContext2D, scene: Waterco
     const sameRow = Math.abs(start.box.y - end.box.y) < 20;
     c.fillText("–", sameRow ? (start.box.x + start.box.w + end.box.x) / 2 : start.box.x + start.box.w / 2, sameRow ? start.box.y + start.field.size * .88 : (start.box.y + start.box.h + end.box.y) / 2);
   }
-  for (const a of t.art)
+  for (const a of t.art.filter(a => !a.tripDateOnly || showTripDates))
     withBox(c, a, () => c.drawImage(art.get(a.asset)!, 0, 0, a.w, a.h));
   withBox(c, t.label, () => { c.font = '400 30px "CardsSerif"'; c.textAlign = "center"; c.letterSpacing = t.key === "polaroid_moodboard" || t.key === "editorial_collage" ? "3px" : "0px"; c.fillStyle = t.key === "one_moment" ? (images.size ? "#ead5b8" : "#66725a") : t.key === "four_cut" ? "#cf8070" : "#be8f6c"; c.fillText(t.displayName, t.label.w / 2, 32); });
   for (const plan of text)
