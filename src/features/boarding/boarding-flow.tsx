@@ -7,6 +7,7 @@ import { Button, LoadingState, MobileShell } from "@/components/ui";
 import {
   createFamilySlots,
   isCurrentTripSession,
+  isSafeMemberPreview,
   resolveBoardingInitialization,
   type CurrentTripSession,
   type FamilyRosterMember,
@@ -26,6 +27,8 @@ type Stage = "loading" | "confirm" | "boarding" | "complete" | "error";
 
 export function BoardingFlow() {
   const router = useRouter();
+  const claimPendingRef = useRef(false);
+  const [claimedElsewhere, setClaimedElsewhere] = useState(false);
   const completionHeading = useRef<HTMLHeadingElement>(null);
   const [session, setSession] = useState<CurrentTripSession | null>(null);
   const [roster, setRoster] = useState<FamilyRosterMember[]>([]);
@@ -43,6 +46,20 @@ export function BoardingFlow() {
         if (!active) return;
 
         if (initialization.stage === "confirm") {
+          const auth = await getCurrentAuthSession();
+          if (!auth) { router.replace("/"); return; }
+          const response = await fetch("/api/member-preview", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${auth.access_token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ name: initialization.pending.name }),
+          });
+          const preview: unknown = await response.json().catch(() => null);
+          if (!active) return;
+          if (!response.ok || !isSafeMemberPreview(preview) || preview.memberId !== initialization.pending.memberId) {
+            router.replace("/");
+            return;
+          }
+          setClaimedElsewhere("claimedElsewhere" in preview && preview.claimedElsewhere === true);
           setPending(initialization.pending);
           setStage("confirm");
           return;
@@ -96,7 +113,8 @@ export function BoardingFlow() {
   }, [stage]);
 
   const claimMember = async () => {
-    if (!pending || claiming) return;
+    if (!pending || claimPendingRef.current) return;
+    claimPendingRef.current = true;
     setClaiming(true);
     setError("");
 
@@ -135,6 +153,7 @@ export function BoardingFlow() {
     } catch {
       setError("탑승을 완료할 수 없어요. 네트워크 연결을 확인해주세요.");
     } finally {
+      claimPendingRef.current = false;
       setClaiming(false);
     }
   };
@@ -258,6 +277,11 @@ export function BoardingFlow() {
     if (!pending) return null;
     return (
       <MobileShell className="boarding-confirm-raster-page">
+        {claimedElsewhere && (
+          <p id="boarding-transfer-warning" role="status" className="boarding-confirm-raster-error">
+            이 가족은 다른 기기에서 사용 중이에요. 계속하면 이 기기로 전환돼요.
+          </p>
+        )}
         {error && (
           <p id="boarding-confirm-error" role="alert" className="boarding-confirm-raster-error">
             {error}
@@ -310,7 +334,7 @@ export function BoardingFlow() {
             disabled={claiming}
             aria-busy={claiming || undefined}
             aria-label="네, 탑승할게요"
-            aria-describedby={error ? "boarding-confirm-error" : undefined}
+            aria-describedby={[error && "boarding-confirm-error", claimedElsewhere && "boarding-transfer-warning"].filter(Boolean).join(" ") || undefined}
             onClick={claimMember}
           />
           <button

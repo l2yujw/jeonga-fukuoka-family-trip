@@ -138,7 +138,7 @@ test("valid invite with retained membership redirects home", async () => {
 
   assert.match(
     source,
-    /if \(invalidInvite\) return;[\s\S]*getCurrentTripSession\(\)[\s\S]*if \(session\)[\s\S]*router\.replace\("\/home"\)/,
+    /if \(invalidInvite\) return;[\s\S]*getCurrentTripSession\(\)[\s\S]*if \(session\)[\s\S]*if \(!switching.active\)[\s\S]*router\.replace\("\/home"\)/,
   );
   assert.match(source, /\}, \[invalidInvite, router\]\);/);
 });

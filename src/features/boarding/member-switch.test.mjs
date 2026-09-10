@@ -42,15 +42,11 @@ test("member-switch API derives identity and trip and maps retry-safe statuses",
 
   assert.match(route, /authenticateRequest\(request\)[\s\S]*401/);
   assert.match(route, /resolveInviteTrip\(request\)[\s\S]*403/);
-  assert.match(route, /release_trip_membership_for_switch/);
-  assert.match(route, /p_trip_id: trip\.id, p_auth_user_id: user\.id/);
-  assert.match(route, /status === "released" \|\| status === "already_released"[\s\S]*NextResponse\.json\(\{ status \}\)/);
-  assert.deepEqual(
-    [...route.matchAll(/status === "([^"]+)"/g)].map((match) => match[1]),
-    ["released", "already_released"],
-  );
-  assert.doesNotMatch(route, /blocked_owned_content|status:\s*409/);
-  assert.doesNotMatch(route, /memberId|request\.json|request\.formData/);
+  assert.match(route, /signSwitchIntent/);
+  assert.match(route, /status: "switch_ready"/);
+  assert.match(route, /if \(!membership\)/);
+  assert.match(route, /membershipId: membership.id/);
+  assert.doesNotMatch(route, /\.rpc\(|\.delete\(|\.insert\(|request\.json/);
   assert.doesNotMatch(route, /signOut|signInAnonymously/);
 });
 
@@ -102,8 +98,8 @@ test("Home requires confirmation and preserves the current auth session", async 
   assert.match(confirmation, /Authorization: `Bearer \$\{authSession\.access_token\}`/);
   assert.match(confirmation, /clearPendingMember\(\)[\s\S]*router\.replace\("\/"\)/);
   assert.ok(confirmation.indexOf("if (!response.ok)") < confirmation.indexOf("router.replace"));
-  assert.match(home, /사용자를 변경할까요\?/);
-  assert.match(home, /사용자 변경을 하면 이\s+기기의 탑승 연결을 해제하고 이름 선택 화면으로 돌아갑니다\./);
+  assert.match(home, /다른 가족으로 다시 입장할까요\?/);
+  assert.match(home, /변경하면 현재 프로필에서\s+나가고 선택한 가족으로 다시 입장해요\./);
   assert.match(home, /memberSwitchPending \? "변경하고 있어요" : "사용자 변경"/);
   assert.match(home, />\s*취소\s*</);
   assert.match(home, /role="dialog"[\s\S]*aria-modal="true"/);
