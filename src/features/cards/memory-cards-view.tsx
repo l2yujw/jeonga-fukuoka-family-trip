@@ -64,6 +64,7 @@ import type { MemoryCardPhotoSlot } from "./memory-card-template-spec";
 import { WATERCOLOR_TEMPLATES as MEMORY_CARD_TEMPLATES, getWatercolorTemplate as getMemoryCardTemplate } from "./watercolor-template-spec";
 import { createWatercolorDraft, finalizeWatercolorLayout, projectWatercolorLayout, type MemoryCardLayoutV4, type WatercolorDraft } from "./watercolor-layout";
 import { WatercolorTextEditor } from "./watercolor-text-editor";
+import { WatercolorEnlargedPreview } from "./watercolor-enlarged-preview";
 import { WatercolorThumbnail, type WatercolorValidation } from "./watercolor-preview";
 import { DEFAULT_WATERCOLOR_APPEARANCE, WATERCOLOR_BACKGROUNDS, freezeWatercolorAppearance, type WatercolorAppearance } from "./watercolor-appearance";
 import { getCurrentAuthSession } from "@/features/boarding/current-trip-session";
@@ -824,6 +825,7 @@ export function MemoryCardsView() {
           </div>
 
         <Card className="cards-preview-frame">
+          <WatercolorEnlargedPreview templateKey={template.key} layout={draftLayout} photos={photos} appearance={appearance} disabled={isSaving || Boolean(draftBusy)} />
           <div className="cards-preview-stage">
             <MemoryCardPreview
               templateKey={template.key}
@@ -1037,6 +1039,7 @@ export function MemoryCardsView() {
                 <button type="button" onClick={() => setComposerStep("template")} aria-label="카드 미리보기 닫기">×</button>
               </header>
               <div className="cards-sheet-body">
+                <WatercolorEnlargedPreview templateKey={template.key} layout={draftLayout} photos={photos} appearance={appearance} disabled={isSaving || Boolean(draftBusy)} />
                 <div className="cards-dialog-preview">
                   <MemoryCardPreview
                     templateKey={template.key}

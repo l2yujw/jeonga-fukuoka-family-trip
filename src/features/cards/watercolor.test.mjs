@@ -14,7 +14,7 @@ const trip={title:'우리 가족',startDate:'2026-09-11',endDate:'2026-09-13'};
 const id=n=>`aaaaaaaa-aaaa-4aaa-8aaa-${String(n).padStart(12,'0')}`;
 const mapping=t=>t.slots.map((s,i)=>({slotId:s.id,photoId:id(i+1),placement:{zoom:1,rotation:0,offsetX:0,offsetY:0}}));
 const make=t=>projectWatercolorLayout(t,mapping(t),createWatercolorDraft(t,trip));
-test('all eight new drafts use the exact family title with blank notes and unchanged dates',()=>{
+test('all twelve new drafts use the exact family title with blank notes and unchanged dates',()=>{
  for(const t of WATERCOLOR_TEMPLATES){
   const draft=createWatercolorDraft(t,trip),layout=projectWatercolorLayout(t,mapping(t),draft);
   assert.equal(layout.textValues[t.primary],'전가네 가족여행',t.key);
@@ -44,10 +44,10 @@ test('empty Album composer retries leave the draft intact until a template is av
  assert.equal(state.photo.photoIds.length,0);
  assert.deepEqual(state.text,createWatercolorDraft(getWatercolorTemplate('one_moment'),trip));
 });
-test('all 8 v4 templates preserve all 74 independent catalog fields and full export bounds',()=>{
- assert.deepEqual(WATERCOLOR_TEMPLATES.map(t=>t.slots.length),[4,4,6,2,3,6,1,1]);
- assert.deepEqual(WATERCOLOR_TEMPLATES.map(t=>t.fields.length),[9,5,16,7,11,18,4,4]);
- assert.equal(WATERCOLOR_TEMPLATES.flatMap(t=>t.fields).length,74);
+test('all 12 v4 templates preserve all 107 independent catalog fields and full export bounds',()=>{
+ assert.deepEqual(WATERCOLOR_TEMPLATES.map(t=>t.slots.length),[4,4,6,2,3,6,1,1,2,3,4,5]);
+ assert.deepEqual(WATERCOLOR_TEMPLATES.map(t=>t.fields.length),[9,5,16,7,11,18,4,4,7,8,8,10]);
+ assert.equal(WATERCOLOR_TEMPLATES.flatMap(t=>t.fields).length,107);
  for(const t of WATERCOLOR_TEMPLATES){
   assert.equal(getRandomPhotoCount(t.key,8,4),t.slots.length);
   let d=createWatercolorDraft(t,trip);const slots=mapping(t);
@@ -126,7 +126,7 @@ test('SQL15 statically retains the v3 predicate and mirrors all v4 catalog limit
  const legacy=old.slice(old.indexOf("jsonb_typeof(layout_json) = 'object'"),old.indexOf('\n);')).trim();
  assert.ok(sql.includes(legacy));
  const validator=sql.slice(0,sql.indexOf('  end case;'));
- for(const t of WATERCOLOR_TEMPLATES){
+ for(const t of WATERCOLOR_TEMPLATES.slice(0,8)){
   const block=validator.split(`when '${t.key}' then`)[1].split(/\n    when |\n    else /)[0];
   const rules=JSON.parse(block.match(/text_rules := '(.*?)'::jsonb/)[1]);
   assert.deepEqual(rules,Object.fromEntries(t.fields.filter(f=>f.kind==='plainText').map(f=>[f.id,[f.maxCodePoints,f.maxLines]])));
@@ -193,7 +193,7 @@ test('Wave B postcard notes remain below their own photo and fit two lines insid
  }
 });
 
-test('all eight empty scenes expose each photo area only in the editor and keep placeholders out of exports',()=>{
+test('all twelve empty scenes expose each photo area only in the editor and keep placeholders out of exports',()=>{
  for(const t of WATERCOLOR_TEMPLATES){
   const words=[],gradients=[];
   const c=new Proxy({fillText:text=>words.push(text),createPattern:()=>({}),createLinearGradient:()=>{gradients.push(true);return {addColorStop(){}};}},{get:(target,key)=>target[key]??(()=>{})});
@@ -210,7 +210,7 @@ test('all eight empty scenes expose each photo area only in the editor and keep 
 });
 
 
-test('all text is optional: all eight blank/date-off layouts finalize with no painted text runs',()=>{
+test('all text is optional: all twelve blank/date-off layouts finalize with no painted text runs',()=>{
  const context={measureText:s=>({width:s.length*10})};
  for(const t of WATERCOLOR_TEMPLATES){
   const slots=mapping(t);let d=createWatercolorDraft(t,trip);
@@ -397,4 +397,86 @@ test('One Moment uses the same trusted content inset for paper and preview hit g
 test('Round 2B leaves SQL15 exactly at the Round 2A checkpoint',async()=>{
  const sql=await readFile(new URL('../../../docs/data/15_MEMORY_CARD_TEMPLATE_TEXT_V4_MIGRATION.sql',import.meta.url));
  assert.equal(createHash('sha256').update(sql).digest('hex'),'9e6e5f247726aa7f1fbddda2f250f98defbf12dff112a90ba5d983394005289c');
+});
+
+test('expansion preserves the original 74 field contracts and eight photo geometries',async()=>{
+ const catalog=JSON.parse(await readFile(new URL('./watercolor-catalog.json',import.meta.url),'utf8'));
+ const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
+ assert.equal(hash(catalog.slice(0,8)),'77ad1938be6f465f65f9974ddb5c0af7cb7106c591a8d9b230c67cd11c804907');
+ assert.deepEqual(WATERCOLOR_TEMPLATES.slice(0,8).map(t=>hash(t.slots)),[
+  '44e375b340e4230235505f30530889f81c2c5c2113023a1d422bff7439e38ea6',
+  'a0d1eb69eea160a691cc58438d89f091d003b6bfbdde1a6ce81d8d4beb3b9040',
+  'c93696b07ada11cf20972779ca101e360415a848ebea2b94b3ff584960257acd',
+  '3e181ca0cfe337c250a558913d27015b5846489aa178eeb94d05b80ecfdfc22a',
+  '7c98758d7f9ee5730a36c31dd4241660056ef363fa309c453d3d3c701cf5df40',
+  'e7a0f974285241b2df644344f4c6bfb5ee5bdf9f8815f94748043305eb29942c',
+  '46d7b51723506c3680bc952cd08fc60938c5efb1ae5cf051e6d86c1a2108e67e',
+  '9902a7690a648605fb1303727fa919f90d19413133b3029daaeb93962a40528d',
+ ]);
+});
+
+test('new templates enforce exact slots/fields and crop-only heroes, and stored PNG rows remain readable',()=>{
+ for(const t of WATERCOLOR_TEMPLATES.slice(8)){
+  const layout=make(t);
+  assert.deepEqual(parseMemoryCardLayoutV4(t.key,layout),layout);
+  for(const mutate of [v=>v.slots.reverse(),v=>v.slots.pop(),v=>v.textValues.extra='x',v=>delete v.dateValues['trip.end'],v=>v.caption='mismatch',v=>v.slots[1].photoId=v.slots[0].photoId]){
+   const v=structuredClone(layout);mutate(v);assert.equal(parseMemoryCardLayoutV4(t.key,v),null,t.key);
+  }
+  for(const version of [1,2,3])assert.equal(parseMemoryCardRenderModel(t.key,version,{version,slots:layout.slots,caption:layout.caption}),null);
+  if(['triptych_story','hero_mosaic'].includes(t.key))assert.equal(t.fields.some(f=>f.photoSlotId===t.slots[0].id),false);
+  const row={id:id(50),trip_id:id(51),creator_member_id:id(52),creator_auth_user_id:id(53),template_key:t.key,layout_version:4,layout_json:layout,result_storage_path:'immutable.png',created_at:'2026-09-11',updated_at:'2026-09-11'};
+  const mapped=mapPersistedMemoryCardRows([row],new Map(),id(53),new Map([['immutable.png','signed-qa']]))[0];
+  assert.equal(mapped.templateKey,t.key);assert.equal(mapped.renderModel.kind,'watercolor');assert.equal(mapped.resultSignedUrl,'signed-qa');
+  assert.equal(mapPersistedMemoryCardRows([{...row,template_key:'unknown'}],new Map(),id(53)).length,0);
+ }
+ assert.equal(getWatercolorTemplate('unknown'),null);
+});
+
+test('all twelve painters hide date-only labels, calendar and ticket while retaining global labels and independent Film dates',()=>{
+ const record=(t,layout)=>{
+  const ops=[];
+  const context=new Proxy({measureText:text=>({width:text.length*10}),createPattern:()=>({}),createLinearGradient:()=>({addColorStop(){}})}, {get:(target,key)=>target[key]??((...args)=>ops.push([key,...args]))});
+  const text=layoutWatercolorText(t,layout,context);
+  paintWatercolorScene(context,{template:t,layout,appearance:DEFAULT_WATERCOLOR_APPEARANCE,images:new Map(),art:new Map(t.art.map(a=>[a.asset,a.asset])),text,errors:{}},1080);
+  return ops;
+ };
+ for(const t of WATERCOLOR_TEMPLATES){
+  const on=make(t),off=projectWatercolorLayout(t,mapping(t),setWatercolorTripDateDisplay(createWatercolorDraft(t,trip),false,trip));
+  const onOps=record(t,on),offOps=record(t,off),words=offOps.filter(op=>op[0]==='fillText').map(op=>op[1]);
+  for(const word of ['여행 기간','여행 날짜','날짜','TRIP','DATE','–','—','/','undefined','2026.09.11','2026.09.13'])assert.equal(words.includes(word),false,t.key+': '+word);
+  assert.ok(words.includes(t.displayName));
+  if(t.key==='postcard_duo')assert.ok(words.includes('장소'));
+  if(t.key==='scrapbook_trio')assert.ok(words.includes('짧은 한 줄 기록'));
+  if(t.key==='polaroid_moodboard'){
+   assert.ok(onOps.some(op=>op[0]==='roundRect'&&op[1]===713&&op[2]===1384));
+   assert.equal(offOps.some(op=>op[0]==='roundRect'&&op[1]===713&&op[2]===1384),false);
+   assert.equal(offOps.some(op=>op[0]==='quadraticCurveTo'),false,'date ticket is absent');
+  }
+  if(t.key==='film_contact_sheet'){
+   assert.ok(words.includes('FAMILY MEMORIES'));
+   off.dateValues['photo.fc1.date']='2026-09-12';const photoOn=record(t,off).filter(op=>op[0]==='fillText').map(op=>op[1]);
+   assert.equal(photoOn.filter(w=>w==='12 SEP').length,1);assert.equal(photoOn.filter(w=>w==='2026.09.12').length,1);
+  }
+ }
+});
+
+test('SQL17 extends only the CHECK and v4 cases; SQL15/16 and owner INSERT policy remain identical',async()=>{
+ const read=name=>readFile(new URL('../../../docs/data/'+name,import.meta.url),'utf8');
+ const [sql15,sql16,sql17]=await Promise.all(['15_MEMORY_CARD_TEMPLATE_TEXT_V4_MIGRATION.sql','16_MEMBER_PROFILE_TRANSFER_MIGRATION.sql','17_MEMORY_CARD_TEMPLATE_EXPANSION_MIGRATION.sql'].map(read));
+ assert.equal(createHash('sha256').update(sql16).digest('hex'),'d88c50921a5efc5794b957cfd16b9db10195ead69a274ce22d4c59b5edc2328f');
+ const fn=sql=>sql.slice(sql.indexOf('create or replace function'),sql.indexOf('\nrevoke all'));
+ const oldFunction=fn(sql15),newFunction=fn(sql17);
+ const newCases=newFunction.slice(newFunction.indexOf("    when 'double_memory'"),newFunction.indexOf('    else return false;'));
+ assert.equal(newFunction.replace(newCases,''),oldFunction,'original validation body unchanged');
+ assert.equal(sql17.slice(sql17.indexOf('drop policy')),sql15.slice(sql15.indexOf('drop policy')),'policy/privilege semantics unchanged');
+ const keys=[...sql17.split('template_key in (')[1].split(')')[0].matchAll(/'([^']+)'/g)].map(m=>m[1]);
+ assert.deepEqual(keys,WATERCOLOR_TEMPLATES.map(t=>t.key));
+ for(const t of WATERCOLOR_TEMPLATES){
+  const block=newFunction.split(`when '${t.key}' then`)[1].split(/\n    when |\n    else /)[0];
+  assert.deepEqual(JSON.parse(block.match(/text_rules := '(.*?)'::jsonb/)[1]),Object.fromEntries(t.fields.filter(f=>f.kind==='plainText').map(f=>[f.id,[f.maxCodePoints,f.maxLines]])));
+  const array=name=>[...block.match(new RegExp(name+' := array\\[(.*?)\\]'))[1].matchAll(/'([^']+)'/g)].map(m=>m[1]);
+  assert.deepEqual(array('slot_ids'),t.slots.map(s=>s.id));assert.deepEqual(array('date_keys'),t.fields.filter(f=>f.kind==='isoDate').map(f=>f.id));
+  assert.ok(block.includes(`primary_key := '${t.primary}'`));
+ }
+ assert.doesNotMatch(sql17.replace(/--[^\n]*/g,''),/security definer|for update|update public\.memory_cards|grant update|insert into|delete from/i);
 });

@@ -34,7 +34,7 @@
 ### Memory Card
 - 사진 직접 선택
 - 사진 랜덤 선택
-- 8개 template
+- 12개 template (Cards Final Template Expansion v2 승인: 기존 8종 + Double Memory / Triptych Story / Gallery Four / Hero Mosaic)
 - template slot에 사진 random mapping
 - 다시 섞기
 - 카드용 caption 변경

@@ -6,7 +6,11 @@ export type MemoryCardTemplateKey =
   | "scrapbook_trio"
   | "film_contact_sheet"
   | "one_moment"
-  | "instant_memory";
+  | "instant_memory"
+  | "double_memory"
+  | "triptych_story"
+  | "gallery_four"
+  | "hero_mosaic";
 
 export type MemoryCardPhotoSlot = {
   id: string;
