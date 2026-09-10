@@ -154,7 +154,7 @@ test("confirm overlays keep approved source geometry and accessible action targe
   assert.match(css, /\.boarding-confirm-action--secondary\s*\{[^}]*top:\s*89\.3033%[^}]*height:\s*5\.7597%/s);
 });
 
-test("confirm visual route reads only the fixed ignored reference path", async () => {
+test("confirm visual route loads only the fixed private visual", async () => {
   const route = await readFile(
     new URL("../../app/api/boarding-confirm-visual/route.ts", import.meta.url),
     "utf8",
@@ -162,7 +162,7 @@ test("confirm visual route reads only the fixed ignored reference path", async (
 
   assert.match(route, /serveLandingVisual as serveBoardingConfirmVisual/);
   assert.match(route, /resolveInviteTrip\(request\)/);
-  assert.match(route, /Jeonga_Fukuoka_Feedback03_Confirm_StartStyle_Approved_Target_v1\.png/);
+  assert.match(route, /loadPrivateVisual\("confirm"\)/);
   assert.doesNotMatch(route, /request\.(?:nextUrl|url|json|formData)/);
 });
 
